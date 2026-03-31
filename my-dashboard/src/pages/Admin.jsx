@@ -38,6 +38,18 @@ const initialVehicleForm = {
   status: "active",
 };
 
+const initialTripForm = {
+  tripCode: "",
+  routeId: "",
+  vehicleId: "",
+  departureTime: "",
+  expectedArrival: "",
+  actualArrival: "",
+  status: "scheduled",
+  delayMinutes: "",
+  notes: "",
+};
+
 export default function Admin() {
   const navigate = useNavigate();
   const { user, role } = useAuth();
@@ -47,14 +59,17 @@ export default function Admin() {
   const [routes, setRoutes] = useState([]);
   const [stops, setStops] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [trips, setTrips] = useState([]);
 
   const [routeForm, setRouteForm] = useState(initialRouteForm);
   const [stopForm, setStopForm] = useState(initialStopForm);
   const [vehicleForm, setVehicleForm] = useState(initialVehicleForm);
+  const [tripForm, setTripForm] = useState(initialTripForm);
 
   const [editingRouteId, setEditingRouteId] = useState(null);
   const [editingStopId, setEditingStopId] = useState(null);
   const [editingVehicleId, setEditingVehicleId] = useState(null);
+  const [editingTripId, setEditingTripId] = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -63,6 +78,7 @@ export default function Admin() {
     const routesQuery = query(collection(db, "routes"), orderBy("createdAt", "desc"));
     const stopsQuery = query(collection(db, "stops"), orderBy("createdAt", "desc"));
     const vehiclesQuery = query(collection(db, "vehicles"), orderBy("createdAt", "desc"));
+    const tripsQuery = query(collection(db, "trips"), orderBy("createdAt", "desc"));
 
     const unsubRoutes = onSnapshot(
       routesQuery,
@@ -96,10 +112,21 @@ export default function Admin() {
       }
     );
 
+    const unsubTrips = onSnapshot(
+      tripsQuery,
+      (snapshot) => {
+        setTrips(snapshot.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
+      },
+      (error) => {
+        console.error("Trips fetch error:", error);
+      }
+    );
+
     return () => {
       unsubRoutes();
       unsubStops();
       unsubVehicles();
+      unsubTrips();
     };
   }, []);
 
@@ -110,6 +137,19 @@ export default function Admin() {
     });
     return map;
   }, [routes]);
+
+  const vehicleMap = useMemo(() => {
+    const map = {};
+    vehicles.forEach((vehicle) => {
+      map[vehicle.id] = vehicle;
+    });
+    return map;
+  }, [vehicles]);
+
+  const filteredVehiclesForTrip = useMemo(() => {
+    if (!tripForm.routeId) return vehicles;
+    return vehicles.filter((vehicle) => vehicle.routeId === tripForm.routeId);
+  }, [vehicles, tripForm.routeId]);
 
   const showMessage = (text) => {
     setMessage(text);
@@ -138,6 +178,22 @@ export default function Admin() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleTripChange = (e) => {
+    const { name, value } = e.target;
+    setTripForm((prev) => {
+      const next = {
+        ...prev,
+        [name]: value,
+      };
+
+      if (name === "routeId" && prev.routeId !== value) {
+        next.vehicleId = "";
+      }
+
+      return next;
+    });
   };
 
   const submitRoute = async (e) => {
@@ -263,6 +319,55 @@ export default function Admin() {
     }
   };
 
+  const submitTrip = async (e) => {
+    e.preventDefault();
+
+    if (
+      !tripForm.tripCode.trim() ||
+      !tripForm.routeId ||
+      !tripForm.vehicleId ||
+      !tripForm.departureTime ||
+      !tripForm.expectedArrival ||
+      !tripForm.status
+    ) {
+      showMessage("Please fill in required trip fields.");
+      return;
+    }
+
+    const payload = {
+      tripCode: tripForm.tripCode.trim(),
+      routeId: tripForm.routeId,
+      vehicleId: tripForm.vehicleId,
+      departureTime: tripForm.departureTime,
+      expectedArrival: tripForm.expectedArrival,
+      actualArrival: tripForm.actualArrival || "",
+      status: tripForm.status,
+      delayMinutes: Number(tripForm.delayMinutes || 0),
+      notes: tripForm.notes.trim(),
+      updatedAt: serverTimestamp(),
+    };
+
+    try {
+      if (editingTripId) {
+        await updateDoc(doc(db, "trips", editingTripId), payload);
+        showMessage("Trip updated successfully.");
+      } else {
+        await addDoc(collection(db, "trips"), {
+          ...payload,
+          createdAt: serverTimestamp(),
+          createdBy: user?.uid || "",
+        });
+        showMessage("Trip added successfully.");
+      }
+
+      setTripForm(initialTripForm);
+      setEditingTripId(null);
+    } catch (error) {
+      console.error("Trip save error:", error);
+      showMessage("Failed to save trip.");
+    }
+  };
+
   const editRoute = (route) => {
     setActiveTab("routes");
     setEditingRouteId(route.id);
@@ -295,6 +400,22 @@ export default function Admin() {
       plateNumber: vehicle.plateNumber || "",
       routeId: vehicle.routeId || "",
       status: vehicle.status || "active",
+    });
+  };
+
+  const editTrip = (trip) => {
+    setActiveTab("trips");
+    setEditingTripId(trip.id);
+    setTripForm({
+      tripCode: trip.tripCode || "",
+      routeId: trip.routeId || "",
+      vehicleId: trip.vehicleId || "",
+      departureTime: trip.departureTime || "",
+      expectedArrival: trip.expectedArrival || "",
+      actualArrival: trip.actualArrival || "",
+      status: trip.status || "scheduled",
+      delayMinutes: trip.delayMinutes ?? "",
+      notes: trip.notes || "",
     });
   };
 
@@ -349,6 +470,23 @@ export default function Admin() {
     }
   };
 
+  const deleteTrip = async (id) => {
+    const confirmed = window.confirm("Delete this trip?");
+    if (!confirmed) return;
+
+    try {
+      await deleteDoc(doc(db, "trips", id));
+      showMessage("Trip deleted successfully.");
+      if (editingTripId === id) {
+        setEditingTripId(null);
+        setTripForm(initialTripForm);
+      }
+    } catch (error) {
+      console.error("Delete trip error:", error);
+      showMessage("Failed to delete trip.");
+    }
+  };
+
   const cancelRouteEdit = () => {
     setEditingRouteId(null);
     setRouteForm(initialRouteForm);
@@ -364,6 +502,11 @@ export default function Admin() {
     setVehicleForm(initialVehicleForm);
   };
 
+  const cancelTripEdit = () => {
+    setEditingTripId(null);
+    setTripForm(initialTripForm);
+  };
+
   return (
     <div
       style={{
@@ -375,7 +518,7 @@ export default function Admin() {
     >
       <div
         style={{
-          maxWidth: "1400px",
+          maxWidth: "1450px",
           margin: "0 auto",
           padding: "1.5rem",
         }}
@@ -462,12 +605,18 @@ export default function Admin() {
               active={activeTab === "vehicles"}
               onClick={() => setActiveTab("vehicles")}
             />
+            <TabButton
+              label="Trips"
+              active={activeTab === "trips"}
+              onClick={() => setActiveTab("trips")}
+            />
 
             <div style={{ marginTop: "1.2rem", color: "#94a3b8", fontSize: "0.95rem" }}>
               <p style={{ marginBottom: "0.5rem" }}>Quick Stats</p>
               <p style={{ margin: "0.25rem 0" }}>Routes: {routes.length}</p>
               <p style={{ margin: "0.25rem 0" }}>Stops: {stops.length}</p>
               <p style={{ margin: "0.25rem 0" }}>Vehicles: {vehicles.length}</p>
+              <p style={{ margin: "0.25rem 0" }}>Trips: {trips.length}</p>
             </div>
           </div>
 
@@ -562,11 +711,7 @@ export default function Admin() {
                         route.routeName || "-",
                         <div
                           key={`${route.id}-color`}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.5rem",
-                          }}
+                          style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
                         >
                           <span
                             style={{
@@ -824,6 +969,184 @@ export default function Admin() {
                     />
                   </div>
                 )}
+
+                {activeTab === "trips" && (
+                  <div>
+                    <h2 style={{ marginTop: 0 }}>Trips Management</h2>
+
+                    <form onSubmit={submitTrip} style={formCardStyle}>
+                      <div style={formGridStyle}>
+                        <div>
+                          <label style={labelStyle}>Trip Code</label>
+                          <input
+                            type="text"
+                            name="tripCode"
+                            value={tripForm.tripCode}
+                            onChange={handleTripChange}
+                            placeholder="e.g. TRIP-001"
+                            style={inputStyle}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Route</label>
+                          <select
+                            name="routeId"
+                            value={tripForm.routeId}
+                            onChange={handleTripChange}
+                            style={inputStyle}
+                          >
+                            <option value="">Select route</option>
+                            {routes.map((route) => (
+                              <option key={route.id} value={route.id}>
+                                {route.routeCode} - {route.routeName}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Vehicle</label>
+                          <select
+                            name="vehicleId"
+                            value={tripForm.vehicleId}
+                            onChange={handleTripChange}
+                            style={inputStyle}
+                          >
+                            <option value="">Select vehicle</option>
+                            {filteredVehiclesForTrip.map((vehicle) => (
+                              <option key={vehicle.id} value={vehicle.id}>
+                                {vehicle.vehicleCode} - {vehicle.plateNumber}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Departure Time</label>
+                          <input
+                            type="datetime-local"
+                            name="departureTime"
+                            value={tripForm.departureTime}
+                            onChange={handleTripChange}
+                            style={inputStyle}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Expected Arrival</label>
+                          <input
+                            type="datetime-local"
+                            name="expectedArrival"
+                            value={tripForm.expectedArrival}
+                            onChange={handleTripChange}
+                            style={inputStyle}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Actual Arrival</label>
+                          <input
+                            type="datetime-local"
+                            name="actualArrival"
+                            value={tripForm.actualArrival}
+                            onChange={handleTripChange}
+                            style={inputStyle}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Status</label>
+                          <select
+                            name="status"
+                            value={tripForm.status}
+                            onChange={handleTripChange}
+                            style={inputStyle}
+                          >
+                            <option value="scheduled">scheduled</option>
+                            <option value="active">active</option>
+                            <option value="delayed">delayed</option>
+                            <option value="completed">completed</option>
+                            <option value="cancelled">cancelled</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Delay Minutes</label>
+                          <input
+                            type="number"
+                            name="delayMinutes"
+                            value={tripForm.delayMinutes}
+                            onChange={handleTripChange}
+                            placeholder="e.g. 10"
+                            style={inputStyle}
+                          />
+                        </div>
+
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <label style={labelStyle}>Notes</label>
+                          <textarea
+                            name="notes"
+                            value={tripForm.notes}
+                            onChange={handleTripChange}
+                            placeholder="Trip notes"
+                            style={{ ...inputStyle, minHeight: "90px", resize: "vertical" }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                        <button type="submit" style={primaryButtonStyle}>
+                          {editingTripId ? "Update Trip" : "Add Trip"}
+                        </button>
+
+                        {editingTripId && (
+                          <button
+                            type="button"
+                            onClick={cancelTripEdit}
+                            style={secondaryButtonStyle}
+                          >
+                            Cancel Edit
+                          </button>
+                        )}
+                      </div>
+                    </form>
+
+                    <DataTable
+                      headers={[
+                        "Trip Code",
+                        "Route",
+                        "Vehicle",
+                        "Departure",
+                        "Expected Arrival",
+                        "Actual Arrival",
+                        "Status",
+                        "Delay",
+                        "Actions",
+                      ]}
+                      rows={trips.map((trip) => [
+                        trip.tripCode || "-",
+                        routeMap[trip.routeId]
+                          ? `${routeMap[trip.routeId].routeCode} - ${routeMap[trip.routeId].routeName}`
+                          : "Unassigned",
+                        vehicleMap[trip.vehicleId]
+                          ? `${vehicleMap[trip.vehicleId].vehicleCode} - ${vehicleMap[trip.vehicleId].plateNumber}`
+                          : "Unassigned",
+                        formatDateTime(trip.departureTime),
+                        formatDateTime(trip.expectedArrival),
+                        trip.actualArrival ? formatDateTime(trip.actualArrival) : "-",
+                        trip.status || "-",
+                        `${trip.delayMinutes ?? 0} mins`,
+                        <ActionButtons
+                          key={`${trip.id}-actions`}
+                          onEdit={() => editTrip(trip)}
+                          onDelete={() => deleteTrip(trip.id)}
+                        />,
+                      ])}
+                      emptyText="No trips yet."
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -831,6 +1154,13 @@ export default function Admin() {
       </div>
     </div>
   );
+}
+
+function formatDateTime(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
 }
 
 function TabButton({ label, active, onClick }) {
@@ -870,7 +1200,7 @@ function DataTable({ headers, rows, emptyText }) {
         style={{
           width: "100%",
           borderCollapse: "collapse",
-          minWidth: "900px",
+          minWidth: "1150px",
         }}
       >
         <thead>
