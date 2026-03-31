@@ -1,14 +1,22 @@
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+} from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import Papa from "papaparse";
 import L from "leaflet";
+import { useNavigate } from "react-router-dom";
 import { logoutUser } from "../firebase/auth";
 import { useAuth } from "../context/AuthContext";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
+  iconRetinaUrl:
+    "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
   shadowUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
 });
@@ -17,6 +25,7 @@ const TOMTOM_API_KEY = import.meta.env.VITE_TOMTOM_API_KEY;
 
 export default function Dashboard() {
   const { user, role } = useAuth();
+  const navigate = useNavigate();
   const [transitData, setTransitData] = useState([]);
   const [trafficLines, setTrafficLines] = useState([]);
 
@@ -105,41 +114,68 @@ export default function Dashboard() {
     : 0;
 
   return (
-    <div style={{ padding: "1rem", fontFamily: "Arial, sans-serif" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        padding: "1rem",
+        fontFamily: "Arial, sans-serif",
+        background: "#0b1020",
+        color: "white",
+      }}
+    >
       <div
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-start",
           marginBottom: "1rem",
           gap: "1rem",
           flexWrap: "wrap",
         }}
       >
         <div>
-          <h1 style={{ fontSize: "2rem", margin: 0 }}>Smart Transit Dashboard</h1>
+          <h1 style={{ fontSize: "2.5rem", margin: 0 }}>Smart Transit Dashboard</h1>
           <p style={{ margin: "0.5rem 0 0" }}>
             Logged in as: <strong>{user?.email || "Unknown"}</strong>
           </p>
           <p style={{ margin: "0.25rem 0 0" }}>
-            Role: <strong>{role || "No role found"}</strong>
+            Role: <strong>{role}</strong>
           </p>
         </div>
 
-        <button
-          onClick={logoutUser}
-          style={{
-            padding: "0.75rem 1rem",
-            border: "none",
-            borderRadius: "8px",
-            background: "#dc3545",
-            color: "#fff",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-        >
-          Logout
-        </button>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          {role === "admin" && (
+            <button
+              onClick={() => navigate("/admin")}
+              style={{
+                padding: "0.85rem 1.1rem",
+                border: "none",
+                borderRadius: "10px",
+                background: "#2563eb",
+                color: "#fff",
+                cursor: "pointer",
+                fontWeight: "bold",
+              }}
+            >
+              Admin Panel
+            </button>
+          )}
+
+          <button
+            onClick={logoutUser}
+            style={{
+              padding: "0.85rem 1.1rem",
+              border: "none",
+              borderRadius: "10px",
+              background: "#ef4444",
+              color: "#fff",
+              cursor: "pointer",
+              fontWeight: "bold",
+            }}
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
       <div
@@ -153,10 +189,10 @@ export default function Dashboard() {
         <div
           style={{
             padding: "1rem",
-            border: "1px solid #ccc",
-            borderRadius: "8px",
-            minWidth: "180px",
-            background: "#fff",
+            borderRadius: "12px",
+            minWidth: "220px",
+            background: "#f5f5f5",
+            color: "#111827",
           }}
         >
           Total Stops: {transitData.length}
@@ -165,10 +201,10 @@ export default function Dashboard() {
         <div
           style={{
             padding: "1rem",
-            border: "1px solid #ccc",
-            borderRadius: "8px",
-            minWidth: "180px",
-            background: "#fff",
+            borderRadius: "12px",
+            minWidth: "220px",
+            background: "#f5f5f5",
+            color: "#111827",
           }}
         >
           Total Passengers: {totalPassengers}
@@ -177,10 +213,10 @@ export default function Dashboard() {
         <div
           style={{
             padding: "1rem",
-            border: "1px solid #ccc",
-            borderRadius: "8px",
-            minWidth: "180px",
-            background: "#fff",
+            borderRadius: "12px",
+            minWidth: "220px",
+            background: "#f5f5f5",
+            color: "#111827",
           }}
         >
           Avg Delay: {avgDelay} mins
@@ -190,15 +226,15 @@ export default function Dashboard() {
       <div
         style={{
           marginBottom: "1rem",
-          border: "1px solid #ccc",
-          borderRadius: "8px",
+          borderRadius: "14px",
           overflow: "hidden",
+          border: "1px solid #1f2937",
         }}
       >
         <MapContainer
           center={[14.5547, 121.0244]}
           zoom={13}
-          style={{ height: "450px", width: "100%" }}
+          style={{ height: "560px", width: "100%" }}
         >
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
