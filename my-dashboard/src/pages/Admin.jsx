@@ -27,6 +27,8 @@ const initialStopForm = {
   latitude: "",
   longitude: "",
   routeId: "",
+  simulatedDelay: "",
+  simulatedPassengers: "",
 };
 
 const initialVehicleForm = {
@@ -193,6 +195,8 @@ export default function Admin() {
       latitude: Number(stopForm.latitude),
       longitude: Number(stopForm.longitude),
       routeId: stopForm.routeId,
+      simulatedDelay: Number(stopForm.simulatedDelay || 0),
+      simulatedPassengers: Number(stopForm.simulatedPassengers || 0),
       updatedAt: serverTimestamp(),
     };
 
@@ -278,6 +282,8 @@ export default function Admin() {
       latitude: stop.latitude ?? "",
       longitude: stop.longitude ?? "",
       routeId: stop.routeId || "",
+      simulatedDelay: stop.simulatedDelay ?? "",
+      simulatedPassengers: stop.simulatedPassengers ?? "",
     });
   };
 
@@ -646,6 +652,30 @@ export default function Admin() {
                             ))}
                           </select>
                         </div>
+
+                        <div>
+                          <label style={labelStyle}>Simulated Delay (mins)</label>
+                          <input
+                            type="number"
+                            name="simulatedDelay"
+                            value={stopForm.simulatedDelay}
+                            onChange={handleStopChange}
+                            placeholder="e.g. 5"
+                            style={inputStyle}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={labelStyle}>Simulated Passengers</label>
+                          <input
+                            type="number"
+                            name="simulatedPassengers"
+                            value={stopForm.simulatedPassengers}
+                            onChange={handleStopChange}
+                            placeholder="e.g. 60"
+                            style={inputStyle}
+                          />
+                        </div>
                       </div>
 
                       <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
@@ -666,7 +696,15 @@ export default function Admin() {
                     </form>
 
                     <DataTable
-                      headers={["Stop Name", "Latitude", "Longitude", "Route", "Actions"]}
+                      headers={[
+                        "Stop Name",
+                        "Latitude",
+                        "Longitude",
+                        "Route",
+                        "Delay",
+                        "Passengers",
+                        "Actions",
+                      ]}
                       rows={stops.map((stop) => [
                         stop.stopName || "-",
                         stop.latitude ?? "-",
@@ -674,6 +712,8 @@ export default function Admin() {
                         routeMap[stop.routeId]
                           ? `${routeMap[stop.routeId].routeCode} - ${routeMap[stop.routeId].routeName}`
                           : "Unassigned",
+                        stop.simulatedDelay ?? 0,
+                        stop.simulatedPassengers ?? 0,
                         <ActionButtons
                           key={`${stop.id}-actions`}
                           onEdit={() => editStop(stop)}
@@ -830,7 +870,7 @@ function DataTable({ headers, rows, emptyText }) {
         style={{
           width: "100%",
           borderCollapse: "collapse",
-          minWidth: "760px",
+          minWidth: "900px",
         }}
       >
         <thead>
