@@ -6,6 +6,7 @@ import {
   Popup,
   Polyline,
   CircleMarker,
+  useMapEvents,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import Papa from "papaparse";
@@ -54,20 +55,26 @@ const vehicleIcon = new L.DivIcon({
 
 const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
 
-const TRAFFIC_SAMPLE_POINTS = [
-  { id: "p1", name: "Makati Center", lat: 14.5547, lng: 121.0244 },
-  { id: "p2", name: "Ayala Area", lat: 14.56, lng: 121.03 },
-  { id: "p3", name: "Buendia Area", lat: 14.565, lng: 121.02 },
-  { id: "p4", name: "Magallanes Area", lat: 14.545, lng: 121.015 },
-  { id: "p5", name: "Gil Puyat Area", lat: 14.552, lng: 121.018 },
-  { id: "p6", name: "Legazpi Area", lat: 14.558, lng: 121.028 },
-];
-
 const TOMTOM_TRAFFIC_TILE_URL = TOMTOM_API_KEY
   ? `https://api.tomtom.com/traffic/map/4/tile/flow/relative0/{z}/{x}/{y}.png?key=${encodeURIComponent(
       TOMTOM_API_KEY
     )}`
   : "";
+
+const GTFS_FILES = [
+  "agency",
+  "calendar",
+  "feed_info",
+  "frequencies",
+  "routes",
+  "shapes",
+  "stop_times",
+  "stops",
+  "trips",
+];
+
+const MAX_GTFS_ROUTE_POLYLINE_POINTS = 900;
+const GTFS_AUTO_STOP_MARKERS_ZOOM = 14;
 
 export default function Dashboard() {
   const { user, role } = useAuth();
@@ -78,6 +85,10 @@ export default function Dashboard() {
   const [vehicles, setVehicles] = useState([]);
   const [trips, setTrips] = useState([]);
   const [predictions, setPredictions] = useState([]);
+
+  const [gtfsBundle, setGtfsBundle] = useState(null);
+  const [gtfsLoading, setGtfsLoading] = useState(true);
+  const [gtfsError, setGtfsError] = useState("");
 
   const [trafficSamples, setTrafficSamples] = useState([]);
   const [routeRoadPaths, setRouteRoadPaths] = useState([]);
@@ -96,8 +107,7 @@ export default function Dashboard() {
   const [showTrafficOverlay, setShowTrafficOverlay] = useState(true);
   const [lastTrafficUpdated, setLastTrafficUpdated] = useState(null);
   const [lastRoutingUpdated, setLastRoutingUpdated] = useState(null);
-
-  const [gtfsFallbackStops, setGtfsFallbackStops] = useState([]);
+  const [mapZoom, setMapZoom] = useState(13);
 
   useEffect(() => {
     const routesQuery = query(
@@ -200,35 +210,43 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    const loadGtfsFallbackStops = async () => {
+    const loadGtfsBundle = async () => {
+      setGtfsLoading(true);
+      setGtfsError("");
+
       try {
-        const res = await fetch("/gtfs/stops.txt");
-        const text = await res.text();
-        const parsed = Papa.parse(text, { header: true });
+        const fileResponses = await Promise.all(
+          GTFS_FILES.map(async (name) => {
+            const res = await fetch(`/gtfs/${name}.txt`);
+            if (!res.ok) {
+              throw new Error(`Failed to load /gtfs/${name}.txt`);
+            }
+            const text = await res.text();
+            const parsed = Papa.parse(text, {
+              header: true,
+              skipEmptyLines: true,
+              dynamicTyping: false,
+            });
+            return [name, parsed.data || []];
+          })
+        );
 
-        const formatted = parsed.data
-          .filter((s) => s.stop_lat && s.stop_lon)
-          .slice(0, 50)
-          .map((s, i) => ({
-            id: `gtfs-${i}`,
-            stopName: s.stop_name,
-            latitude: parseFloat(s.stop_lat),
-            longitude: parseFloat(s.stop_lon),
-            routeId: "",
-            simulatedDelay: Math.floor(Math.random() * 10),
-            simulatedPassengers: Math.floor(Math.random() * 100),
-          }));
-
-        setGtfsFallbackStops(formatted);
+        const raw = Object.fromEntries(fileResponses);
+        const built = buildGtfsBundle(raw);
+        setGtfsBundle(built);
       } catch (err) {
-        console.error("GTFS fallback load error:", err);
+        console.error("GTFS load error:", err);
+        setGtfsError(err.message || "Failed to load GTFS data.");
+        setGtfsBundle(null);
+      } finally {
+        setGtfsLoading(false);
       }
     };
 
-    loadGtfsFallbackStops();
+    loadGtfsBundle();
   }, []);
 
-  const routeMap = useMemo(() => {
+  const firestoreRouteMap = useMemo(() => {
     const map = {};
     routes.forEach((route) => {
       map[route.id] = route;
@@ -236,7 +254,7 @@ export default function Dashboard() {
     return map;
   }, [routes]);
 
-  const vehicleMap = useMemo(() => {
+  const firestoreVehicleMap = useMemo(() => {
     const map = {};
     vehicles.forEach((vehicle) => {
       map[vehicle.id] = vehicle;
@@ -244,16 +262,11 @@ export default function Dashboard() {
     return map;
   }, [vehicles]);
 
-  const activeRoutes = useMemo(
-    () => routes.filter((route) => route.active !== false),
-    [routes]
-  );
-
-  const routeGroupedStops = useMemo(() => {
+  const firestoreRouteGroupedStops = useMemo(() => {
     const grouped = {};
 
     stops.forEach((stop) => {
-      if (!stop.routeId || !routeMap[stop.routeId]) return;
+      if (!stop.routeId || !firestoreRouteMap[stop.routeId]) return;
       if (!grouped[stop.routeId]) grouped[stop.routeId] = [];
       grouped[stop.routeId].push(stop);
     });
@@ -272,11 +285,118 @@ export default function Dashboard() {
     });
 
     return grouped;
-  }, [stops, routeMap]);
+  }, [stops, firestoreRouteMap]);
+
+  const gtfsRouteMap = gtfsBundle?.routeMap || {};
+  const gtfsVehicleMap = {};
+
+  const hasFirestoreData =
+    routes.length > 0 || stops.length > 0 || vehicles.length > 0 || trips.length > 0;
+
+  const sourceMode = useFirestoreData && hasFirestoreData ? "firestore" : "gtfs";
+
+  const sourceRoutes = sourceMode === "firestore" ? routes : gtfsBundle?.routes || [];
+  const sourceStops = sourceMode === "firestore" ? stops : gtfsBundle?.stops || [];
+  const sourceTrips = sourceMode === "firestore" ? trips : gtfsBundle?.trips || [];
+  const sourceVehicles = sourceMode === "firestore" ? vehicles : [];
+  const sourceRouteMap = sourceMode === "firestore" ? firestoreRouteMap : gtfsRouteMap;
+  const sourceVehicleMap = sourceMode === "firestore" ? firestoreVehicleMap : gtfsVehicleMap;
+  const sourceGroupedStops =
+    sourceMode === "firestore"
+      ? firestoreRouteGroupedStops
+      : gtfsBundle?.routeGroupedStops || {};
+
+  const activeRoutes = useMemo(
+    () => sourceRoutes.filter((route) => route.active !== false),
+    [sourceRoutes]
+  );
+
+  useEffect(() => {
+    if (
+      sourceMode === "gtfs" &&
+      selectedRouteId === "all" &&
+      activeRoutes.length > 0
+    ) {
+      setSelectedRouteId(activeRoutes[0].id);
+    }
+  }, [sourceMode, selectedRouteId, activeRoutes]);
+
+  const filteredStops = useMemo(() => {
+    if (sourceMode === "gtfs" && selectedRouteId === "all") return [];
+    if (selectedRouteId === "all") return sourceStops;
+    return sourceStops.filter((stop) => stop.routeId === selectedRouteId);
+  }, [sourceStops, selectedRouteId, sourceMode]);
+
+  const filteredVehicles = useMemo(() => {
+    if (selectedRouteId === "all") return sourceVehicles;
+    return sourceVehicles.filter((vehicle) => vehicle.routeId === selectedRouteId);
+  }, [sourceVehicles, selectedRouteId]);
+
+  const filteredTrips = useMemo(() => {
+    if (selectedRouteId === "all") return sourceTrips;
+    return sourceTrips.filter((trip) => trip.routeId === selectedRouteId);
+  }, [sourceTrips, selectedRouteId]);
+
+  const buildTrafficSamplePoints = useMemo(() => {
+    if (sourceMode === "gtfs") return [];
+
+    const validStops = filteredStops.filter(
+      (stop) =>
+        stop.latitude !== undefined &&
+        stop.longitude !== undefined &&
+        !Number.isNaN(Number(stop.latitude)) &&
+        !Number.isNaN(Number(stop.longitude))
+    );
+
+    const base = validStops.length
+      ? validStops
+      : sourceStops.filter(
+          (stop) =>
+            stop.latitude !== undefined &&
+            stop.longitude !== undefined &&
+            !Number.isNaN(Number(stop.latitude)) &&
+            !Number.isNaN(Number(stop.longitude))
+        );
+
+    if (!base.length) {
+      return [
+        { id: "p1", name: "Makati Center", lat: 14.5547, lng: 121.0244 },
+        { id: "p2", name: "Ayala Area", lat: 14.56, lng: 121.03 },
+        { id: "p3", name: "Buendia Area", lat: 14.565, lng: 121.02 },
+      ];
+    }
+
+    const sampleCount = Math.min(6, base.length);
+    const step = Math.max(1, Math.floor(base.length / sampleCount));
+    const samples = [];
+
+    for (let index = 0; index < base.length && samples.length < sampleCount; index += step) {
+      const stop = base[index];
+      samples.push({
+        id: `sample-${stop.id}-${samples.length}`,
+        name: stop.stopName || stop.stop_name || `Stop ${samples.length + 1}`,
+        lat: Number(stop.latitude),
+        lng: Number(stop.longitude),
+      });
+    }
+
+    return samples;
+  }, [filteredStops, sourceStops, sourceMode]);
 
   const fetchTraffic = async () => {
+    if (sourceMode === "gtfs") {
+      setTrafficSamples([]);
+      setTrafficError("");
+      return;
+    }
+
     if (!TOMTOM_API_KEY) {
       setTrafficError("Missing TomTom API key.");
+      setTrafficSamples([]);
+      return;
+    }
+
+    if (!buildTrafficSamplePoints.length) {
       setTrafficSamples([]);
       return;
     }
@@ -286,7 +406,7 @@ export default function Dashboard() {
 
     try {
       const responses = await Promise.all(
-        TRAFFIC_SAMPLE_POINTS.map(async (point) => {
+        buildTrafficSamplePoints.map(async (point) => {
           const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?key=${encodeURIComponent(
             TOMTOM_API_KEY
           )}&point=${point.lat},${point.lng}`;
@@ -304,13 +424,6 @@ export default function Dashboard() {
           }
 
           const data = await res.json();
-
-          if (data.error) {
-            throw new Error(
-              data.error.description || "TomTom API returned an error."
-            );
-          }
-
           const segment = data?.flowSegmentData;
 
           if (!segment) {
@@ -351,13 +464,6 @@ export default function Dashboard() {
         })
       );
 
-      const usable = responses.filter((item) => item.usable);
-      if (!usable.length) {
-        setTrafficError(
-          "TomTom overlay is ready, but point-based traffic samples were not returned."
-        );
-      }
-
       setTrafficSamples(responses);
       setLastTrafficUpdated(new Date());
     } catch (err) {
@@ -370,6 +476,12 @@ export default function Dashboard() {
   };
 
   const fetchRoadSnappedRoutes = async () => {
+    if (sourceMode === "gtfs") {
+      setRoutingError("");
+      setLastRoutingUpdated(new Date());
+      return;
+    }
+
     if (!TOMTOM_API_KEY) {
       setRoutingError("Missing TomTom API key.");
       setRouteRoadPaths([]);
@@ -380,15 +492,20 @@ export default function Dashboard() {
     setRoutingError("");
 
     try {
-      const entries = Object.entries(routeGroupedStops);
+      const entries = Object.entries(sourceGroupedStops);
 
       if (!entries.length) {
         setRouteRoadPaths([]);
         return;
       }
 
+      const filteredEntries =
+        selectedRouteId === "all"
+          ? entries
+          : entries.filter(([routeId]) => routeId === selectedRouteId);
+
       const results = await Promise.all(
-        entries.map(async ([routeId, groupedStops]) => {
+        filteredEntries.map(async ([routeId, groupedStops]) => {
           const validStops = groupedStops.filter(
             (stop) =>
               stop.latitude !== undefined &&
@@ -405,11 +522,12 @@ export default function Dashboard() {
           if (validStops.length < 2) {
             return {
               routeId,
-              routeCode: routeMap[routeId]?.routeCode || "N/A",
-              routeName: routeMap[routeId]?.routeName || "Unnamed Route",
-              color: routeMap[routeId]?.color || "#2563eb",
+              routeCode: sourceRouteMap[routeId]?.routeCode || "N/A",
+              routeName: sourceRouteMap[routeId]?.routeName || "Unnamed Route",
+              color: sourceRouteMap[routeId]?.color || "#2563eb",
               positions: fallbackPositions,
               usedRoutingApi: false,
+              source: "stops",
               summary: null,
             };
           }
@@ -429,43 +547,20 @@ export default function Dashboard() {
 
           try {
             const res = await fetch(url);
-
             if (!res.ok) {
-              let errorText = "";
-              try {
-                errorText = await res.text();
-              } catch {
-                errorText = "";
-              }
-
-              console.error(`Routing failed for route ${routeId}:`, errorText);
-
               return {
                 routeId,
-                routeCode: routeMap[routeId]?.routeCode || "N/A",
-                routeName: routeMap[routeId]?.routeName || "Unnamed Route",
-                color: routeMap[routeId]?.color || "#2563eb",
+                routeCode: sourceRouteMap[routeId]?.routeCode || "N/A",
+                routeName: sourceRouteMap[routeId]?.routeName || "Unnamed Route",
+                color: sourceRouteMap[routeId]?.color || "#2563eb",
                 positions: fallbackPositions,
                 usedRoutingApi: false,
+                source: "stops",
                 summary: null,
               };
             }
 
             const data = await res.json();
-
-            if (data.error) {
-              console.error(`TomTom routing API error for route ${routeId}:`, data);
-              return {
-                routeId,
-                routeCode: routeMap[routeId]?.routeCode || "N/A",
-                routeName: routeMap[routeId]?.routeName || "Unnamed Route",
-                color: routeMap[routeId]?.color || "#2563eb",
-                positions: fallbackPositions,
-                usedRoutingApi: false,
-                summary: null,
-              };
-            }
-
             const firstRoute = data?.routes?.[0];
             const positions = (firstRoute?.legs || []).flatMap((leg) =>
               (leg.points || [])
@@ -479,36 +574,37 @@ export default function Dashboard() {
             );
 
             if (positions.length < 2) {
-              console.error(`No usable routing polyline for route ${routeId}:`, data);
               return {
                 routeId,
-                routeCode: routeMap[routeId]?.routeCode || "N/A",
-                routeName: routeMap[routeId]?.routeName || "Unnamed Route",
-                color: routeMap[routeId]?.color || "#2563eb",
+                routeCode: sourceRouteMap[routeId]?.routeCode || "N/A",
+                routeName: sourceRouteMap[routeId]?.routeName || "Unnamed Route",
+                color: sourceRouteMap[routeId]?.color || "#2563eb",
                 positions: fallbackPositions,
                 usedRoutingApi: false,
+                source: "stops",
                 summary: null,
               };
             }
 
             return {
               routeId,
-              routeCode: routeMap[routeId]?.routeCode || "N/A",
-              routeName: routeMap[routeId]?.routeName || "Unnamed Route",
-              color: routeMap[routeId]?.color || "#2563eb",
+              routeCode: sourceRouteMap[routeId]?.routeCode || "N/A",
+              routeName: sourceRouteMap[routeId]?.routeName || "Unnamed Route",
+              color: sourceRouteMap[routeId]?.color || "#2563eb",
               positions,
               usedRoutingApi: true,
+              source: "tomtom",
               summary: firstRoute.summary || null,
             };
-          } catch (err) {
-            console.error(`Routing exception for route ${routeId}:`, err);
+          } catch {
             return {
               routeId,
-              routeCode: routeMap[routeId]?.routeCode || "N/A",
-              routeName: routeMap[routeId]?.routeName || "Unnamed Route",
-              color: routeMap[routeId]?.color || "#2563eb",
+              routeCode: sourceRouteMap[routeId]?.routeCode || "N/A",
+              routeName: sourceRouteMap[routeId]?.routeName || "Unnamed Route",
+              color: sourceRouteMap[routeId]?.color || "#2563eb",
               positions: fallbackPositions,
               usedRoutingApi: false,
+              source: "stops",
               summary: null,
             };
           }
@@ -517,18 +613,16 @@ export default function Dashboard() {
 
       const usableResults = results.filter((item) => item.positions.length >= 2);
       setRouteRoadPaths(usableResults);
+      setLastRoutingUpdated(new Date());
 
-      const usedCount = usableResults.filter((item) => item.usedRoutingApi).length;
-      if (!usedCount && usableResults.length) {
+      if (!usableResults.some((item) => item.usedRoutingApi)) {
         setRoutingError(
-          "TomTom routing failed for the current route data, so the map is using straight-line fallback."
+          "TomTom routing could not build road-following lines, so the dashboard is using stop-to-stop fallback lines."
         );
       }
-
-      setLastRoutingUpdated(new Date());
     } catch (err) {
       console.error("Routing error:", err);
-      setRoutingError(err.message || "Failed to build road-following routes.");
+      setRoutingError(err.message || "Failed to build route lines.");
       setRouteRoadPaths([]);
     } finally {
       setRoutingLoading(false);
@@ -536,46 +630,54 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchTraffic();
+    if (sourceMode === "gtfs") {
+      setTrafficSamples([]);
+      setTrafficError("");
+      return;
+    }
 
-    const interval = setInterval(() => {
+    if (sourceStops.length > 0) {
       fetchTraffic();
-    }, 60000);
+      const interval = setInterval(() => {
+        fetchTraffic();
+      }, 60000);
 
-    return () => clearInterval(interval);
-  }, []);
+      return () => clearInterval(interval);
+    }
+
+    return undefined;
+  }, [sourceMode, sourceStops.length, selectedRouteId, buildTrafficSamplePoints.length]);
 
   useEffect(() => {
-    if (stops.length > 0 && routes.length > 0) {
+    if (sourceMode === "gtfs") {
+      setRoutingError("");
+      setLastRoutingUpdated(new Date());
+      return;
+    }
+
+    if (sourceStops.length > 0) {
       fetchRoadSnappedRoutes();
     } else {
       setRouteRoadPaths([]);
     }
-  }, [stops, routes]);
-
-  const filteredStops = useMemo(() => {
-    const sourceStops =
-      useFirestoreData && stops.length > 0 ? stops : gtfsFallbackStops;
-
-    if (selectedRouteId === "all") return sourceStops;
-    return sourceStops.filter((stop) => stop.routeId === selectedRouteId);
-  }, [useFirestoreData, stops, gtfsFallbackStops, selectedRouteId]);
-
-  const filteredVehicles = useMemo(() => {
-    if (selectedRouteId === "all") return vehicles;
-    return vehicles.filter((vehicle) => vehicle.routeId === selectedRouteId);
-  }, [vehicles, selectedRouteId]);
-
-  const filteredTrips = useMemo(() => {
-    if (selectedRouteId === "all") return trips;
-    return trips.filter((trip) => trip.routeId === selectedRouteId);
-  }, [trips, selectedRouteId]);
+  }, [sourceMode, selectedRouteId, sourceStops.length, routes.length]);
 
   const filteredRoutePaths = useMemo(() => {
+    if (sourceMode === "gtfs") {
+      if (selectedRouteId === "all") return [];
+
+      return (gtfsBundle?.routeShapePaths || [])
+        .filter((item) => item.routeId === selectedRouteId)
+        .map((item) => ({
+          ...item,
+          positions: simplifyPolyline(item.positions, MAX_GTFS_ROUTE_POLYLINE_POINTS),
+        }));
+    }
+
     return routeRoadPaths.filter(
       (item) => selectedRouteId === "all" || item.routeId === selectedRouteId
     );
-  }, [routeRoadPaths, selectedRouteId]);
+  }, [sourceMode, selectedRouteId, gtfsBundle, routeRoadPaths]);
 
   const trafficSummary = useMemo(() => {
     const usable = trafficSamples.filter((item) => item.usable);
@@ -612,14 +714,14 @@ export default function Dashboard() {
   }, [trafficSamples]);
 
   const totalPassengers = filteredStops.reduce(
-    (sum, stop) => sum + Number(stop.simulatedPassengers || 0),
+    (sum, stop) => sum + Number(stop.simulatedPassengers || stop.estimatedPassengers || 0),
     0
   );
 
   const avgStopDelay = filteredStops.length
     ? (
         filteredStops.reduce(
-          (sum, stop) => sum + Number(stop.simulatedDelay || 0),
+          (sum, stop) => sum + Number(stop.simulatedDelay || stop.averageDelay || 0),
           0
         ) / filteredStops.length
       ).toFixed(1)
@@ -634,7 +736,7 @@ export default function Dashboard() {
   ).length;
 
   const delayedTripsCount = filteredTrips.filter(
-    (trip) => trip.status === "delayed"
+    (trip) => trip.status === "delayed" || Number(trip.delayMinutes || 0) > 0
   ).length;
 
   const completedTripsCount = filteredTrips.filter(
@@ -659,8 +761,7 @@ export default function Dashboard() {
   const avgTripDelay = avgTripDelayValue.toFixed(1);
 
   const onTimeTripsCount = filteredTrips.filter(
-    (trip) =>
-      Number(trip.delayMinutes || 0) === 0 && trip.status !== "cancelled"
+    (trip) => Number(trip.delayMinutes || 0) === 0 && trip.status !== "cancelled"
   ).length;
 
   const onTimeRate = filteredTrips.length
@@ -694,18 +795,18 @@ export default function Dashboard() {
       }
     });
 
-    if (!bestRouteId || !routeMap[bestRouteId]) return null;
+    if (!bestRouteId || !sourceRouteMap[bestRouteId]) return null;
 
     return {
       routeId: bestRouteId,
-      routeCode: routeMap[bestRouteId].routeCode || "N/A",
-      routeName: routeMap[bestRouteId].routeName || "Unnamed Route",
+      routeCode: sourceRouteMap[bestRouteId].routeCode || "N/A",
+      routeName: sourceRouteMap[bestRouteId].routeName || "Unnamed Route",
       averageDelay: highestAverage.toFixed(1),
     };
-  }, [filteredTrips, routeMap]);
+  }, [filteredTrips, sourceRouteMap]);
 
   const currentPrediction = useMemo(() => {
-    const selectedRoute = selectedRouteId === "all" ? null : routeMap[selectedRouteId];
+    const selectedRoute = selectedRouteId === "all" ? null : sourceRouteMap[selectedRouteId];
     const now = new Date();
     const currentHour = now.getHours();
     const isRushHour =
@@ -730,17 +831,14 @@ export default function Dashboard() {
       score += 3;
       reasons.push("Road closure detected");
     }
-
     if (heavyTrafficCount > 0) {
       score += 2;
       reasons.push("Heavy traffic detected");
     }
-
     if (moderateTrafficCount > 1) {
       score += 1;
       reasons.push("Moderate traffic on multiple points");
     }
-
     if (avgTripDelayValue >= 10) {
       score += 2;
       reasons.push("Route has recent delays");
@@ -748,7 +846,6 @@ export default function Dashboard() {
       score += 1;
       reasons.push("Average delay is rising");
     }
-
     if (isRushHour) {
       score += 1;
       reasons.push("Rush hour");
@@ -761,30 +858,22 @@ export default function Dashboard() {
       return "Low";
     };
 
-    const predictedCongestion =
-      roadClosedCount > 0
-        ? "Very High"
-        : getLevel(
-            (heavyTrafficCount > 0 ? 3 : 0) +
-              (moderateTrafficCount > 1 ? 1 : 0) +
-              (isRushHour ? 1 : 0)
-          );
-
-    const predictedDelayRisk = getLevel(score);
-
     return {
       routeId: selectedRoute?.id || selectedRouteId || "all",
       routeCode: selectedRoute?.routeCode || "ALL",
       routeName: selectedRoute?.routeName || "All Routes",
-      predictedCongestion,
-      predictedDelayRisk,
+      predictedCongestion:
+        roadClosedCount > 0
+          ? "Very High"
+          : getLevel((heavyTrafficCount > 0 ? 3 : 0) + (moderateTrafficCount > 1 ? 1 : 0) + (isRushHour ? 1 : 0)),
+      predictedDelayRisk: getLevel(score),
       reason: reasons.length ? reasons : ["Normal operating conditions"],
       basedOnTrafficSamples: usableTraffic.length,
       basedOnAvgDelay: Number(avgTripDelay),
       generatedAt: new Date().toISOString(),
       score,
     };
-  }, [selectedRouteId, routeMap, trafficSamples, avgTripDelay, avgTripDelayValue]);
+  }, [selectedRouteId, sourceRouteMap, trafficSamples, avgTripDelay, avgTripDelayValue]);
 
   const savePredictionToFirestore = async () => {
     setPredictionSaving(true);
@@ -805,6 +894,7 @@ export default function Dashboard() {
         generatedAtText: new Date().toISOString(),
         score: currentPrediction.score,
         createdBy: user?.uid || null,
+        sourceMode,
       });
 
       setPredictionMessage("Prediction saved to Firestore.");
@@ -825,21 +915,23 @@ export default function Dashboard() {
           !Number.isNaN(Number(stop.latitude)) &&
           !Number.isNaN(Number(stop.longitude))
       );
-
       if (first) return [Number(first.latitude), Number(first.longitude)];
     }
 
+    if (sourceMode === "gtfs" && selectedRouteId !== "all") {
+      const selectedLine = filteredRoutePaths[0];
+      if (selectedLine?.positions?.length) return selectedLine.positions[0];
+    }
+
     return [14.5547, 121.0244];
-  }, [filteredStops]);
+  }, [filteredStops, filteredRoutePaths, sourceMode, selectedRouteId]);
 
   const renderVehiclePosition = (vehicle) => {
-    const routeStops = stops.filter((stop) => stop.routeId === vehicle.routeId);
+    const routeStops = sourceStops.filter((stop) => stop.routeId === vehicle.routeId);
     if (!routeStops.length) return null;
 
     const baseIndex =
-      vehicle.id
-        ?.split("")
-        .reduce((sum, char) => sum + char.charCodeAt(0), 0) || 0;
+      vehicle.id?.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) || 0;
 
     const sourceStop = routeStops[baseIndex % routeStops.length];
     const lat = Number(sourceStop.latitude);
@@ -860,6 +952,12 @@ export default function Dashboard() {
         : predictions.filter((item) => item.routeId === selectedRouteId);
     return items.slice(0, 5);
   }, [predictions, selectedRouteId]);
+
+  const isOverallLoading = sourceMode === "gtfs" ? gtfsLoading : loadingMapData;
+  const shouldShowGtfsSelectMessage =
+    sourceMode === "gtfs" && selectedRouteId === "all";
+  const shouldRenderStopMarkers =
+    sourceMode === "firestore" || mapZoom >= GTFS_AUTO_STOP_MARKERS_ZOOM;
 
   return (
     <div
@@ -948,12 +1046,14 @@ export default function Dashboard() {
         <div>
           <label style={filterLabelStyle}>Data Source</label>
           <select
-            value={useFirestoreData ? "firestore" : "gtfs"}
+            value={sourceMode}
             onChange={(e) => setUseFirestoreData(e.target.value === "firestore")}
             style={filterSelectStyle}
           >
-            <option value="firestore">Firestore Admin Data</option>
-            <option value="gtfs">GTFS Fallback</option>
+            <option value="firestore" disabled={!hasFirestoreData}>
+              Firestore Admin Data
+            </option>
+            <option value="gtfs">GTFS Full Dataset</option>
           </select>
         </div>
 
@@ -963,6 +1063,7 @@ export default function Dashboard() {
             value={showTrafficOverlay ? "on" : "off"}
             onChange={(e) => setShowTrafficOverlay(e.target.value === "on")}
             style={filterSelectStyle}
+            disabled={sourceMode === "gtfs"}
           >
             <option value="on">Show Traffic</option>
             <option value="off">Hide Traffic</option>
@@ -979,18 +1080,23 @@ export default function Dashboard() {
         >
           <button
             onClick={fetchTraffic}
-            disabled={trafficLoading || !TOMTOM_API_KEY}
-            style={primaryButtonStyle(trafficLoading ? "#475569" : "#10b981")}
+            disabled={trafficLoading || !TOMTOM_API_KEY || sourceMode === "gtfs"}
+            style={primaryButtonStyle(
+              trafficLoading || sourceMode === "gtfs" ? "#475569" : "#10b981"
+            )}
           >
             {trafficLoading ? "Refreshing Traffic..." : "Refresh Traffic"}
           </button>
 
           <button
             onClick={fetchRoadSnappedRoutes}
-            disabled={routingLoading || !TOMTOM_API_KEY}
+            disabled={
+              routingLoading ||
+              (sourceMode === "firestore" && !TOMTOM_API_KEY && sourceStops.length > 0)
+            }
             style={primaryButtonStyle(routingLoading ? "#475569" : "#2563eb")}
           >
-            {routingLoading ? "Building Routes..." : "Refresh Road Routes"}
+            {routingLoading ? "Building Routes..." : "Refresh Route Lines"}
           </button>
 
           <button
@@ -1003,22 +1109,71 @@ export default function Dashboard() {
         </div>
 
         <div style={{ color: "#cbd5e1", fontSize: "0.95rem" }}>
-          <div>Routes Loaded: {routes.length}</div>
-          <div>Stops Loaded: {stops.length}</div>
-          <div>Vehicles Loaded: {vehicles.length}</div>
-          <div>Trips Loaded: {trips.length}</div>
+          <div>Source Mode: {sourceMode.toUpperCase()}</div>
+          <div>Routes Loaded: {sourceRoutes.length}</div>
+          <div>Stops Loaded: {sourceStops.length}</div>
+          <div>Trips Loaded: {sourceTrips.length}</div>
+          <div>Vehicles Loaded: {sourceVehicles.length}</div>
           <div>
-            Traffic Updated:{" "}
-            {lastTrafficUpdated ? lastTrafficUpdated.toLocaleTimeString() : "—"}
+            GTFS Status: {gtfsLoading ? "Loading..." : gtfsError ? "Error" : gtfsBundle ? "Ready" : "Not Loaded"}
           </div>
           <div>
-            Routes Updated:{" "}
-            {lastRoutingUpdated ? lastRoutingUpdated.toLocaleTimeString() : "—"}
+            Traffic Updated: {lastTrafficUpdated ? lastTrafficUpdated.toLocaleTimeString() : "—"}
           </div>
+          <div>
+            Routes Updated: {lastRoutingUpdated ? lastRoutingUpdated.toLocaleTimeString() : "—"}
+          </div>
+          <div>Map Zoom: {mapZoom}</div>
         </div>
       </div>
 
+      {shouldShowGtfsSelectMessage && (
+        <div
+          style={{
+            marginBottom: "1rem",
+            background: "#3a2d00",
+            border: "1px solid #a16207",
+            color: "#fde68a",
+            borderRadius: "12px",
+            padding: "0.9rem 1rem",
+            fontWeight: "bold",
+          }}
+        >
+          GTFS mode is optimized to show one route at a time. Select a route first to display stops and shape lines.
+        </div>
+      )}
+
+      {sourceMode === "gtfs" && mapZoom < GTFS_AUTO_STOP_MARKERS_ZOOM && selectedRouteId !== "all" && (
+        <div
+          style={{
+            marginBottom: "1rem",
+            background: "#172554",
+            border: "1px solid #1d4ed8",
+            color: "#bfdbfe",
+            borderRadius: "12px",
+            padding: "0.9rem 1rem",
+            fontWeight: "bold",
+          }}
+        >
+          Zoom in to level {GTFS_AUTO_STOP_MARKERS_ZOOM}+ to show stop markers.
+        </div>
+      )}
+
       <div style={panelGridStyle}>
+        <div style={panelStyle}>
+          <h3 style={{ marginTop: 0 }}>GTFS Dataset Status</h3>
+          <SummaryRow label="Agency" value={gtfsBundle?.agencyName || "-"} />
+          <SummaryRow label="Feed Version" value={gtfsBundle?.feedVersion || "-"} />
+          <SummaryRow label="GTFS Routes" value={gtfsBundle?.routes.length || 0} />
+          <SummaryRow label="GTFS Stops" value={gtfsBundle?.stops.length || 0} />
+          <SummaryRow label="GTFS Trips" value={gtfsBundle?.trips.length || 0} />
+          <SummaryRow label="GTFS Shapes" value={gtfsBundle?.shapeCount || 0} />
+          <SummaryRow label="GTFS Stop Times" value={gtfsBundle?.stopTimeCount || 0} />
+          <div style={statusTextStyle(gtfsError)}>
+            {gtfsError || "The dashboard now reads routes, trips, stop_times, and shapes from your GTFS folder."}
+          </div>
+        </div>
+
         <div style={panelStyle}>
           <h3 style={{ marginTop: 0 }}>Traffic Summary</h3>
           <SummaryRow label="Usable Samples" value={trafficSummary.total} />
@@ -1038,40 +1193,21 @@ export default function Dashboard() {
 
         <div style={panelStyle}>
           <h3 style={{ marginTop: 0 }}>Routing Status</h3>
-          <SummaryRow label="Road Paths" value={filteredRoutePaths.length} />
+          <SummaryRow label="Route Lines" value={filteredRoutePaths.length} />
           <SummaryRow
             label="Using TomTom"
-            value={
-              filteredRoutePaths.filter((item) => item.usedRoutingApi).length
-            }
+            value={filteredRoutePaths.filter((item) => item.usedRoutingApi).length}
           />
           <SummaryRow
-            label="Fallback Straight"
-            value={
-              filteredRoutePaths.filter((item) => !item.usedRoutingApi).length
-            }
+            label="Using GTFS Shapes"
+            value={filteredRoutePaths.filter((item) => item.source === "gtfs-shapes").length}
           />
-          <SummaryRow label="Routing Loading" value={routingLoading ? "Yes" : "No"} />
+          <SummaryRow
+            label="Stop Fallback"
+            value={filteredRoutePaths.filter((item) => item.source === "stops").length}
+          />
           <div style={statusTextStyle(routingError)}>
-            {routingError || "Road-following route generation is running."}
-          </div>
-        </div>
-
-        <div style={panelStyle}>
-          <h3 style={{ marginTop: 0 }}>Prediction Status</h3>
-          <SummaryRow label="Predicted Congestion" value={currentPrediction.predictedCongestion} />
-          <SummaryRow label="Predicted Delay Risk" value={currentPrediction.predictedDelayRisk} />
-          <SummaryRow label="Prediction Score" value={currentPrediction.score} />
-          <SummaryRow
-            label="Traffic Samples"
-            value={currentPrediction.basedOnTrafficSamples}
-          />
-          <SummaryRow
-            label="Avg Delay Basis"
-            value={`${currentPrediction.basedOnAvgDelay} mins`}
-          />
-          <div style={statusTextStyle(predictionError)}>
-            {predictionError || predictionMessage || "Prediction system is running."}
+            {routingError || "Route visualization is ready."}
           </div>
         </div>
       </div>
@@ -1082,10 +1218,7 @@ export default function Dashboard() {
           <SummaryRow label="Route" value={`${currentPrediction.routeCode} - ${currentPrediction.routeName}`} />
           <SummaryRow label="Predicted Congestion" value={currentPrediction.predictedCongestion} />
           <SummaryRow label="Predicted Delay Risk" value={currentPrediction.predictedDelayRisk} />
-          <SummaryRow
-            label="Generated"
-            value={new Date(currentPrediction.generatedAt).toLocaleString()}
-          />
+          <SummaryRow label="Prediction Score" value={currentPrediction.score} />
           <div style={{ marginTop: "0.9rem", color: "#cbd5e1" }}>
             <strong style={{ color: "#fff" }}>Reasons:</strong>
             <ul style={{ marginTop: "0.5rem", paddingLeft: "1.25rem" }}>
@@ -1101,23 +1234,22 @@ export default function Dashboard() {
         <div style={panelStyle}>
           <h3 style={{ marginTop: 0 }}>Traffic Status</h3>
           <SummaryRow label="API Key" value={TOMTOM_API_KEY ? "Configured" : "Missing"} />
-          <SummaryRow label="Overlay" value={showTrafficOverlay ? "Visible" : "Hidden"} />
+          <SummaryRow label="Overlay" value={sourceMode === "gtfs" ? "Disabled in GTFS mode" : showTrafficOverlay ? "Visible" : "Hidden"} />
           <SummaryRow label="Loading" value={trafficLoading ? "Yes" : "No"} />
+          <SummaryRow label="Sample Points" value={buildTrafficSamplePoints.length} />
           <div style={statusTextStyle(trafficError)}>
-            {trafficError || "Traffic monitoring is running."}
+            {trafficError || (sourceMode === "gtfs" ? "Traffic is disabled in GTFS mode for performance." : "Traffic monitoring is running.")}
           </div>
         </div>
 
         <div style={panelStyle}>
-          <h3 style={{ marginTop: 0 }}>Prediction Legend</h3>
-          <LegendRow color="#22c55e" label="Low Risk" />
-          <LegendRow color="#f59e0b" label="Medium Risk" />
-          <LegendRow color="#ef4444" label="High Risk" />
-          <LegendRow color="#7c3aed" label="Very High Risk" />
-          <div style={{ marginTop: "0.9rem", color: "#cbd5e1", lineHeight: 1.6 }}>
-            <div>• Heavy traffic raises congestion score</div>
-            <div>• Recent delays raise delay risk</div>
-            <div>• Rush hour adds extra risk</div>
+          <h3 style={{ marginTop: 0 }}>Prediction Status</h3>
+          <SummaryRow label="Predicted Congestion" value={currentPrediction.predictedCongestion} />
+          <SummaryRow label="Predicted Delay Risk" value={currentPrediction.predictedDelayRisk} />
+          <SummaryRow label="Traffic Samples" value={currentPrediction.basedOnTrafficSamples} />
+          <SummaryRow label="Avg Delay Basis" value={`${currentPrediction.basedOnAvgDelay} mins`} />
+          <div style={statusTextStyle(predictionError)}>
+            {predictionError || predictionMessage || "Prediction system is running."}
           </div>
         </div>
       </div>
@@ -1130,7 +1262,7 @@ export default function Dashboard() {
           border: "1px solid #1f2937",
         }}
       >
-        {loadingMapData ? (
+        {isOverallLoading ? (
           <div
             style={{
               height: "560px",
@@ -1145,28 +1277,28 @@ export default function Dashboard() {
             Loading map data...
           </div>
         ) : (
-          <MapContainer
-            center={mapCenter}
-            zoom={13}
-            style={{ height: "560px", width: "100%" }}
-          >
+          <MapContainer center={mapCenter} zoom={13} style={{ height: "560px", width: "100%" }}>
+            <MapZoomHandler setMapZoom={setMapZoom} />
+            <MapRecenter center={mapCenter} />
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               attribution="&copy; OpenStreetMap contributors"
             />
 
-            {showTrafficOverlay && TOMTOM_TRAFFIC_TILE_URL && (
+            {sourceMode === "firestore" && showTrafficOverlay && TOMTOM_TRAFFIC_TILE_URL && (
               <TileLayer url={TOMTOM_TRAFFIC_TILE_URL} opacity={0.85} />
             )}
 
             {filteredRoutePaths.map((line) => (
               <Polyline
-                key={`route-road-${line.routeId}`}
+                key={`route-line-${line.routeId}`}
                 positions={line.positions}
+                smoothFactor={3}
+                noClip={true}
                 pathOptions={{
                   color: line.color,
-                  weight: 5,
-                  opacity: 0.95,
+                  weight: 4,
+                  opacity: 0.9,
                 }}
               >
                 <Popup>
@@ -1175,23 +1307,20 @@ export default function Dashboard() {
                       {line.routeCode} - {line.routeName}
                     </strong>
                     <br />
-                    Path Type: {line.usedRoutingApi ? "TomTom road route" : "Fallback line"}
+                    Line Source: {line.source || (line.usedRoutingApi ? "TomTom" : "Fallback")}
                     <br />
-                    Distance:{" "}
-                    {line.summary?.lengthInMeters
-                      ? `${(line.summary.lengthInMeters / 1000).toFixed(2)} km`
-                      : "N/A"}
+                    Distance: {line.summary?.lengthInMeters ? `${(line.summary.lengthInMeters / 1000).toFixed(2)} km` : "N/A"}
                     <br />
-                    Travel Time:{" "}
-                    {line.summary?.travelTimeInSeconds
-                      ? `${Math.round(line.summary.travelTimeInSeconds / 60)} mins`
-                      : "N/A"}
+                    Travel Time: {line.summary?.travelTimeInSeconds ? `${Math.round(line.summary.travelTimeInSeconds / 60)} mins` : "N/A"}
+                    <br />
+                    Points Rendered: {line.positions.length}
                   </div>
                 </Popup>
               </Polyline>
             ))}
 
-            {showTrafficOverlay &&
+            {sourceMode === "firestore" &&
+              showTrafficOverlay &&
               trafficSamples
                 .filter((sample) => sample.usable)
                 .map((sample) => (
@@ -1217,50 +1346,45 @@ export default function Dashboard() {
                         Free Flow Speed: {sample.freeFlowSpeed} km/h
                         <br />
                         Ratio: {(sample.ratio * 100).toFixed(0)}%
-                        <br />
-                        Confidence: {sample.confidence ?? "N/A"}
                       </div>
                     </Popup>
                   </CircleMarker>
                 ))}
 
-            {filteredStops.map((stop) => {
-              const lat = Number(stop.latitude);
-              const lng = Number(stop.longitude);
+            {shouldRenderStopMarkers &&
+              filteredStops.map((stop) => {
+                const lat = Number(stop.latitude);
+                const lng = Number(stop.longitude);
+                if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
 
-              if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+                return (
+                  <Marker key={stop.id} position={[lat, lng]} icon={stopIcon}>
+                    <Popup>
+                      <div>
+                        <strong>{stop.stopName || "Unnamed Stop"}</strong>
+                        <br />
+                        Route: {stop.routeId && sourceRouteMap[stop.routeId]
+                          ? `${sourceRouteMap[stop.routeId].routeCode} - ${sourceRouteMap[stop.routeId].routeName}`
+                          : "Unassigned"}
+                        <br />
+                        Stop Code: {stop.stopCode || "N/A"}
+                        <br />
+                        Sequence: {stop.stopOrder ?? stop.sequence ?? "N/A"}
+                        <br />
+                        Delay: {stop.simulatedDelay ?? stop.averageDelay ?? 0} min
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })}
 
-              return (
-                <Marker key={stop.id} position={[lat, lng]} icon={stopIcon}>
-                  <Popup>
-                    <div>
-                      <strong>{stop.stopName || "Unnamed Stop"}</strong>
-                      <br />
-                      Route:{" "}
-                      {stop.routeId && routeMap[stop.routeId]
-                        ? `${routeMap[stop.routeId].routeCode} - ${routeMap[stop.routeId].routeName}`
-                        : "Unassigned"}
-                      <br />
-                      Delay: {stop.simulatedDelay ?? 0} min
-                      <br />
-                      Passengers: {stop.simulatedPassengers ?? 0}
-                    </div>
-                  </Popup>
-                </Marker>
-              );
-            })}
-
-            {useFirestoreData &&
+            {sourceMode === "firestore" &&
               filteredVehicles.map((vehicle) => {
                 const pos = renderVehiclePosition(vehicle);
                 if (!pos) return null;
 
                 return (
-                  <Marker
-                    key={`vehicle-${vehicle.id}`}
-                    position={pos}
-                    icon={vehicleIcon}
-                  >
+                  <Marker key={`vehicle-${vehicle.id}`} position={pos} icon={vehicleIcon}>
                     <Popup>
                       <div>
                         <strong>{vehicle.vehicleCode || "Vehicle"}</strong>
@@ -1269,10 +1393,7 @@ export default function Dashboard() {
                         <br />
                         Status: {vehicle.status || "N/A"}
                         <br />
-                        Route:{" "}
-                        {vehicle.routeId && routeMap[vehicle.routeId]
-                          ? `${routeMap[vehicle.routeId].routeCode} - ${routeMap[vehicle.routeId].routeName}`
-                          : "Unassigned"}
+                        Route: {vehicle.routeId && sourceRouteMap[vehicle.routeId] ? `${sourceRouteMap[vehicle.routeId].routeCode} - ${sourceRouteMap[vehicle.routeId].routeName}` : "Unassigned"}
                       </div>
                     </Popup>
                   </Marker>
@@ -1296,14 +1417,8 @@ export default function Dashboard() {
           <h3 style={{ marginTop: 0 }}>Delay Insight</h3>
           {mostDelayedRoute ? (
             <>
-              <SummaryRow
-                label="Most Delayed Route"
-                value={`${mostDelayedRoute.routeCode} - ${mostDelayedRoute.routeName}`}
-              />
-              <SummaryRow
-                label="Avg Delay"
-                value={`${mostDelayedRoute.averageDelay} mins`}
-              />
+              <SummaryRow label="Most Delayed Route" value={`${mostDelayedRoute.routeCode} - ${mostDelayedRoute.routeName}`} />
+              <SummaryRow label="Avg Delay" value={`${mostDelayedRoute.averageDelay} mins`} />
             </>
           ) : (
             <p style={{ margin: 0, color: "#cbd5e1" }}>No route delay data yet.</p>
@@ -1315,11 +1430,11 @@ export default function Dashboard() {
         <div style={panelStyle}>
           <h3 style={{ marginTop: 0 }}>Map Notes</h3>
           <div style={{ color: "#cbd5e1", lineHeight: 1.7 }}>
-            <div>• Blue markers = stops</div>
-            <div>• Red markers = vehicles</div>
-            <div>• Colored route lines = TomTom road-following route paths</div>
+            <div>• Blue markers = route stops</div>
+            <div>• Red markers = Firestore vehicles</div>
+            <div>• Colored route lines = GTFS shapes or TomTom route lines</div>
             <div>• TomTom overlay = real traffic road colors</div>
-            <div>• Sample dots = traffic stats points</div>
+            <div>• Sample dots = live traffic query points</div>
           </div>
         </div>
       </div>
@@ -1331,13 +1446,7 @@ export default function Dashboard() {
             <p style={{ margin: 0, color: "#cbd5e1" }}>No predictions saved yet.</p>
           ) : (
             recentPredictions.map((item) => (
-              <div
-                key={item.id}
-                style={{
-                  padding: "0.75rem 0",
-                  borderBottom: "1px solid #1f2937",
-                }}
-              >
+              <div key={item.id} style={{ padding: "0.75rem 0", borderBottom: "1px solid #1f2937" }}>
                 <div style={{ fontWeight: "bold" }}>
                   {item.routeCode || "N/A"} - {item.routeName || "Unnamed Route"}
                 </div>
@@ -1364,27 +1473,21 @@ export default function Dashboard() {
         <div style={panelStyle}>
           <h3 style={{ marginTop: 0 }}>Route Summary</h3>
           {activeRoutes.length === 0 ? (
-            <p style={{ margin: 0, color: "#cbd5e1" }}>No routes added yet.</p>
+            <p style={{ margin: 0, color: "#cbd5e1" }}>No routes available.</p>
           ) : (
             activeRoutes.map((route) => (
-              <div
-                key={route.id}
-                style={{
-                  padding: "0.75rem 0",
-                  borderBottom: "1px solid #1f2937",
-                }}
-              >
+              <div key={route.id} style={{ padding: "0.75rem 0", borderBottom: "1px solid #1f2937" }}>
                 <div style={{ fontWeight: "bold" }}>
                   {route.routeCode} - {route.routeName}
                 </div>
                 <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
-                  Stops: {stops.filter((stop) => stop.routeId === route.id).length}
+                  Stops: {sourceStops.filter((stop) => stop.routeId === route.id).length}
                 </div>
                 <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
-                  Vehicles: {vehicles.filter((vehicle) => vehicle.routeId === route.id).length}
+                  Trips: {sourceTrips.filter((trip) => trip.routeId === route.id).length}
                 </div>
                 <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
-                  Trips: {trips.filter((trip) => trip.routeId === route.id).length}
+                  Vehicles: {sourceVehicles.filter((vehicle) => vehicle.routeId === route.id).length}
                 </div>
               </div>
             ))
@@ -1394,33 +1497,21 @@ export default function Dashboard() {
         <div style={panelStyle}>
           <h3 style={{ marginTop: 0 }}>Recent Trips</h3>
           {recentTrips.length === 0 ? (
-            <p style={{ margin: 0, color: "#cbd5e1" }}>No trips added yet.</p>
+            <p style={{ margin: 0, color: "#cbd5e1" }}>No trips available.</p>
           ) : (
             recentTrips.map((trip) => (
-              <div
-                key={trip.id}
-                style={{
-                  padding: "0.75rem 0",
-                  borderBottom: "1px solid #1f2937",
-                }}
-              >
+              <div key={trip.id} style={{ padding: "0.75rem 0", borderBottom: "1px solid #1f2937" }}>
                 <div style={{ fontWeight: "bold" }}>
-                  {trip.tripCode || "Unnamed Trip"}
+                  {trip.tripCode || trip.tripHeadsign || "Unnamed Trip"}
                 </div>
                 <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
-                  Route:{" "}
-                  {routeMap[trip.routeId]
-                    ? `${routeMap[trip.routeId].routeCode} - ${routeMap[trip.routeId].routeName}`
-                    : "Unassigned"}
+                  Route: {sourceRouteMap[trip.routeId] ? `${sourceRouteMap[trip.routeId].routeCode} - ${sourceRouteMap[trip.routeId].routeName}` : "Unassigned"}
                 </div>
                 <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
-                  Vehicle:{" "}
-                  {vehicleMap[trip.vehicleId]
-                    ? `${vehicleMap[trip.vehicleId].vehicleCode} - ${vehicleMap[trip.vehicleId].plateNumber}`
-                    : "Unassigned"}
+                  Vehicle: {sourceVehicleMap[trip.vehicleId] ? `${sourceVehicleMap[trip.vehicleId].vehicleCode} - ${sourceVehicleMap[trip.vehicleId].plateNumber}` : sourceMode === "gtfs" ? "GTFS scheduled trip" : "Unassigned"}
                 </div>
                 <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
-                  Status: <strong>{trip.status || "-"}</strong>
+                  Status: <strong>{trip.status || "scheduled"}</strong>
                 </div>
                 <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
                   ETA / Schedule: {getTripTimingLabel(trip)}
@@ -1435,6 +1526,275 @@ export default function Dashboard() {
       </div>
     </div>
   );
+}
+
+function buildGtfsBundle(raw) {
+  const routesRaw = (raw.routes || []).filter((item) => item.route_id);
+  const stopsRaw = (raw.stops || []).filter((item) => item.stop_id && item.stop_lat && item.stop_lon);
+  const tripsRaw = (raw.trips || []).filter((item) => item.trip_id && item.route_id);
+  const stopTimesRaw = (raw.stop_times || []).filter((item) => item.trip_id && item.stop_id);
+  const shapesRaw = (raw.shapes || []).filter((item) => item.shape_id && item.shape_pt_lat && item.shape_pt_lon);
+
+  const stopsById = {};
+  const routes = routesRaw.map((route, index) => {
+    const color = normalizeRouteColor(route.route_color, index);
+    return {
+      id: route.route_id,
+      routeCode: route.route_short_name || route.route_id,
+      routeName: route.route_long_name || route.route_desc || `Route ${route.route_id}`,
+      color,
+      active: true,
+      routeType: route.route_type || "N/A",
+      agencyId: route.agency_id || "",
+      raw: route,
+    };
+  });
+
+  const routeMap = Object.fromEntries(routes.map((route) => [route.id, route]));
+
+  const stopTimesByTrip = {};
+  stopTimesRaw.forEach((item) => {
+    if (!stopTimesByTrip[item.trip_id]) stopTimesByTrip[item.trip_id] = [];
+    stopTimesByTrip[item.trip_id].push(item);
+  });
+  Object.values(stopTimesByTrip).forEach((items) => {
+    items.sort(
+      (a, b) =>
+        Number(a.stop_sequence || 999999) - Number(b.stop_sequence || 999999)
+    );
+  });
+
+  const stops = stopsRaw.map((stop) => {
+    const formatted = {
+      id: stop.stop_id,
+      stopId: stop.stop_id,
+      stopCode: stop.stop_code || stop.stop_id,
+      stopName: stop.stop_name || stop.stop_id,
+      latitude: Number(stop.stop_lat),
+      longitude: Number(stop.stop_lon),
+      routeId: null,
+      sequence: null,
+      simulatedDelay: 0,
+      simulatedPassengers: 0,
+      raw: stop,
+    };
+    stopsById[stop.stop_id] = formatted;
+    return formatted;
+  });
+
+  const shapesById = {};
+  shapesRaw.forEach((shape) => {
+    if (!shapesById[shape.shape_id]) shapesById[shape.shape_id] = [];
+    shapesById[shape.shape_id].push(shape);
+  });
+  Object.values(shapesById).forEach((items) => {
+    items.sort(
+      (a, b) =>
+        Number(a.shape_pt_sequence || 999999) - Number(b.shape_pt_sequence || 999999)
+    );
+  });
+
+  const trips = tripsRaw.map((trip, index) => {
+    const orderedStopTimes = stopTimesByTrip[trip.trip_id] || [];
+    const firstStopTime = orderedStopTimes[0];
+    const lastStopTime = orderedStopTimes[orderedStopTimes.length - 1];
+    const delayMinutes = deterministicNumber(`${trip.trip_id}-delay`, 0, 12);
+
+    return {
+      id: trip.trip_id,
+      tripId: trip.trip_id,
+      tripCode: trip.trip_short_name || trip.trip_id,
+      tripHeadsign: trip.trip_headsign || "",
+      routeId: trip.route_id,
+      serviceId: trip.service_id || "",
+      shapeId: trip.shape_id || "",
+      status: delayMinutes >= 8 ? "delayed" : "scheduled",
+      delayMinutes,
+      departureTime: firstStopTime?.departure_time ? toTodayDateTime(firstStopTime.departure_time) : null,
+      expectedArrival: lastStopTime?.arrival_time ? toTodayDateTime(lastStopTime.arrival_time) : null,
+      stopCount: orderedStopTimes.length,
+      displayOrder: index,
+      raw: trip,
+    };
+  });
+
+  const representativeTripPerRoute = {};
+  trips.forEach((trip) => {
+    const current = representativeTripPerRoute[trip.routeId];
+    if (!current || trip.stopCount > current.stopCount) {
+      representativeTripPerRoute[trip.routeId] = trip;
+    }
+  });
+
+  const routeGroupedStops = {};
+  const routeStopAssigned = new Set();
+
+  Object.entries(representativeTripPerRoute).forEach(([routeId, trip]) => {
+    const orderedStopTimes = stopTimesByTrip[trip.tripId] || [];
+    const items = orderedStopTimes
+      .map((stopTime) => {
+        const stop = stopsById[stopTime.stop_id];
+        if (!stop) return null;
+        const sequence = Number(stopTime.stop_sequence || 0);
+        const stopItem = {
+          ...stop,
+          routeId,
+          sequence,
+          stopOrder: sequence,
+          simulatedDelay: deterministicNumber(`${routeId}-${stop.id}-delay`, 0, 8),
+          simulatedPassengers: deterministicNumber(`${routeId}-${stop.id}-passengers`, 10, 120),
+        };
+        routeStopAssigned.add(stop.id);
+        return stopItem;
+      })
+      .filter(Boolean);
+
+    routeGroupedStops[routeId] = items;
+  });
+
+  const unassignedStops = stops
+    .filter((stop) => !routeStopAssigned.has(stop.id))
+    .map((stop) => ({
+      ...stop,
+      simulatedDelay: deterministicNumber(`${stop.id}-delay`, 0, 8),
+      simulatedPassengers: deterministicNumber(`${stop.id}-passengers`, 10, 120),
+    }));
+
+  const routeShapePaths = Object.entries(representativeTripPerRoute)
+    .map(([routeId, trip]) => {
+      const shapePoints = trip.shapeId ? shapesById[trip.shapeId] || [] : [];
+      const positions = shapePoints.length
+        ? shapePoints.map((point) => [Number(point.shape_pt_lat), Number(point.shape_pt_lon)])
+        : (routeGroupedStops[routeId] || []).map((stop) => [Number(stop.latitude), Number(stop.longitude)]);
+
+      if (positions.length < 2) return null;
+
+      return {
+        routeId,
+        routeCode: routeMap[routeId]?.routeCode || routeId,
+        routeName: routeMap[routeId]?.routeName || routeId,
+        color: routeMap[routeId]?.color || "#2563eb",
+        positions,
+        usedRoutingApi: false,
+        source: shapePoints.length ? "gtfs-shapes" : "stops",
+        summary: shapePoints.length ? { lengthInMeters: estimatePolylineMeters(positions) } : null,
+      };
+    })
+    .filter(Boolean);
+
+  const simplifiedRouteShapePaths = routeShapePaths.map((item) => ({
+    ...item,
+    positions: simplifyPolyline(item.positions, MAX_GTFS_ROUTE_POLYLINE_POINTS),
+  }));
+
+  const allStops = [
+    ...Object.values(routeGroupedStops).flat(),
+    ...unassignedStops,
+  ];
+
+  return {
+    routes,
+    stops: allStops,
+    trips,
+    routeMap,
+    routeGroupedStops,
+    routeShapePaths: simplifiedRouteShapePaths,
+    shapeCount: Object.keys(shapesById).length,
+    stopTimeCount: stopTimesRaw.length,
+    agencyName: raw.agency?.[0]?.agency_name || "GTFS Feed",
+    feedVersion: raw.feed_info?.[0]?.feed_version || raw.feed_info?.[0]?.feed_publisher_name || "-",
+  };
+}
+
+function deterministicNumber(seedText, min, max) {
+  let hash = 0;
+  for (let i = 0; i < seedText.length; i += 1) {
+    hash = (hash * 31 + seedText.charCodeAt(i)) % 1000000007;
+  }
+  const range = max - min + 1;
+  return min + (hash % range);
+}
+
+function normalizeRouteColor(color, index) {
+  const cleaned = String(color || "").trim().replace("#", "");
+  if (/^[0-9a-fA-F]{6}$/.test(cleaned)) return `#${cleaned}`;
+  const palette = ["#2563eb", "#16a34a", "#dc2626", "#7c3aed", "#f59e0b", "#0891b2"];
+  return palette[index % palette.length];
+}
+
+function toTodayDateTime(gtfsTime) {
+  if (!gtfsTime || !String(gtfsTime).includes(":")) return null;
+  const [hoursText, minutesText, secondsText = "0"] = String(gtfsTime).split(":");
+  const totalHours = Number(hoursText || 0);
+  const minutes = Number(minutesText || 0);
+  const seconds = Number(secondsText || 0);
+  const date = new Date();
+  date.setHours(totalHours % 24, minutes, seconds, 0);
+  if (totalHours >= 24) {
+    date.setDate(date.getDate() + Math.floor(totalHours / 24));
+  }
+  return date.toISOString();
+}
+
+function estimatePolylineMeters(positions) {
+  let total = 0;
+  for (let i = 1; i < positions.length; i += 1) {
+    total += haversineMeters(positions[i - 1], positions[i]);
+  }
+  return Math.round(total);
+}
+
+function haversineMeters(a, b) {
+  const toRad = (value) => (value * Math.PI) / 180;
+  const [lat1, lon1] = a;
+  const [lat2, lon2] = b;
+  const earthRadius = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const q =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(q), Math.sqrt(1 - q));
+  return earthRadius * c;
+}
+
+function simplifyPolyline(points, maxPoints = 900) {
+  if (!Array.isArray(points) || points.length <= maxPoints) return points || [];
+  const step = Math.ceil(points.length / maxPoints);
+  const simplified = [];
+  for (let i = 0; i < points.length; i += step) {
+    simplified.push(points[i]);
+  }
+  const lastPoint = points[points.length - 1];
+  const lastSimplified = simplified[simplified.length - 1];
+  if (
+    !lastSimplified ||
+    lastSimplified[0] !== lastPoint[0] ||
+    lastSimplified[1] !== lastPoint[1]
+  ) {
+    simplified.push(lastPoint);
+  }
+  return simplified;
+}
+
+function MapZoomHandler({ setMapZoom }) {
+  useMapEvents({
+    zoomend(event) {
+      setMapZoom(event.target.getZoom());
+    },
+  });
+  return null;
+}
+
+function MapRecenter({ center }) {
+  const map = useMapEvents({});
+  useEffect(() => {
+    if (center && Array.isArray(center)) {
+      map.setView(center, map.getZoom(), { animate: false });
+    }
+  }, [center, map]);
+  return null;
 }
 
 function StatCard({ label, value }) {
@@ -1474,37 +1834,6 @@ function SummaryRow({ label, value }) {
   );
 }
 
-function LegendRow({ color, label }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "0.75rem",
-        marginBottom: "0.8rem",
-        color: "#cbd5e1",
-      }}
-    >
-      <div
-        style={{
-          width: "38px",
-          height: "8px",
-          borderRadius: "999px",
-          background: color,
-        }}
-      />
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function formatDateTime(value) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
 function formatTimestamp(ts, fallbackText) {
   if (ts?.seconds) {
     return new Date(ts.seconds * 1000).toLocaleString();
@@ -1519,26 +1848,19 @@ function formatTimestamp(ts, fallbackText) {
 
 function getTripTimingLabel(trip) {
   const now = new Date();
-
   const departure = trip.departureTime ? new Date(trip.departureTime) : null;
   const expected = trip.expectedArrival ? new Date(trip.expectedArrival) : null;
   const actual = trip.actualArrival ? new Date(trip.actualArrival) : null;
 
   if (trip.status === "cancelled") return "Cancelled";
-  if (trip.status === "completed" && actual) {
-    return `Completed at ${actual.toLocaleString()}`;
-  }
+  if (trip.status === "completed" && actual) return `Completed at ${actual.toLocaleString()}`;
   if (trip.status === "completed") return "Completed";
-  if (trip.status === "delayed") {
-    return `Delayed by ${trip.delayMinutes || 0} mins`;
-  }
+  if (trip.status === "delayed") return `Delayed by ${trip.delayMinutes || 0} mins`;
   if (trip.status === "scheduled" && departure && departure > now) {
     return `Departs ${departure.toLocaleString()}`;
   }
   if (trip.status === "active" && expected) {
-    const diffMs = expected.getTime() - now.getTime();
-    const diffMins = Math.round(diffMs / 60000);
-
+    const diffMins = Math.round((expected.getTime() - now.getTime()) / 60000);
     if (diffMins > 0) return `ETA in ${diffMins} mins`;
     if (diffMins === 0) return "Arriving now";
     return `Past ETA by ${Math.abs(diffMins)} mins`;
