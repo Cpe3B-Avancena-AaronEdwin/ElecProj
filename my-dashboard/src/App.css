@@ -108,12 +108,13 @@
 html, body, #root {
   height: 100%;
   margin: 0;
+  background: #f5f7fb;
 }
 
 .app {
   display: flex;
-  height: 100vh;
-  background: var(--bg-main) !important;
+  min-height: 100vh;
+  background: #f5f7fb !important;
   color: var(--text-main);
 }
 

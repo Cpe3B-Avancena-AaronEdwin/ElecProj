@@ -29,8 +29,8 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-wrapper login-background">
-      <div className="auth-card login-card">
+    <div className="auth-wrapper">
+      <div className="auth-card">
         <div className="login-brand">
           <div className="brand-mark" aria-hidden="true">
             🚍
