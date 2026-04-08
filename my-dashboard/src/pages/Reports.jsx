@@ -1,25 +1,20 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 import { useFirestoreTransitData } from "../hooks/useFirestoreTransitData";
 import { useGtfsBundle } from "../hooks/useGtfsBundle";
 import { useTrafficData } from "../hooks/useTrafficData";
-import { useRouteLines } from "../hooks/useRouteLines";
 import { useDashboardMetrics } from "../hooks/useDashboardMetrics";
 
-import DashboardHeader from "../components/dashboard/DashboardHeader";
-import DashboardStats from "../components/dashboard/DashboardStats";
-import GtfsStatusPanel from "../components/dashboard/GtfsStatusPanel";
+import TripStatusSummaryPanel from "../components/dashboard/TripStatusSummaryPanel";
+import DelayInsightPanel from "../components/dashboard/DelayInsightPanel";
+import RecentPredictionsPanel from "../components/dashboard/RecentPredictionsPanel";
 import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
-import CurrentPredictionPanel from "../components/dashboard/CurrentPredictionPanel";
-import TrafficStatusPanel from "../components/dashboard/TrafficStatusPanel";
 
 import Layout from "../components/Layout";
 
-export default function Dashboard() {
-  const { user, role } = useAuth();
-  const navigate = useNavigate();
+export default function Reports() {
+  const { user } = useAuth();
 
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
 
@@ -28,6 +23,7 @@ export default function Dashboard() {
     stops = [],
     vehicles = [],
     trips = [],
+    predictions = [],
     loadingMapData,
   } = useFirestoreTransitData();
 
@@ -45,11 +41,6 @@ export default function Dashboard() {
   const sourceStops = sourceMode === "firestore" ? stops : gtfsBundle?.stops || [];
   const sourceTrips = sourceMode === "firestore" ? trips : gtfsBundle?.trips || [];
   const sourceVehicles = sourceMode === "firestore" ? vehicles : [];
-
-  const activeRoutes = useMemo(
-    () => sourceRoutes.filter((route) => route.active !== false),
-    [sourceRoutes]
-  );
 
   const filteredStops = useMemo(() => {
     if (sourceMode === "gtfs" && selectedRouteId === "all") return [];
@@ -77,18 +68,7 @@ export default function Dashboard() {
     trafficSamples = [],
     trafficSummary,
     trafficLoading,
-    refreshTraffic,
-    trafficError,
-    lastTrafficUpdated,
   } = useTrafficData(filteredStops, TOMTOM_API_KEY, sourceMode);
-
-  const {
-    routePaths = [],
-    refreshRouteLines,
-    routingLoading,
-    routingError,
-    lastRoutingUpdated,
-  } = useRouteLines(filteredStops, TOMTOM_API_KEY, sourceMode, {});
 
   const metrics = useDashboardMetrics({
     routes: sourceRoutes,
@@ -98,52 +78,39 @@ export default function Dashboard() {
     trafficSummary,
   });
 
-  const isLoading = sourceMode === "gtfs" ? gtfsLoading : loadingMapData;
-
   return (
     <Layout>
       <div className="dashboard-container">
 
-        <DashboardHeader
-          user={user}
-          role={role}
-          onAdmin={() => navigate("/admin")}
-        />
+        <div className="page-header">
+          <h1>Analytics & Reports</h1>
+          <p>Performance metrics, delay analysis, and predictive insights</p>
+        </div>
 
-        {/* KEY METRICS */}
-        <DashboardStats metrics={metrics} />
-
-        {/* QUICK STATUS OVERVIEW */}
+        {/* PERFORMANCE METRICS */}
         <div className="grid">
-          <GtfsStatusPanel gtfsBundle={gtfsBundle} loading={gtfsLoading} error={gtfsError} />
+          <TripStatusSummaryPanel metrics={metrics} />
+          <DelayInsightPanel metrics={metrics} />
           <TrafficSummaryPanel summary={trafficSummary} />
-          <CurrentPredictionPanel prediction={{}} />
         </div>
 
-        {/* SYSTEM STATUS */}
+        {/* PREDICTIVE ANALYTICS */}
         <div className="grid">
-          <TrafficStatusPanel
-            loading={trafficLoading}
-            error={trafficError}
-            sourceMode={sourceMode}
-            showTrafficOverlay={true}
-            samplePoints={trafficSamples.length}
-            apiConfigured={!!TOMTOM_API_KEY}
-          />
+          <RecentPredictionsPanel predictions={predictions} />
         </div>
 
-        {/* QUICK ACTIONS */}
-        <div className="quick-actions">
-          <h3>Quick Actions</h3>
-          <div className="action-buttons">
-            <button onClick={() => navigate("/traffic")} className="action-btn">
-              📊 View Live Traffic
+        {/* REPORT CONTROLS */}
+        <div className="report-controls">
+          <h3>Report Generation</h3>
+          <div className="control-buttons">
+            <button className="report-btn">
+              📊 Generate Performance Report
             </button>
-            <button onClick={() => navigate("/routes")} className="action-btn">
-              🗺️ Manage Routes
+            <button className="report-btn">
+              🚗 Export Route Analytics
             </button>
-            <button onClick={() => navigate("/reports")} className="action-btn">
-              📈 View Reports
+            <button className="report-btn">
+              📈 Download Traffic Summary
             </button>
           </div>
         </div>

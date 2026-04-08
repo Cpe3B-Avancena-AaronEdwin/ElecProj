@@ -1,6 +1,9 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { loginUser } from "../firebase/auth";
+import Input from "../components/input";
+import Button from "../components/button";
+import "../styles/auth.css";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -26,85 +29,48 @@ export default function Login() {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        height: "100vh",
-        justifyContent: "center",
-        alignItems: "center",
-        background: "#f5f7fb",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <form
-        onSubmit={handleLogin}
-        style={{
-          width: "340px",
-          background: "#fff",
-          padding: "2rem",
-          borderRadius: "12px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
-        }}
-      >
-        <h2 style={{ marginBottom: "1rem", textAlign: "center" }}>
-          Smart Transit Login
-        </h2>
+    <div className="auth-wrapper login-background">
+      <div className="auth-card login-card">
+        <div className="login-brand">
+          <div className="brand-mark" aria-hidden="true">
+            🚍
+          </div>
+          <div className="brand-copy">
+            <h1 className="brand-name">MoveMint</h1>
+            <p className="brand-subtitle">Smart Public Transportation Analytics</p>
+          </div>
+        </div>
 
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          style={{
-            width: "100%",
-            padding: "0.75rem",
-            marginBottom: "1rem",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-            boxSizing: "border-box",
-          }}
-        />
+        <form className="auth-form" onSubmit={handleLogin} noValidate>
+          <Input
+            id="email"
+            label="Email"
+            type="email"
+            placeholder="operator@movemint.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          style={{
-            width: "100%",
-            padding: "0.75rem",
-            marginBottom: "1rem",
-            borderRadius: "8px",
-            border: "1px solid #ccc",
-            boxSizing: "border-box",
-          }}
-        />
+          <Input
+            id="password"
+            label="Password"
+            type="password"
+            placeholder="Enter password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
 
-        {error && (
-          <p style={{ color: "red", marginBottom: "1rem", fontSize: "0.9rem" }}>
-            {error}
-          </p>
-        )}
+          {error && <div role="alert" className="form-error">{error}</div>}
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: "100%",
-            padding: "0.75rem",
-            border: "none",
-            borderRadius: "8px",
-            background: "#007bff",
-            color: "#fff",
-            fontWeight: "bold",
-            cursor: "pointer",
-          }}
-        >
-          {loading ? "Logging in..." : "Login"}
-        </button>
-      </form>
+          <Button type="submit" className="btn--primary" disabled={loading}>
+            {loading ? "Signing in..." : "Sign In"}
+          </Button>
+
+          <p className="login-hint">Demo: Use any email and password to sign in</p>
+        </form>
+      </div>
     </div>
   );
 }

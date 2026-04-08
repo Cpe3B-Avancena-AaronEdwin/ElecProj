@@ -1,8 +1,8 @@
 import { getTripTimingLabel } from "../../utils/dashboardFormatters";
 
 const panelStyle = {
-  background: "#111827",
-  border: "1px solid #1f2937",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border)",
   borderRadius: "16px",
   padding: "1rem",
 };
@@ -15,19 +15,19 @@ export default function RecentTripsPanel({
 }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0, color: "#fff" }}>Recent Trips</h3>
+      <h3 style={{ marginTop: 0, color: "var(--text-on-dark)" }}>Recent Trips</h3>
       {trips.length === 0 ? (
-        <p style={{ margin: 0, color: "#cbd5e1" }}>No trips available.</p>
+        <p style={{ margin: 0, color: "var(--text-sub)" }}>No trips available.</p>
       ) : (
         trips.slice(0, 5).map((trip) => (
           <div
             key={trip.id || trip.trip_id}
-            style={{ padding: "0.75rem 0", borderBottom: "1px solid #1f2937" }}
+            style={{ padding: "0.75rem 0", borderBottom: "1px solid var(--border)" }}
           >
-            <div style={{ fontWeight: "bold", color: "#fff" }}>
+            <div style={{ fontWeight: "bold", color: "var(--text-on-dark)" }}>
               {trip.tripCode || trip.trip_short_name || trip.tripHeadsign || trip.trip_headsign || "Unnamed Trip"}
             </div>
-            <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
+            <div style={{ color: "var(--text-sub)", marginTop: "0.25rem" }}>
               Route:{" "}
               {sourceRouteMap[trip.routeId || trip.route_id]
                 ? `${sourceRouteMap[trip.routeId || trip.route_id].routeCode || sourceRouteMap[trip.routeId || trip.route_id].route_short_name} - ${
@@ -37,7 +37,7 @@ export default function RecentTripsPanel({
                   }`
                 : "Unassigned"}
             </div>
-            <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
+            <div style={{ color: "var(--text-sub)", marginTop: "0.25rem" }}>
               Vehicle:{" "}
               {sourceVehicleMap[trip.vehicleId]
                 ? `${sourceVehicleMap[trip.vehicleId].vehicleCode || "Vehicle"} - ${
@@ -47,13 +47,13 @@ export default function RecentTripsPanel({
                 ? "GTFS scheduled trip"
                 : "Unassigned"}
             </div>
-            <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
+            <div style={{ color: "var(--text-sub)", marginTop: "0.25rem" }}>
               Status: <strong>{trip.status || "scheduled"}</strong>
             </div>
-            <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
+            <div style={{ color: "var(--text-sub)", marginTop: "0.25rem" }}>
               ETA / Schedule: {getTripTimingLabel(trip)}
             </div>
-            <div style={{ color: "#cbd5e1", marginTop: "0.25rem" }}>
+            <div style={{ color: "var(--text-sub)", marginTop: "0.25rem" }}>
               Delay: {trip.delayMinutes ?? 0} mins
             </div>
           </div>

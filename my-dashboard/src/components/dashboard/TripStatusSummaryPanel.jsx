@@ -1,8 +1,8 @@
 import SummaryRow from "./SummaryRow";
 
 const panelStyle = {
-  background: "#111827",
-  border: "1px solid #1f2937",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border)",
   borderRadius: "16px",
   padding: "1rem",
 };
@@ -10,7 +10,7 @@ const panelStyle = {
 export default function TripStatusSummaryPanel({ metrics }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0, color: "#fff" }}>Trip Status Summary</h3>
+      <h3 style={{ marginTop: 0, color: "var(--text-on-dark)" }}>Trip Status Summary</h3>
       <SummaryRow label="Scheduled Trips" value={metrics.scheduledTrips} />
       <SummaryRow label="Active Trips" value={metrics.activeTrips} />
       <SummaryRow label="Delayed Trips" value={metrics.delayedTrips} />

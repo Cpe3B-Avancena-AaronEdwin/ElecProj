@@ -83,7 +83,7 @@ export default function DashboardMap({
         marginBottom: "1.5rem",
         borderRadius: "18px",
         overflow: "hidden",
-        border: "1px solid #1f2937",
+        border: "1px solid var(--border)",
         height: "560px",
       }}
     >
@@ -111,7 +111,7 @@ export default function DashboardMap({
               key={line.routeId || i}
               positions={positions}
               pathOptions={{
-                color: line.color || "#2563eb",
+                color: line.color || "#B8805A",
                 weight: 4,
                 opacity: 0.9,
               }}

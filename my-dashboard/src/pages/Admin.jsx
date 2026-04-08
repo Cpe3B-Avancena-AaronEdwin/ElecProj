@@ -18,7 +18,7 @@ import { useAuth } from "../context/AuthContext";
 const initialRouteForm = {
   routeCode: "",
   routeName: "",
-  color: "#2563eb",
+  color: "#B8805A",
   active: true,
 };
 
@@ -374,7 +374,7 @@ export default function Admin() {
     setRouteForm({
       routeCode: route.routeCode || "",
       routeName: route.routeName || "",
-      color: route.color || "#2563eb",
+      color: route.color || "#B8805A",
       active: route.active ?? true,
     });
   };
@@ -511,8 +511,8 @@ export default function Admin() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#0f172a",
-        color: "#e5e7eb",
+        background: "#181215",
+        color: "#F5F5F5",
         fontFamily: "Arial, sans-serif",
       }}
     >
@@ -546,7 +546,7 @@ export default function Admin() {
           <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
             <button
               onClick={() => navigate("/dashboard")}
-              style={topButtonStyle("#2563eb")}
+              style={topButtonStyle("#B8805A")}
             >
               Back to Dashboard
             </button>
@@ -719,7 +719,7 @@ export default function Admin() {
                               width: "18px",
                               height: "18px",
                               borderRadius: "4px",
-                              background: route.color || "#2563eb",
+                              background: route.color || "#B8805A",
                               border: "1px solid #fff",
                             }}
                           />
@@ -1175,8 +1175,8 @@ function TabButton({ label, active, onClick }) {
         borderRadius: "12px",
         border: "none",
         cursor: "pointer",
-        background: active ? "#2563eb" : "#1f2937",
-        color: "#fff",
+        background: active ? "#B8805A" : "#373638",
+        color: "#F5F5F5",
         fontWeight: "bold",
       }}
     >
@@ -1191,9 +1191,9 @@ function DataTable({ headers, rows, emptyText }) {
       style={{
         marginTop: "1rem",
         overflowX: "auto",
-        background: "#0b1220",
+        background: "#2A2522",
         borderRadius: "14px",
-        border: "1px solid #1f2937",
+        border: "1px solid #373638",
       }}
     >
       <table
@@ -1276,14 +1276,14 @@ const topButtonStyle = (background) => ({
   border: "none",
   borderRadius: "10px",
   background,
-  color: "#fff",
+  color: "#181215",
   cursor: "pointer",
   fontWeight: "bold",
 });
 
 const formCardStyle = {
-  background: "#0b1220",
-  border: "1px solid #1f2937",
+  background: "#2A2522",
+  border: "1px solid #373638",
   borderRadius: "14px",
   padding: "1rem",
   marginBottom: "1rem",
@@ -1317,8 +1317,8 @@ const primaryButtonStyle = {
   padding: "0.85rem 1.1rem",
   border: "none",
   borderRadius: "10px",
-  background: "#2563eb",
-  color: "#fff",
+  background: "#B8805A",
+  color: "#181215",
   cursor: "pointer",
   fontWeight: "bold",
 };
@@ -1337,8 +1337,8 @@ const smallEditButtonStyle = {
   padding: "0.5rem 0.8rem",
   border: "none",
   borderRadius: "8px",
-  background: "#2563eb",
-  color: "#fff",
+  background: "#B8805A",
+  color: "#181215",
   cursor: "pointer",
   fontWeight: "bold",
 };

@@ -1,8 +1,8 @@
 import SummaryRow from "./SummaryRow";
 
 const panelStyle = {
-  background: "#111827",
-  border: "1px solid #1f2937",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border)",
   borderRadius: "16px",
   padding: "1rem",
 };
@@ -14,7 +14,7 @@ export default function PredictionStatusPanel({
 }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0, color: "#fff" }}>Prediction Status</h3>
+      <h3 style={{ marginTop: 0, color: "var(--text-on-dark)" }}>Prediction Status</h3>
       <SummaryRow
         label="Predicted Congestion"
         value={prediction?.predictedCongestion || "Low"}
@@ -35,7 +35,7 @@ export default function PredictionStatusPanel({
       <div
         style={{
           marginTop: "0.9rem",
-          color: error ? "#fca5a5" : "#cbd5e1",
+          color: error ? "#fca5a5" : "var(--text-sub)",
         }}
       >
         {error || message || "Prediction system is running."}

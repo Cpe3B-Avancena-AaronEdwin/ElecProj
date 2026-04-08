@@ -1,8 +1,8 @@
 import SummaryRow from "./SummaryRow";
 
 const panelStyle = {
-  background: "#111827",
-  border: "1px solid #1f2937",
+  background: "var(--bg-card)",
+  border: "1px solid var(--border)",
   borderRadius: "16px",
   padding: "1rem",
 };
@@ -10,7 +10,7 @@ const panelStyle = {
 export default function CurrentPredictionPanel({ prediction }) {
   return (
     <div style={panelStyle}>
-      <h3 style={{ marginTop: 0, color: "#fff" }}>Current Prediction</h3>
+      <h3 style={{ marginTop: 0, color: "var(--text-on-dark)" }}>Current Prediction</h3>
       <SummaryRow
         label="Route"
         value={`${prediction?.routeCode || "ALL"} - ${prediction?.routeName || "All Routes"}`}
@@ -25,8 +25,8 @@ export default function CurrentPredictionPanel({ prediction }) {
       />
       <SummaryRow label="Prediction Score" value={prediction?.score ?? 0} />
 
-      <div style={{ marginTop: "0.9rem", color: "#cbd5e1" }}>
-        <strong style={{ color: "#fff" }}>Reasons:</strong>
+      <div style={{ marginTop: "0.9rem", color: "var(--text-sub)" }}>
+        <strong style={{ color: "var(--text-on-dark)" }}>Reasons:</strong>
         <ul style={{ marginTop: "0.5rem", paddingLeft: "1.25rem" }}>
           {(prediction?.reason?.length
             ? prediction.reason
