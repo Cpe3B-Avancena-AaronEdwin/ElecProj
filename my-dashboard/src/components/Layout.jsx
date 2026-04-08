@@ -1,20 +1,67 @@
-import { Link, useLocation } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { logoutUser } from "../firebase/auth";
 
 export default function Layout({ children }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, role } = useAuth();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    }
+
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownOpen]);
+
+  const handleLogout = async () => {
+    await logoutUser();
+    navigate("/login");
+  };
+
+  const handleAdminPanel = () => {
+    navigate("/admin");
+    setDropdownOpen(false);
+  };
+
+  const handleSettings = () => {
+    navigate("/admin");
+    setDropdownOpen(false);
+  };
+
+  const navItems = [
+    { label: "Dashboard", path: "/dashboard" },
+    { label: "Live Traffic", path: "/traffic" },
+    { label: "Routes", path: "/routes" },
+    { label: "Reports", path: "/reports" },
+    { label: "About Us", path: "/about" },
+  ];
 
   const getPageTitle = () => {
     switch (location.pathname) {
       case "/dashboard":
         return "Dashboard";
       case "/traffic":
-        return "Live Traffic";
+        return "Dashboard";
       case "/routes":
-        return "Routes";
+        return "Dashboard";
       case "/reports":
-        return "Reports";
+        return "Dashboard";
       case "/admin":
-        return "Admin";
+        return "Admin Panel";
       default:
         return "Dashboard";
     }
@@ -22,48 +69,69 @@ export default function Layout({ children }) {
 
   return (
     <div className="app">
+      {/* MAIN LAYOUT */}
+      <div className="main full-width">
 
-      {/* SIDEBAR */}
-      <div className="sidebar">
-        <h2>TrafficSys</h2>
-        <Link
-          to="/dashboard"
-          className={location.pathname === "/dashboard" ? "active" : ""}
-        >
-          Dashboard
-        </Link>
-        <Link
-          to="/traffic"
-          className={location.pathname === "/traffic" ? "active" : ""}
-        >
-          Live Traffic
-        </Link>
-        <Link
-          to="/routes"
-          className={location.pathname === "/routes" ? "active" : ""}
-        >
-          Routes
-        </Link>
-        <Link
-          to="/reports"
-          className={location.pathname === "/reports" ? "active" : ""}
-        >
-          Reports
-        </Link>
-        <Link
-          to="/admin"
-          className={location.pathname === "/admin" ? "active" : ""}
-        >
-          Settings
-        </Link>
-      </div>
+        {/* HEADER */}
+        <div className="header">
+          <div className="header-left">
+            <div className="header-icon">🚌</div>
+            <div className="header-content">
+              <h1 className="header-title">MoveMint</h1>
+              <p className="header-subtitle">Live Transit Analytics</p>
+            </div>
+          </div>
 
-      {/* MAIN */}
-      <div className="main">
+          {/* DROPDOWN MENU */}
+          <div className="dropdown-wrapper" ref={dropdownRef}>
+            <button 
+              className="dropdown-trigger"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+            >
+              <span>→</span>
+            </button>
+            
+            {dropdownOpen && (
+              <div className="dropdown-menu">
+                {role === "admin" && (
+                  <button 
+                    className="dropdown-item"
+                    onClick={handleAdminPanel}
+                  >
+                    Admin Panel
+                  </button>
+                )}
+                <button 
+                  className="dropdown-item"
+                  onClick={handleSettings}
+                >
+                  Settings
+                </button>
+                <button 
+                  className="dropdown-item dropdown-item--danger"
+                  onClick={handleLogout}
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
 
-        <div className="topbar">
-          <h3>{getPageTitle()}</h3>
-          <input placeholder="Search location..." />
+        {/* NAVIGATION BAR */}
+        <div className="nav-bar">
+          <nav className="horizontal-nav">
+            {navItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+          <input className="search-input" placeholder="Search location..." />
         </div>
 
         <div className="content">

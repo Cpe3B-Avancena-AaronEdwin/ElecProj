@@ -8,7 +8,6 @@ import { useTrafficData } from "../hooks/useTrafficData";
 import { useRouteLines } from "../hooks/useRouteLines";
 import { useDashboardMetrics } from "../hooks/useDashboardMetrics";
 
-import DashboardHeader from "../components/dashboard/DashboardHeader";
 import DashboardStats from "../components/dashboard/DashboardStats";
 import GtfsStatusPanel from "../components/dashboard/GtfsStatusPanel";
 import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
@@ -103,12 +102,6 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="dashboard-container">
-
-        <DashboardHeader
-          user={user}
-          role={role}
-          onAdmin={() => navigate("/admin")}
-        />
 
         {/* KEY METRICS */}
         <DashboardStats metrics={metrics} />

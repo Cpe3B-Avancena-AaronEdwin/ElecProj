@@ -511,8 +511,8 @@ export default function Admin() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#181215",
-        color: "#F5F5F5",
+        background: "#000000",
+        color: "#f8fafc",
         fontFamily: "Arial, sans-serif",
       }}
     >
