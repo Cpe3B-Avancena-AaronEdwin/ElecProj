@@ -14,6 +14,7 @@ import {
 import { db } from "../firebase/config";
 import { logoutUser } from "../firebase/auth";
 import { useAuth } from "../context/AuthContext";
+import Layout from "../components/Layout";
 
 const initialRouteForm = {
   routeCode: "",
@@ -508,86 +509,59 @@ export default function Admin() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#000000",
-        color: "#f8fafc",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "1450px",
-          margin: "0 auto",
-          padding: "1.5rem",
-        }}
-      >
+    <Layout>
+      <div style={{ width: "100%", padding: "20px", boxSizing: "border-box" }}>
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "flex-start",
+            alignItems: "center",
             gap: "1rem",
             flexWrap: "wrap",
             marginBottom: "1.5rem",
           }}
         >
           <div>
-            <h1 style={{ margin: 0, fontSize: "2.2rem" }}>Admin Panel</h1>
-            <p style={{ margin: "0.5rem 0 0", color: "#cbd5e1" }}>
-              Logged in as: <strong>{user?.email || "Unknown"}</strong>
-            </p>
-            <p style={{ margin: "0.25rem 0 0", color: "#cbd5e1" }}>
-              Role: <strong>{role}</strong>
-            </p>
+            <h2 style={{ margin: 0, fontSize: "1.8rem", color: "#f8fafc" }}>Admin Panel</h2>
           </div>
 
-          <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-            <button
-              onClick={() => navigate("/dashboard")}
-              style={topButtonStyle("#B8805A")}
-            >
-              Back to Dashboard
-            </button>
-
-            <button onClick={logoutUser} style={topButtonStyle("#ef4444")}>
-              Logout
-            </button>
-          </div>
+          <button
+            onClick={() => navigate("/dashboard")}
+            style={{
+              padding: "10px 16px",
+              border: "none",
+              borderRadius: "8px",
+              background: "linear-gradient(90deg, rgba(34, 211, 238, 0.15) 0%, rgba(56, 189, 248, 0.1) 100%)",
+              color: "var(--accent)",
+              cursor: "pointer",
+              fontWeight: "600",
+              transition: "all 0.15s ease",
+              borderColor: "rgba(34, 211, 238, 0.3)",
+              border: "1px solid rgba(34, 211, 238, 0.3)",
+            }}
+          >
+            ← Back to Dashboard
+          </button>
         </div>
 
         {message && (
           <div
             style={{
               marginBottom: "1rem",
-              background: "#1d4ed8",
-              color: "white",
-              padding: "0.9rem 1rem",
-              borderRadius: "10px",
-              fontWeight: "bold",
+              background: "rgba(34, 211, 238, 0.1)",
+              color: "#22d3ee",
+              padding: "1rem",
+              borderRadius: "8px",
+              fontWeight: "500",
+              border: "1px solid rgba(34, 211, 238, 0.2)",
             }}
           >
             {message}
           </div>
         )}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "260px 1fr",
-            gap: "1.25rem",
-          }}
-        >
-          <div
-            style={{
-              background: "#111827",
-              borderRadius: "16px",
-              padding: "1rem",
-              border: "1px solid #1f2937",
-              height: "fit-content",
-            }}
-          >
+        <div className="admin-grid">
+          <div className="panel" style={{ height: "fit-content" }}>
             <h3 style={{ marginTop: 0 }}>Management Tabs</h3>
 
             <TabButton
@@ -620,14 +594,7 @@ export default function Admin() {
             </div>
           </div>
 
-          <div
-            style={{
-              background: "#111827",
-              borderRadius: "16px",
-              padding: "1rem",
-              border: "1px solid #1f2937",
-            }}
-          >
+          <div className="panel">
             {loading ? (
               <div style={{ padding: "1rem" }}>Loading data...</div>
             ) : (
@@ -1152,7 +1119,7 @@ export default function Admin() {
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }
 
@@ -1172,12 +1139,13 @@ function TabButton({ label, active, onClick }) {
         textAlign: "left",
         marginBottom: "0.75rem",
         padding: "0.9rem 1rem",
-        borderRadius: "12px",
-        border: "none",
+        borderRadius: "8px",
+        border: active ? "1px solid rgba(34, 211, 238, 0.4)" : "1px solid rgba(34, 211, 238, 0.1)",
         cursor: "pointer",
-        background: active ? "#B8805A" : "#373638",
-        color: "#F5F5F5",
-        fontWeight: "bold",
+        background: active ? "linear-gradient(90deg, rgba(34, 211, 238, 0.15) 0%, rgba(56, 189, 248, 0.1) 100%)" : "rgba(15, 23, 42, 0.6)",
+        color: active ? "#22d3ee" : "#cbd5e1",
+        fontWeight: active ? "600" : "500",
+        transition: "all 0.15s ease",
       }}
     >
       {label}
@@ -1191,28 +1159,29 @@ function DataTable({ headers, rows, emptyText }) {
       style={{
         marginTop: "1rem",
         overflowX: "auto",
-        background: "#2A2522",
-        borderRadius: "14px",
-        border: "1px solid #373638",
+        background: "var(--bg-card)",
+        borderRadius: "12px",
+        border: "1px solid rgba(34, 211, 238, 0.1)",
       }}
     >
       <table
         style={{
           width: "100%",
           borderCollapse: "collapse",
-          minWidth: "1150px",
+          minWidth: "100%",
         }}
       >
         <thead>
-          <tr style={{ background: "#1f2937" }}>
+          <tr style={{ background: "rgba(34, 211, 238, 0.05)", borderBottom: "1px solid rgba(34, 211, 238, 0.15)" }}>
             {headers.map((header) => (
               <th
                 key={header}
                 style={{
                   textAlign: "left",
-                  padding: "0.95rem",
-                  color: "#fff",
-                  borderBottom: "1px solid #334155",
+                  padding: "1rem",
+                  color: "#22d3ee",
+                  fontWeight: "600",
+                  fontSize: "0.9rem",
                 }}
               >
                 {header}
@@ -1227,8 +1196,9 @@ function DataTable({ headers, rows, emptyText }) {
               <td
                 colSpan={headers.length}
                 style={{
-                  padding: "1rem",
+                  padding: "1.5rem",
                   color: "#cbd5e1",
+                  textAlign: "center",
                 }}
               >
                 {emptyText}
@@ -1236,14 +1206,15 @@ function DataTable({ headers, rows, emptyText }) {
             </tr>
           ) : (
             rows.map((row, index) => (
-              <tr key={index} style={{ borderBottom: "1px solid #1f2937" }}>
+              <tr key={index} style={{ borderBottom: "1px solid rgba(34, 211, 238, 0.05)", transition: "background 0.15s ease" }}>
                 {row.map((cell, cellIndex) => (
                   <td
                     key={cellIndex}
                     style={{
-                      padding: "0.95rem",
-                      color: "#e5e7eb",
-                      verticalAlign: "top",
+                      padding: "1rem",
+                      color: "#cbd5e1",
+                      verticalAlign: "middle",
+                      fontSize: "0.9rem",
                     }}
                   >
                     {cell}
@@ -1273,82 +1244,92 @@ function ActionButtons({ onEdit, onDelete }) {
 
 const topButtonStyle = (background) => ({
   padding: "0.85rem 1.05rem",
-  border: "none",
-  borderRadius: "10px",
+  border: "1px solid rgba(34, 211, 238, 0.2)",
+  borderRadius: "8px",
   background,
   color: "#181215",
   cursor: "pointer",
-  fontWeight: "bold",
+  fontWeight: "600",
+  transition: "all 0.15s ease",
 });
 
 const formCardStyle = {
-  background: "#2A2522",
-  border: "1px solid #373638",
-  borderRadius: "14px",
-  padding: "1rem",
+  background: "var(--bg-card)",
+  border: "1px solid rgba(34, 211, 238, 0.1)",
+  borderRadius: "12px",
+  padding: "1.2rem",
   marginBottom: "1rem",
 };
 
 const formGridStyle = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
   gap: "1rem",
   marginBottom: "1rem",
 };
 
 const labelStyle = {
   display: "block",
-  marginBottom: "0.45rem",
+  marginBottom: "0.5rem",
   color: "#cbd5e1",
-  fontWeight: "bold",
+  fontWeight: "600",
+  fontSize: "0.9rem",
 };
 
 const inputStyle = {
   width: "100%",
   padding: "0.8rem",
-  borderRadius: "10px",
-  border: "1px solid #334155",
-  background: "#111827",
-  color: "#fff",
+  borderRadius: "8px",
+  border: "1px solid rgba(34, 211, 238, 0.15)",
+  background: "rgba(15, 23, 42, 0.8)",
+  color: "#f8fafc",
   boxSizing: "border-box",
+  fontSize: "0.9rem",
+  transition: "all 0.15s ease",
 };
 
 const primaryButtonStyle = {
   padding: "0.85rem 1.1rem",
-  border: "none",
-  borderRadius: "10px",
-  background: "#B8805A",
-  color: "#181215",
+  border: "1px solid rgba(34, 211, 238, 0.3)",
+  borderRadius: "8px",
+  background: "linear-gradient(90deg, rgba(34, 211, 238, 0.15) 0%, rgba(56, 189, 248, 0.1) 100%)",
+  color: "#22d3ee",
   cursor: "pointer",
-  fontWeight: "bold",
+  fontWeight: "600",
+  transition: "all 0.15s ease",
 };
 
 const secondaryButtonStyle = {
   padding: "0.85rem 1.1rem",
-  border: "none",
-  borderRadius: "10px",
-  background: "#475569",
-  color: "#fff",
+  border: "1px solid rgba(148, 163, 184, 0.2)",
+  borderRadius: "8px",
+  background: "rgba(148, 163, 184, 0.1)",
+  color: "#cbd5e1",
   cursor: "pointer",
-  fontWeight: "bold",
+  fontWeight: "600",
+  transition: "all 0.15s ease",
 };
 
 const smallEditButtonStyle = {
   padding: "0.5rem 0.8rem",
-  border: "none",
-  borderRadius: "8px",
-  background: "#B8805A",
-  color: "#181215",
+  border: "1px solid rgba(34, 211, 238, 0.3)",
+  borderRadius: "6px",
+  background: "rgba(34, 211, 238, 0.1)",
+  color: "#22d3ee",
   cursor: "pointer",
-  fontWeight: "bold",
+  fontWeight: "600",
+  fontSize: "0.85rem",
+  transition: "all 0.15s ease",
 };
 
 const smallDeleteButtonStyle = {
   padding: "0.5rem 0.8rem",
-  border: "none",
-  borderRadius: "8px",
-  background: "#ef4444",
-  color: "#fff",
+  border: "1px solid rgba(239, 68, 68, 0.3)",
+  borderRadius: "6px",
+  background: "rgba(239, 68, 68, 0.1)",
+  color: "#f87171",
   cursor: "pointer",
-  fontWeight: "bold",
+  fontWeight: "600",
+  fontSize: "0.85rem",
+  transition: "all 0.15s ease",
 };
