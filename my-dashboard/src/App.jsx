@@ -5,6 +5,7 @@ import Traffic from "./pages/Traffic";
 import RoutesPage from "./pages/Routes";
 import Reports from "./pages/Reports";
 import Admin from "./pages/Admin";
+import AboutUs from "./pages/AboutUs"; // ✅ added
 import ProtectedRoute from "./components/ProtectedRoute";
 import { AuthProvider } from "./context/AuthContext";
 
@@ -13,9 +14,14 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+
+          {/* Default Route */}
           <Route path="/" element={<Navigate to="/login" replace />} />
+
+          {/* Login */}
           <Route path="/login" element={<Login />} />
 
+          {/* Dashboard */}
           <Route
             path="/dashboard"
             element={
@@ -25,6 +31,7 @@ export default function App() {
             }
           />
 
+          {/* Traffic */}
           <Route
             path="/traffic"
             element={
@@ -34,6 +41,7 @@ export default function App() {
             }
           />
 
+          {/* Routes */}
           <Route
             path="/routes"
             element={
@@ -43,6 +51,7 @@ export default function App() {
             }
           />
 
+          {/* Reports */}
           <Route
             path="/reports"
             element={
@@ -52,6 +61,7 @@ export default function App() {
             }
           />
 
+          {/* Admin */}
           <Route
             path="/admin"
             element={
@@ -60,6 +70,20 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* About Us */}
+          <Route
+            path="/about"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "operator", "viewer"]}>
+                <AboutUs />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+
         </Routes>
       </BrowserRouter>
     </AuthProvider>
