@@ -1,44 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-<<<<<<< HEAD
-import Layout from "../components/Layout";
-
-const initialRouteForm = {
-  routeCode: "",
-  routeName: "",
-  color: "#B8805A",
-  active: true,
-};
-
-const initialStopForm = {
-  stopName: "",
-  latitude: "",
-  longitude: "",
-  routeId: "",
-  simulatedDelay: "",
-  simulatedPassengers: "",
-};
-
-const initialVehicleForm = {
-  vehicleCode: "",
-  plateNumber: "",
-  routeId: "",
-  status: "active",
-};
-
-const initialTripForm = {
-  tripCode: "",
-  routeId: "",
-  vehicleId: "",
-  departureTime: "",
-  expectedArrival: "",
-  actualArrival: "",
-  status: "scheduled",
-  delayMinutes: "",
-  notes: "",
-};
-=======
 import { useAdminData } from "../hooks/useAdminData";
 import { useAdminForms } from "../hooks/useAdminForms";
 import {
@@ -65,7 +27,6 @@ import {
   initialTripForm,
   initialVehicleForm,
 } from "../constants/adminInitialState";
->>>>>>> 93b213b76935f92a1872cb3d59cdf2d6d39ad806
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -196,62 +157,7 @@ export default function Admin() {
     }
   };
 
-<<<<<<< HEAD
-  const editRoute = (route) => {
-    setActiveTab("routes");
-    setEditingRouteId(route.id);
-    setRouteForm({
-      routeCode: route.routeCode || "",
-      routeName: route.routeName || "",
-      color: route.color || "#B8805A",
-      active: route.active ?? true,
-    });
-  };
-
-  const editStop = (stop) => {
-    setActiveTab("stops");
-    setEditingStopId(stop.id);
-    setStopForm({
-      stopName: stop.stopName || "",
-      latitude: stop.latitude ?? "",
-      longitude: stop.longitude ?? "",
-      routeId: stop.routeId || "",
-      simulatedDelay: stop.simulatedDelay ?? "",
-      simulatedPassengers: stop.simulatedPassengers ?? "",
-    });
-  };
-
-  const editVehicle = (vehicle) => {
-    setActiveTab("vehicles");
-    setEditingVehicleId(vehicle.id);
-    setVehicleForm({
-      vehicleCode: vehicle.vehicleCode || "",
-      plateNumber: vehicle.plateNumber || "",
-      routeId: vehicle.routeId || "",
-      status: vehicle.status || "active",
-    });
-  };
-
-  const editTrip = (trip) => {
-    setActiveTab("trips");
-    setEditingTripId(trip.id);
-    setTripForm({
-      tripCode: trip.tripCode || "",
-      routeId: trip.routeId || "",
-      vehicleId: trip.vehicleId || "",
-      departureTime: trip.departureTime || "",
-      expectedArrival: trip.expectedArrival || "",
-      actualArrival: trip.actualArrival || "",
-      status: trip.status || "scheduled",
-      delayMinutes: trip.delayMinutes ?? "",
-      notes: trip.notes || "",
-    });
-  };
-
-  const deleteRoute = async (id) => {
-=======
   const handleDeleteRoute = async (id) => {
->>>>>>> 93b213b76935f92a1872cb3d59cdf2d6d39ad806
     const confirmed = window.confirm("Delete this route?");
     if (!confirmed) return;
 
@@ -336,92 +242,6 @@ export default function Admin() {
   };
 
   return (
-<<<<<<< HEAD
-    <Layout>
-      <div style={{ width: "100%", padding: "20px", boxSizing: "border-box" }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "1rem",
-            flexWrap: "wrap",
-            marginBottom: "1.5rem",
-          }}
-        >
-          <div>
-            <h2 style={{ margin: 0, fontSize: "1.8rem", color: "#f8fafc" }}>Admin Panel</h2>
-          </div>
-
-          <button
-            onClick={() => navigate("/dashboard")}
-            style={{
-              padding: "10px 16px",
-              border: "none",
-              borderRadius: "8px",
-              background: "linear-gradient(90deg, rgba(34, 211, 238, 0.15) 0%, rgba(56, 189, 248, 0.1) 100%)",
-              color: "var(--accent)",
-              cursor: "pointer",
-              fontWeight: "600",
-              transition: "all 0.15s ease",
-              borderColor: "rgba(34, 211, 238, 0.3)",
-              border: "1px solid rgba(34, 211, 238, 0.3)",
-            }}
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
-
-        {message && (
-          <div
-            style={{
-              marginBottom: "1rem",
-              background: "rgba(34, 211, 238, 0.1)",
-              color: "#22d3ee",
-              padding: "1rem",
-              borderRadius: "8px",
-              fontWeight: "500",
-              border: "1px solid rgba(34, 211, 238, 0.2)",
-            }}
-          >
-            {message}
-          </div>
-        )}
-
-        <div className="admin-grid">
-          <div className="panel" style={{ height: "fit-content" }}>
-            <h3 style={{ marginTop: 0 }}>Management Tabs</h3>
-
-            <TabButton
-              label="Routes"
-              active={activeTab === "routes"}
-              onClick={() => setActiveTab("routes")}
-            />
-            <TabButton
-              label="Stops"
-              active={activeTab === "stops"}
-              onClick={() => setActiveTab("stops")}
-            />
-            <TabButton
-              label="Vehicles"
-              active={activeTab === "vehicles"}
-              onClick={() => setActiveTab("vehicles")}
-            />
-            <TabButton
-              label="Trips"
-              active={activeTab === "trips"}
-              onClick={() => setActiveTab("trips")}
-            />
-
-            <div style={{ marginTop: "1.2rem", color: "#94a3b8", fontSize: "0.95rem" }}>
-              <p style={{ marginBottom: "0.5rem" }}>Quick Stats</p>
-              <p style={{ margin: "0.25rem 0" }}>Routes: {routes.length}</p>
-              <p style={{ margin: "0.25rem 0" }}>Stops: {stops.length}</p>
-              <p style={{ margin: "0.25rem 0" }}>Vehicles: {vehicles.length}</p>
-              <p style={{ margin: "0.25rem 0" }}>Trips: {trips.length}</p>
-            </div>
-          </div>
-=======
     <div
       style={{
         minHeight: "100vh",
@@ -456,118 +276,20 @@ export default function Admin() {
             vehiclesCount={vehicles.length}
             tripsCount={trips.length}
           />
->>>>>>> 93b213b76935f92a1872cb3d59cdf2d6d39ad806
 
-          <div className="panel">
+          <div
+            style={{
+              background: "#111827",
+              borderRadius: "16px",
+              padding: "1rem",
+              border: "1px solid #1f2937",
+            }}
+          >
             {loading ? (
               <div style={{ padding: "1rem" }}>Loading data...</div>
             ) : (
               <>
                 {activeTab === "routes" && (
-<<<<<<< HEAD
-                  <div>
-                    <h2 style={{ marginTop: 0 }}>Routes Management</h2>
-
-                    <form onSubmit={submitRoute} style={formCardStyle}>
-                      <div style={formGridStyle}>
-                        <div>
-                          <label style={labelStyle}>Route Code</label>
-                          <input
-                            type="text"
-                            name="routeCode"
-                            value={routeForm.routeCode}
-                            onChange={handleRouteChange}
-                            placeholder="e.g. R-01"
-                            style={inputStyle}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={labelStyle}>Route Name</label>
-                          <input
-                            type="text"
-                            name="routeName"
-                            value={routeForm.routeName}
-                            onChange={handleRouteChange}
-                            placeholder="e.g. Manila to Makati"
-                            style={inputStyle}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={labelStyle}>Color</label>
-                          <input
-                            type="color"
-                            name="color"
-                            value={routeForm.color}
-                            onChange={handleRouteChange}
-                            style={{ ...inputStyle, padding: "0.25rem", height: "46px" }}
-                          />
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-                          <input
-                            id="routeActive"
-                            type="checkbox"
-                            name="active"
-                            checked={routeForm.active}
-                            onChange={handleRouteChange}
-                          />
-                          <label htmlFor="routeActive" style={labelStyle}>
-                            Active Route
-                          </label>
-                        </div>
-                      </div>
-
-                      <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                        <button type="submit" style={primaryButtonStyle}>
-                          {editingRouteId ? "Update Route" : "Add Route"}
-                        </button>
-
-                        {editingRouteId && (
-                          <button
-                            type="button"
-                            onClick={cancelRouteEdit}
-                            style={secondaryButtonStyle}
-                          >
-                            Cancel Edit
-                          </button>
-                        )}
-                      </div>
-                    </form>
-
-                    <DataTable
-                      headers={["Route Code", "Route Name", "Color", "Status", "Actions"]}
-                      rows={routes.map((route) => [
-                        route.routeCode || "-",
-                        route.routeName || "-",
-                        <div
-                          key={`${route.id}-color`}
-                          style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
-                        >
-                          <span
-                            style={{
-                              display: "inline-block",
-                              width: "18px",
-                              height: "18px",
-                              borderRadius: "4px",
-                              background: route.color || "#B8805A",
-                              border: "1px solid #fff",
-                            }}
-                          />
-                          {route.color || "-"}
-                        </div>,
-                        route.active ? "Active" : "Inactive",
-                        <ActionButtons
-                          key={`${route.id}-actions`}
-                          onEdit={() => editRoute(route)}
-                          onDelete={() => deleteRoute(route.id)}
-                        />,
-                      ])}
-                      emptyText="No routes yet."
-                    />
-                  </div>
-=======
                   <RoutesTab
                     routes={routes}
                     routeForm={forms.routeForm}
@@ -578,7 +300,6 @@ export default function Admin() {
                     onEditRoute={handleEditRoute}
                     onDeleteRoute={handleDeleteRoute}
                   />
->>>>>>> 93b213b76935f92a1872cb3d59cdf2d6d39ad806
                 )}
 
                 {activeTab === "stops" && (
@@ -632,221 +353,6 @@ export default function Admin() {
           </div>
         </div>
       </div>
-    </Layout>
-  );
-<<<<<<< HEAD
-}
-
-function formatDateTime(value) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
-function TabButton({ label, active, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        width: "100%",
-        textAlign: "left",
-        marginBottom: "0.75rem",
-        padding: "0.9rem 1rem",
-        borderRadius: "8px",
-        border: active ? "1px solid rgba(34, 211, 238, 0.4)" : "1px solid rgba(34, 211, 238, 0.1)",
-        cursor: "pointer",
-        background: active ? "linear-gradient(90deg, rgba(34, 211, 238, 0.15) 0%, rgba(56, 189, 248, 0.1) 100%)" : "rgba(15, 23, 42, 0.6)",
-        color: active ? "#22d3ee" : "#cbd5e1",
-        fontWeight: active ? "600" : "500",
-        transition: "all 0.15s ease",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-function DataTable({ headers, rows, emptyText }) {
-  return (
-    <div
-      style={{
-        marginTop: "1rem",
-        overflowX: "auto",
-        background: "var(--bg-card)",
-        borderRadius: "12px",
-        border: "1px solid rgba(34, 211, 238, 0.1)",
-      }}
-    >
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          minWidth: "100%",
-        }}
-      >
-        <thead>
-          <tr style={{ background: "rgba(34, 211, 238, 0.05)", borderBottom: "1px solid rgba(34, 211, 238, 0.15)" }}>
-            {headers.map((header) => (
-              <th
-                key={header}
-                style={{
-                  textAlign: "left",
-                  padding: "1rem",
-                  color: "#22d3ee",
-                  fontWeight: "600",
-                  fontSize: "0.9rem",
-                }}
-              >
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-
-        <tbody>
-          {rows.length === 0 ? (
-            <tr>
-              <td
-                colSpan={headers.length}
-                style={{
-                  padding: "1.5rem",
-                  color: "#cbd5e1",
-                  textAlign: "center",
-                }}
-              >
-                {emptyText}
-              </td>
-            </tr>
-          ) : (
-            rows.map((row, index) => (
-              <tr key={index} style={{ borderBottom: "1px solid rgba(34, 211, 238, 0.05)", transition: "background 0.15s ease" }}>
-                {row.map((cell, cellIndex) => (
-                  <td
-                    key={cellIndex}
-                    style={{
-                      padding: "1rem",
-                      color: "#cbd5e1",
-                      verticalAlign: "middle",
-                      fontSize: "0.9rem",
-                    }}
-                  >
-                    {cell}
-                  </td>
-                ))}
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
     </div>
   );
 }
-
-function ActionButtons({ onEdit, onDelete }) {
-  return (
-    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-      <button onClick={onEdit} style={smallEditButtonStyle}>
-        Edit
-      </button>
-      <button onClick={onDelete} style={smallDeleteButtonStyle}>
-        Delete
-      </button>
-    </div>
-  );
-}
-
-const topButtonStyle = (background) => ({
-  padding: "0.85rem 1.05rem",
-  border: "1px solid rgba(34, 211, 238, 0.2)",
-  borderRadius: "8px",
-  background,
-  color: "#181215",
-  cursor: "pointer",
-  fontWeight: "600",
-  transition: "all 0.15s ease",
-});
-
-const formCardStyle = {
-  background: "var(--bg-card)",
-  border: "1px solid rgba(34, 211, 238, 0.1)",
-  borderRadius: "12px",
-  padding: "1.2rem",
-  marginBottom: "1rem",
-};
-
-const formGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-  gap: "1rem",
-  marginBottom: "1rem",
-};
-
-const labelStyle = {
-  display: "block",
-  marginBottom: "0.5rem",
-  color: "#cbd5e1",
-  fontWeight: "600",
-  fontSize: "0.9rem",
-};
-
-const inputStyle = {
-  width: "100%",
-  padding: "0.8rem",
-  borderRadius: "8px",
-  border: "1px solid rgba(34, 211, 238, 0.15)",
-  background: "rgba(15, 23, 42, 0.8)",
-  color: "#f8fafc",
-  boxSizing: "border-box",
-  fontSize: "0.9rem",
-  transition: "all 0.15s ease",
-};
-
-const primaryButtonStyle = {
-  padding: "0.85rem 1.1rem",
-  border: "1px solid rgba(34, 211, 238, 0.3)",
-  borderRadius: "8px",
-  background: "linear-gradient(90deg, rgba(34, 211, 238, 0.15) 0%, rgba(56, 189, 248, 0.1) 100%)",
-  color: "#22d3ee",
-  cursor: "pointer",
-  fontWeight: "600",
-  transition: "all 0.15s ease",
-};
-
-const secondaryButtonStyle = {
-  padding: "0.85rem 1.1rem",
-  border: "1px solid rgba(148, 163, 184, 0.2)",
-  borderRadius: "8px",
-  background: "rgba(148, 163, 184, 0.1)",
-  color: "#cbd5e1",
-  cursor: "pointer",
-  fontWeight: "600",
-  transition: "all 0.15s ease",
-};
-
-const smallEditButtonStyle = {
-  padding: "0.5rem 0.8rem",
-  border: "1px solid rgba(34, 211, 238, 0.3)",
-  borderRadius: "6px",
-  background: "rgba(34, 211, 238, 0.1)",
-  color: "#22d3ee",
-  cursor: "pointer",
-  fontWeight: "600",
-  fontSize: "0.85rem",
-  transition: "all 0.15s ease",
-};
-
-const smallDeleteButtonStyle = {
-  padding: "0.5rem 0.8rem",
-  border: "1px solid rgba(239, 68, 68, 0.3)",
-  borderRadius: "6px",
-  background: "rgba(239, 68, 68, 0.1)",
-  color: "#f87171",
-  cursor: "pointer",
-  fontWeight: "600",
-  fontSize: "0.85rem",
-  transition: "all 0.15s ease",
-};
-=======
-}
->>>>>>> 93b213b76935f92a1872cb3d59cdf2d6d39ad806
