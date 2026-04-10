@@ -10,35 +10,40 @@ export default function Layout({ children }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setDropdownOpen(false);
-      }
+  function handleClickOutside(e) {
+    if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      setDropdownOpen(false);
     }
+  }
 
-    if (dropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
+  if (dropdownOpen) {
+    document.addEventListener("mousedown", handleClickOutside);
+  }
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, [dropdownOpen]);
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, [dropdownOpen]);
 
   const handleLogout = async () => {
     await logoutUser();
     navigate("/login");
   };
 
-  const handleAdminPanel = () => {
-    navigate("/admin");
+  // Navigation handlers
+  const handleUserSettings = () => {
+    navigate("/settings");
     setDropdownOpen(false);
   };
 
-  const handleSettings = () => {
-    navigate("/admin");
+  const handleAdminUsers = () => {
+    navigate("/admin/users");
+    setDropdownOpen(false);
+  };
+
+  const handleAdminRoutes = () => {
+    navigate("/admin/routes");
     setDropdownOpen(false);
   };
 
@@ -50,28 +55,9 @@ export default function Layout({ children }) {
     { label: "About Us", path: "/about" },
   ];
 
-  const getPageTitle = () => {
-    switch (location.pathname) {
-      case "/dashboard":
-        return "Dashboard";
-      case "/traffic":
-        return "Dashboard";
-      case "/routes":
-        return "Dashboard";
-      case "/reports":
-        return "Dashboard";
-      case "/admin":
-        return "Admin Panel";
-      default:
-        return "Dashboard";
-    }
-  };
-
   return (
     <div className="app">
-      {/* MAIN LAYOUT */}
       <div className="main full-width">
-
         {/* HEADER */}
         <div className="header">
           <div className="header-left">
@@ -84,35 +70,45 @@ export default function Layout({ children }) {
 
           {/* DROPDOWN MENU */}
           <div className="dropdown-wrapper" ref={dropdownRef}>
-            <button 
+            <button
               className="dropdown-trigger"
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
-              <span>→</span>
+              <span>{user?.displayName || user?.email || "User"}</span>
             </button>
-            
+
             {dropdownOpen && (
               <div className="dropdown-menu">
-                {role === "admin" && (
-                  <button 
-                    className="dropdown-item"
-                    onClick={handleAdminPanel}
-                  >
-                    Admin Panel
-                  </button>
+                {role === "viewer" && (
+                  <>
+                    <button className="dropdown-item" onClick={handleUserSettings}>
+                      User Information Settings
+                    </button>
+                    <button
+                      className="dropdown-item dropdown-item--danger"
+                      onClick={handleLogout}
+                    >
+                      Log out
+                    </button>
+                  </>
                 )}
-                <button 
-                  className="dropdown-item"
-                  onClick={handleSettings}
-                >
-                  Settings
-                </button>
-                <button 
-                  className="dropdown-item dropdown-item--danger"
-                  onClick={handleLogout}
-                >
-                  Sign Out
-                </button>
+
+                {role === "admin" && (
+                  <>
+                    <button className="dropdown-item" onClick={handleAdminUsers}>
+                      Users Information Settings
+                    </button>
+                    <button className="dropdown-item" onClick={handleAdminRoutes}>
+                      Manage Routes
+                    </button>
+                    <button
+                      className="dropdown-item dropdown-item--danger"
+                      onClick={handleLogout}
+                    >
+                      Log out
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -134,10 +130,7 @@ export default function Layout({ children }) {
           <input className="search-input" placeholder="Search location..." />
         </div>
 
-        <div className="content">
-          {children}
-        </div>
-
+        <div className="content">{children}</div>
       </div>
     </div>
   );
