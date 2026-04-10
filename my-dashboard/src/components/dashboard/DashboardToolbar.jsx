@@ -3,7 +3,7 @@ function labelStyle() {
     display: "block",
     marginBottom: "0.6rem",
     fontWeight: "700",
-    color: "#f8fafc",
+    color: "var(--text-on-dark)",
     fontSize: "1rem",
   };
 }
@@ -12,9 +12,9 @@ function selectStyle() {
   return {
     padding: "0.95rem 1rem",
     borderRadius: "14px",
-    border: "1px solid #334155",
-    background: "#020b20",
-    color: "#fff",
+    border: "1px solid var(--border)",
+    background: "var(--bg-main)",
+    color: "var(--text-on-dark)",
     minWidth: "250px",
     width: "100%",
     fontSize: "1rem",
@@ -27,7 +27,7 @@ function buttonStyle(background) {
     border: "none",
     borderRadius: "14px",
     background,
-    color: "#fff",
+    color: "var(--text-on-dark)",
     cursor: "pointer",
     fontWeight: "bold",
     minHeight: "48px",
@@ -56,8 +56,8 @@ export default function DashboardToolbar({
   return (
     <div
       style={{
-        background: "#0a1835",
-        border: "1px solid #1f2937",
+        background: "var(--bg-card)",
+        border: "1px solid var(--border)",
         borderRadius: "18px",
         padding: "1.5rem",
         marginBottom: "1.5rem",
@@ -132,7 +132,7 @@ export default function DashboardToolbar({
         <button
           onClick={onRefreshRouteLines}
           disabled={routingLoading || (!tomtomEnabled && sourceMode === "firestore")}
-          style={buttonStyle(routingLoading ? "#475569" : "#2563eb")}
+          style={buttonStyle(routingLoading ? "#475569" : "var(--accent)")}
         >
           {routingLoading ? "Building Routes..." : "Refresh Route Lines"}
         </button>

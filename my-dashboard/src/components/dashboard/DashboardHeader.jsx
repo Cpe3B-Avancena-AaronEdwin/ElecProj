@@ -6,7 +6,7 @@ function buttonStyle(background) {
     border: "none",
     borderRadius: "16px",
     background,
-    color: "#fff",
+    color: "var(--text-on-dark)",
     cursor: "pointer",
     fontWeight: "bold",
     fontSize: "1rem",
@@ -34,7 +34,7 @@ export default function DashboardHeader({ user, role, onAdmin }) {
             lineHeight: 1,
             margin: 0,
             fontWeight: "800",
-            color: "#f8fafc",
+            color: "var(--text-on-dark)",
           }}
         >
           Smart Transit Dashboard
@@ -44,7 +44,7 @@ export default function DashboardHeader({ user, role, onAdmin }) {
           style={{
             margin: "1rem 0 0.2rem",
             fontSize: "1.05rem",
-            color: "#fff",
+            color: "var(--text-on-dark)",
           }}
         >
           Logged in as: <strong>{user?.email || "Unknown"}</strong>
@@ -54,7 +54,7 @@ export default function DashboardHeader({ user, role, onAdmin }) {
           style={{
             margin: 0,
             fontSize: "1.05rem",
-            color: "#fff",
+            color: "var(--text-on-dark)",
           }}
         >
           Role: <strong>{role}</strong>
@@ -63,7 +63,7 @@ export default function DashboardHeader({ user, role, onAdmin }) {
 
       <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
         {role === "admin" && (
-          <button onClick={onAdmin} style={buttonStyle("#2563eb")}>
+          <button onClick={onAdmin} style={buttonStyle("var(--accent)")}>
             Admin Panel
           </button>
         )}

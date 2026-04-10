@@ -6,12 +6,12 @@ export default function SummaryRow({ label, value }) {
         justifyContent: "space-between",
         gap: "1rem",
         padding: "0.55rem 0",
-        borderBottom: "1px solid #1f2937",
-        color: "#cbd5e1",
+        borderBottom: "1px solid var(--border)",
+        color: "var(--text-sub)",
       }}
     >
       <span>{label}</span>
-      <strong style={{ color: "#fff", textAlign: "right" }}>{value}</strong>
+      <strong style={{ color: "var(--text-on-dark)", textAlign: "right" }}>{value}</strong>
     </div>
   );
 }

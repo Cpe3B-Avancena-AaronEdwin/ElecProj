@@ -1,12 +1,5 @@
 import SummaryRow from "./SummaryRow";
 
-const panelStyle = {
-  background: "#111827",
-  border: "1px solid #1f2937",
-  borderRadius: "16px",
-  padding: "1rem",
-};
-
 export default function TrafficStatusPanel({
   loading,
   error = "",
@@ -16,8 +9,8 @@ export default function TrafficStatusPanel({
   apiConfigured = false,
 }) {
   return (
-    <div style={panelStyle}>
-      <h3 style={{ marginTop: 0, color: "#fff" }}>Traffic Status</h3>
+    <div className="panel">
+      <h3>Traffic Status</h3>
       <SummaryRow label="API Key" value={apiConfigured ? "Configured" : "Missing"} />
       <SummaryRow
         label="Overlay"
@@ -35,7 +28,7 @@ export default function TrafficStatusPanel({
       <div
         style={{
           marginTop: "0.9rem",
-          color: error ? "#fca5a5" : "#cbd5e1",
+          color: error ? "#fca5a5" : "var(--text-sub)",
         }}
       >
         {error ||
