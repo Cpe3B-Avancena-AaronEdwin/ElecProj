@@ -11,20 +11,20 @@ export default function Layout({ children }) {
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-  function handleClickOutside(e) {
-    if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-      setDropdownOpen(false);
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
     }
-  }
 
-  if (dropdownOpen) {
-    document.addEventListener("mousedown", handleClickOutside);
-  }
+    if (dropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
 
-  return () => {
-    document.removeEventListener("mousedown", handleClickOutside);
-  };
-}, [dropdownOpen]);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownOpen]);
 
   const handleLogout = async () => {
     await logoutUser();
@@ -38,12 +38,12 @@ export default function Layout({ children }) {
   };
 
   const handleAdminUsers = () => {
-    navigate("/admin/users");
+    navigate("/admin/users");   // ✅ User Management
     setDropdownOpen(false);
   };
 
-  const handleAdminRoutes = () => {
-    navigate("/admin/routes");
+  const handleAdminPanel = () => {
+    navigate("/admin");         // ✅ Admin Panel
     setDropdownOpen(false);
   };
 
@@ -68,13 +68,17 @@ export default function Layout({ children }) {
             </div>
           </div>
 
-          {/* DROPDOWN MENU */}
-          <div className="dropdown-wrapper" ref={dropdownRef}>
+          {/* USER INFO + DROPDOWN */}
+          <div className="header-right" ref={dropdownRef}>
+            <span className="user-label">
+              Hello, {user?.displayName || "User"}
+            </span>
+
             <button
               className="dropdown-trigger"
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
-              <span>{user?.displayName || user?.email || "User"}</span>
+              ☰
             </button>
 
             {dropdownOpen && (
@@ -98,7 +102,7 @@ export default function Layout({ children }) {
                     <button className="dropdown-item" onClick={handleAdminUsers}>
                       Users Information Settings
                     </button>
-                    <button className="dropdown-item" onClick={handleAdminRoutes}>
+                    <button className="dropdown-item" onClick={handleAdminPanel}>
                       Manage Routes
                     </button>
                     <button

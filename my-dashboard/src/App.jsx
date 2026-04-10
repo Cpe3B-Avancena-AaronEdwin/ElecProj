@@ -1,14 +1,15 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";   
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
-import Dashboard from "./pages/Dashboard";                       
-import Admin from "./pages/Admin";                              
-import UserSettings from "./components/user/UserSettings";       
-import Login from "./pages/Login";                               
-import Reports from "./pages/Reports";                           
-import Traffic from "./pages/Traffic";                           
-import RoutesPage from "./pages/Routes";                         
-import About from "./pages/About";                               
+import Dashboard from "./pages/Dashboard";
+import Admin from "./pages/Admin";              // ✅ Admin Panel
+import AdminUsersPage from "./pages/AdminUsersPage"; // ✅ User Management
+import UserSettings from "./components/user/UserSettings";
+import Login from "./pages/Login";
+import Reports from "./pages/Reports";
+import Traffic from "./pages/Traffic";
+import RoutesPage from "./pages/Routes";       // ✅ Public routes page
+import About from "./pages/About";
 
 // 🔹 Protected Route wrapper
 function ProtectedRoute({ children, allowedRoles }) {
@@ -72,10 +73,20 @@ export default function App() {
 
           {/* 🔹 Admin Panel */}
           <Route
-            path="/admin/*"
+            path="/admin"
             element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <Admin />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 🔹 Admin Users Page */}
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminUsersPage />
               </ProtectedRoute>
             }
           />
