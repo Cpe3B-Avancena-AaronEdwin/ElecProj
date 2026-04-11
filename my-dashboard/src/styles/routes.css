@@ -1,0 +1,87 @@
+/* Dashboard container */
+body {
+  font-size: 14px;
+}
+.dashboard-container {
+  background:
+    radial-gradient(circle at 20% 10%, rgba(255,255,255,0.04), transparent 40%),
+    radial-gradient(circle at 80% 30%, rgba(255,255,255,0.03), transparent 45%),
+    radial-gradient(circle at 50% 90%, rgba(255,255,255,0.02), transparent 50%),
+    var(--color-base);
+
+  
+  padding: clamp(1rem, 2vw, 2.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 1400px;
+  margin: 0 auto;
+    height: 100vh;
+  overflow: hidden;
+}
+
+/* Page header */
+.page-header {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(10px);
+}
+.page-header h1 {
+  font-size: clamp(1.4rem, 2vw, 2rem);
+  font-weight: 700;
+  color: var(--color-text-on-dark);
+  margin-bottom: 0.5rem;
+}
+.page-header p {
+  font-size: clamp(0.9rem, 1.2vw, 1rem);
+  color: var(--color-muted);
+}
+
+/* Grid panels */
+.grid {
+  position: relative;
+  align-items: start;
+}
+
+/* Card wrapper */
+.card {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+/* Responsive map */
+.card > .dashboard-map {
+  width: 100%;
+  height: clamp(300px, 50vh, 600px);
+}
+
+/* Panels */
+.panel {
+  background: var(--color-panel);
+  border-radius: 0.8rem;
+  padding: 1rem;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.dashboard-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding-right: 0.5rem;
+}
+.map-card {
+  height: 45vh;
+  min-height: 350px;
+  padding: 0;
+  overflow: hidden;
+}

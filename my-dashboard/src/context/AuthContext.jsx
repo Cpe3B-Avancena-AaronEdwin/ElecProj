@@ -3,6 +3,13 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { observeAuthState } from "../firebase/auth";
 
+import {
+  updateUserProfile,
+  updatePassword,
+  getUserSessions,
+  deleteUserAccount
+} from "../components/user/UserService";
+
 const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
@@ -40,8 +47,39 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
+  // 🔹 New helper functions for User Settings
+  const updateProfileInfo = async (data) => {
+    await updateUserProfile(data);
+    // Refresh local state with updated info
+    setUser({ ...user, displayName: data.fullName, photoURL: data.photoURL });
+  };
+
+  const changePassword = async (newPassword) => {
+    await updatePassword(newPassword);
+  };
+
+  const fetchSessions = async () => {
+    return await getUserSessions();
+  };
+
+  const removeAccount = async () => {
+    await deleteUserAccount();
+    setUser(null);
+    setRole(null);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, role, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        role,
+        loading,
+        updateProfileInfo,
+        changePassword,
+        fetchSessions,
+        removeAccount
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

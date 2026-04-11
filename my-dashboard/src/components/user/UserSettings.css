@@ -1,0 +1,401 @@
+/* ============================= */
+/* CONTAINER */
+/* ============================= */
+.user-settings-container {
+  padding: 3rem;
+  background: var(--color-base);
+  min-height: 100vh;
+  color: var(--color-text-on-dark);
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+/* ============================= */
+/* HEADER */
+/* ============================= */
+.settings-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08); /* subtle divider */
+  margin-bottom: 2rem;
+}
+
+
+.page-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--color-text-on-dark);
+}
+
+/* ============================= */
+/* BANNER */
+/* ============================= */
+.banner {
+  padding: 1rem;
+  border-radius: 0.7rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.banner.success {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--success);
+}
+
+.banner.error {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--danger);
+}
+
+/* ============================= */
+/* CARD */
+/* ============================= */
+/* Settings card (transparent cyan) */
+/* Settings card (transparent cyan) */
+.settings-section {
+  background: rgba(6, 182, 212, 0.12);
+  border: 1px solid rgba(6, 182, 212, 0.35);
+  backdrop-filter: blur(10px);
+  border-radius: 1.2rem;
+  padding: 2.5rem;
+  margin-bottom: 2rem;
+  transition: 0.2s ease;
+}
+
+.settings-section:hover {
+  box-shadow: 0 0 12px rgba(6, 182, 212, 0.25);
+}
+
+
+/* Danger section (Delete) */
+.settings-section.danger {
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  background: rgba(127, 29, 29, 0.15);
+}
+
+/* ============================= */
+/* SECTION TITLE */
+/* ============================= */
+.section-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: var(--color-text-on-dark);
+}
+
+/* ============================= */
+/* FORM LAYOUT */
+/* ============================= */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* LABEL */
+label {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+/* HELPER TEXT */
+.helper-text {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+/* ============================= */
+/* INPUT STYLE */
+/* ============================= */
+.input-wrapper {
+  background: var(--color-panel);
+  border-radius: 0.9rem;
+  padding: 0 1rem;
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  border: 1px solid rgba(255,255,255,0.05);
+  transition: 0.2s ease;
+}
+
+.input-wrapper:focus-within {
+  border: 1px solid var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(34,211,238,0.15);
+}
+
+.input-wrapper.disabled {
+  opacity: 0.6;
+}
+
+/* INPUT */
+.settings-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text-on-dark);
+  font-size: 1rem;
+}
+
+.settings-input::placeholder {
+  color: var(--color-muted);
+}
+
+/* ============================= */
+/* BUTTONS */
+/* ============================= */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+/* PRIMARY BUTTON */
+.settings-button.primary {
+  background: var(--color-accent);
+  color: var(--color-base);
+  font-weight: 600;
+  padding: 0.65rem 1.4rem;
+  border-radius: 0.7rem;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.settings-button.primary:hover {
+  background: var(--color-highlight);
+}
+
+/* CANCEL BUTTON */
+.settings-button-cancel {
+  background: transparent;
+  color: var(--color-text-on-dark);
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 0.65rem 1.4rem;
+  border-radius: 0.7rem;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.settings-button-cancel:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+/* ============================= */
+/* DELETE BUTTON */
+/* ============================= */
+.settings-button-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #fff;
+  font-weight: 600;
+  padding: 0.7rem 1.4rem;
+  border-radius: 0.7rem;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.settings-button-danger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.3);
+}
+
+/* ============================= */
+/* DELETE SECTION CONTENT */
+/* ============================= */
+.delete-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.delete-warning {
+  font-size: 0.9rem;
+  color: var(--danger);
+}
+
+/* ============================= */
+/* SESSIONS */
+/* ============================= */
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+.session-item {
+  display: flex;
+  justify-content: space-between;
+  background: var(--color-panel);
+  padding: 0.75rem 1rem;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+/* PASSWORD TOGGLE */
+.toggle {
+  cursor: pointer;
+  margin-left: 0.5rem;
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+/* MODAL OVERLAY */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+/* MODAL BOX */
+.modal {
+  background: var(--color-card);
+  padding: 2rem;
+  border-radius: 1rem;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+/* MODAL TITLE */
+.modal-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+/* MODAL ACTIONS */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+/* FIX OVERLAP ISSUE */
+.settings-section {
+  position: relative;
+  z-index: 1;
+}
+
+/* PASSWORD TOGGLE FIX */
+.input-wrapper {
+  position: relative;
+}
+
+.toggle {
+  position: absolute;
+  right: 12px;
+  cursor: pointer;
+}
+
+/* DELETE SECTION FIX */
+.settings-section.danger {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* DELETE TEXT FIX */
+.delete-warning {
+  line-height: 1.4;
+  max-width: 400px;
+}
+
+/* MODAL FIX */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+
+/* PREVENT LAYOUT BREAK */
+.modal {
+  max-width: 340px;
+  width: 100%;
+}
+
+.header-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--color-text-on-dark);
+  margin: 0;
+}
+
+.sub-title {
+  font-size: 0.95rem;
+  color: var(--color-muted);
+  margin-top: 0.3rem;
+}
+
+/* HEADER */
+.settings-header {
+  display: flex;
+  align-items: center;
+  background: var(--color-card);
+  padding: 1rem 1.5rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255,255,255,0.08);
+  margin-bottom: 2rem;
+}
+
+/* Back button (matches action buttons + cards) */
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(6, 182, 212, 0.15);   /* transparent cyan */
+  border: 1px solid rgba(6, 182, 212, 0.4);
+  backdrop-filter: blur(8px);
+  color: #e0f2fe;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.45rem 1rem;
+  border-radius: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-button:hover {
+  background: rgba(6, 182, 212, 0.3);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+}
+
+/* Header text */
+.header-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text-on-dark);
+}
+
+.sub-title {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  margin-top: 0.25rem;
+}
