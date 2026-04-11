@@ -108,13 +108,14 @@
 html, body, #root {
   height: 100%;
   margin: 0;
-  background: #000000;
+ background-color: var(--color-base) !important;
+  color: #f8fafc;
+  font-family: Inter, system-ui, sans-serif;
 }
-
 .app {
   display: flex;
   min-height: 100vh;
-  background: #000000 !important;
+  background-color: var(--color-base) !important;
   color: var(--text-main);
   flex-direction: column;
 }
@@ -154,7 +155,7 @@ html, body, #root {
 .content {
   flex: 1;
   overflow-y: auto;
-  background: #000000;
+  background-color: var(--color-base);
 }
 
 /* HEADER */
@@ -296,7 +297,7 @@ html, body, #root {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: #1e293b;            /* matches dashboard card background */
+  background-color: #0f172a;            /* matches dashboard card background */
   border: 1px solid #475569;
   border-radius: 12px;
   padding: 8px;
@@ -321,7 +322,7 @@ html, body, #root {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: #1e293b;            /* matches dashboard card background */
+  background-color: #0f172a;;            /* matches dashboard card background */
   border: 1px solid #475569;
   border-radius: 12px;
   padding: 8px;
@@ -371,7 +372,7 @@ html, body, #root {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: #1e293b;        /* dark card background */
+   background-color: #0f172a;;        /* dark card background */
   border: 1px solid rgba(34, 211, 238, 0.15);
   border-radius: 12px;
   padding: 8px;
@@ -607,6 +608,8 @@ html, body, #root {
   padding: 20px;
   box-sizing: border-box;
   flex: 1;
+  background-color: var(--color-base);   /* ✅ ultra-dark navy background */
+  color: var(--color-text-on-dark);      /* ✅ crisp light text */
 }
 
 .dashboard-status-row {
@@ -948,3 +951,8 @@ html, body, #root {
   font-size: 0.95rem;
   text-align: center;
 }
+html, body, #root, .app, .content, .dashboard-container, .user-settings-container {
+  background: var(--color-base) !important;  /* one unified tone */
+  color: var(--color-text-on-dark);
+}
+

@@ -1,6 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";              // ✅ Admin Panel
 import AdminUsersPage from "./pages/AdminUsersPage"; // ✅ User Management
@@ -10,6 +9,8 @@ import Reports from "./pages/Reports";
 import Traffic from "./pages/Traffic";
 import RoutesPage from "./pages/Routes";       // ✅ Public routes page
 import About from "./pages/About";
+import './App';      
+import "./components/user/UserSettings";
 
 // 🔹 Protected Route wrapper
 function ProtectedRoute({ children, allowedRoles }) {
@@ -30,6 +31,17 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Routes>
+          <Route path="/" element={<Login />} />
+
+  <Route
+    path="/dashboard"
+    element={
+      <ProtectedRoute allowedRoles={["admin", "operator", "viewer"]}>
+        <Dashboard />
+      </ProtectedRoute>
+    }
+  />
+
           {/* Public routes */}
           <Route path="/login" element={<Login />} />
           <Route path="/about" element={<About />} />
