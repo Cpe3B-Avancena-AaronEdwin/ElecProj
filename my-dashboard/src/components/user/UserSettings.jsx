@@ -5,7 +5,7 @@ import UserPasswordForm from "./UserPasswordForm";
 import UserDeleteAccount from "./UserDeleteAccount";
 import UserSessions from "./UserSessions";
 import { updateUserProfile } from "./UserService";
-import "./userSettings.css";
+import "./UserSettings.css";
 
 export default function UserSettings() {
   const navigate = useNavigate();
