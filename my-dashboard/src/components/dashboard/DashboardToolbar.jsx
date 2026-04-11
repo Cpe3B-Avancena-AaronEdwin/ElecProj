@@ -35,6 +35,21 @@ function buttonStyle(background) {
   };
 }
 
+function overlayToggleButtonStyle(active) {
+  return {
+    flex: 1,
+    padding: "0.95rem 1rem",
+    borderRadius: "14px",
+    border: `1px solid ${active ? "rgba(56, 189, 248, 0.9)" : "var(--border)"}`,
+    background: active ? "rgba(56, 189, 248, 0.18)" : "var(--bg-main)",
+    color: "var(--text-on-dark)",
+    fontSize: "1rem",
+    fontWeight: "700",
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+  };
+}
+
 export default function DashboardToolbar({
   routes = [],
   selectedRouteId,
@@ -71,14 +86,14 @@ export default function DashboardToolbar({
         <label style={labelStyle()}>Route Filter</label>
         <select
           value={selectedRouteId}
-          onChange={(e) => onChangeRoute(e.target.value)}
+          onChange={(e) => onChangeRoute?.(e.target.value)}
           style={selectStyle()}
         >
           <option value="all">All Routes</option>
           {routes.map((r) => (
             <option key={r.route_id || r.id} value={r.route_id || r.id}>
               {(r.routeCode || r.route_short_name || "N/A")} -{" "}
-              {(r.routeName || r.route_long_name || r.route_desc || "Unnamed Route")}
+              {r.routeName || r.route_long_name || r.route_desc || "Unnamed Route"}
             </option>
           ))}
         </select>
@@ -100,15 +115,51 @@ export default function DashboardToolbar({
 
       <div>
         <label style={labelStyle()}>Traffic Overlay</label>
-        <select
-          value={showTrafficOverlay ? "on" : "off"}
-          onChange={(e) => onChangeTrafficOverlay?.(e.target.value === "on")}
-          style={selectStyle()}
-          disabled={sourceMode === "gtfs"}
+        <div
+          style={{
+            display: "flex",
+            gap: "0.75rem",
+            width: "100%",
+          }}
         >
-          <option value="on">Show Traffic</option>
-          <option value="off">Hide Traffic</option>
-        </select>
+          <button
+            type="button"
+            onClick={() => onChangeTrafficOverlay?.(true)}
+            disabled={!tomtomEnabled}
+            style={{
+              ...overlayToggleButtonStyle(showTrafficOverlay),
+              opacity: tomtomEnabled ? 1 : 0.6,
+              cursor: tomtomEnabled ? "pointer" : "not-allowed",
+            }}
+          >
+            Show Traffic
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onChangeTrafficOverlay?.(false)}
+            disabled={!tomtomEnabled}
+            style={{
+              ...overlayToggleButtonStyle(!showTrafficOverlay),
+              opacity: tomtomEnabled ? 1 : 0.6,
+              cursor: tomtomEnabled ? "pointer" : "not-allowed",
+            }}
+          >
+            Hide Traffic
+          </button>
+        </div>
+
+        {!tomtomEnabled ? (
+          <div
+            style={{
+              marginTop: "0.5rem",
+              fontSize: "0.9rem",
+              color: "var(--text-sub)",
+            }}
+          >
+            TomTom API key not configured.
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -121,9 +172,9 @@ export default function DashboardToolbar({
       >
         <button
           onClick={onRefreshTraffic}
-          disabled={trafficLoading || !tomtomEnabled || sourceMode === "gtfs"}
+          disabled={trafficLoading || !tomtomEnabled}
           style={buttonStyle(
-            trafficLoading || sourceMode === "gtfs" ? "#475569" : "#10b981"
+            trafficLoading || !tomtomEnabled ? "#475569" : "#10b981"
           )}
         >
           {trafficLoading ? "Refreshing Traffic..." : "Refresh Traffic"}
@@ -132,7 +183,11 @@ export default function DashboardToolbar({
         <button
           onClick={onRefreshRouteLines}
           disabled={routingLoading || (!tomtomEnabled && sourceMode === "firestore")}
-          style={buttonStyle(routingLoading ? "#475569" : "var(--accent)")}
+          style={buttonStyle(
+            routingLoading || (!tomtomEnabled && sourceMode === "firestore")
+              ? "#475569"
+              : "var(--accent)"
+          )}
         >
           {routingLoading ? "Building Routes..." : "Refresh Route Lines"}
         </button>

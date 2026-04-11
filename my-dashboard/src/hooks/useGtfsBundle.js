@@ -24,9 +24,21 @@ export function useGtfsBundle() {
       try {
         const raw = await loadGtfsFiles(FILES);
         const built = buildGtfsBundle(raw);
-        setGtfsBundle(built);
+
+        setGtfsBundle({
+          ...built,
+          rawRoutes: raw.routes || [],
+          rawStops: raw.stops || [],
+          rawTrips: raw.trips || [],
+          rawStopTimes: raw.stop_times || [],
+          rawShapes: raw.shapes || [],
+          rawAgency: raw.agency || [],
+          rawCalendar: raw.calendar || [],
+          rawFeedInfo: raw.feed_info || [],
+          rawFrequencies: raw.frequencies || [],
+        });
       } catch (e) {
-        setGtfsError(e.message);
+        setGtfsError(e.message || "Failed to load GTFS bundle.");
       } finally {
         setGtfsLoading(false);
       }

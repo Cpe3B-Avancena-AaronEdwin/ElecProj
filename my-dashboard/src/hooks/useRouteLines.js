@@ -4,7 +4,9 @@ export function useRouteLines(
   stops = [],
   apiKey,
   sourceMode = "firestore",
-  sourceRouteMap = {}
+  sourceRouteMap = {},
+  gtfsShapePoints = [],
+  selectedRouteMeta = null
 ) {
   const [routePaths, setRoutePaths] = useState([]);
   const [routingLoading, setRoutingLoading] = useState(false);
@@ -13,33 +15,69 @@ export function useRouteLines(
 
   const validStops = useMemo(() => {
     return stops.filter((s) => {
-      const lat = parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude);
-      const lng = parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude);
+      const lat = parseFloat(
+        s.stopLat ?? s.stop_lat ?? s.latitude ?? s.lat
+      );
+      const lng = parseFloat(
+        s.stopLon ?? s.stop_lon ?? s.longitude ?? s.lng
+      );
       return !Number.isNaN(lat) && !Number.isNaN(lng);
     });
   }, [stops]);
 
+  const validGtfsShapePoints = useMemo(() => {
+    return (gtfsShapePoints || []).filter(
+      (p) =>
+        Array.isArray(p) &&
+        p.length >= 2 &&
+        !Number.isNaN(parseFloat(p[0])) &&
+        !Number.isNaN(parseFloat(p[1]))
+    );
+  }, [gtfsShapePoints]);
+
   const refreshRouteLines = async () => {
     if (sourceMode === "gtfs") {
-      const fallback = validStops.length >= 2
-        ? [
-            {
-              routeId: "gtfs",
-              routeCode: "GTFS",
-              routeName: "GTFS Shape",
-              color: "#2563eb",
-              path: validStops.map((s) => [
-                parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude),
-                parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude),
-              ]),
-              usedRoutingApi: false,
-              source: "gtfs-shapes",
-            },
-          ]
-        : [];
+      if (validGtfsShapePoints.length >= 2) {
+        setRoutePaths([
+          {
+            routeId: selectedRouteMeta?.id || "gtfs-shape",
+            routeCode: selectedRouteMeta?.code || "GTFS",
+            routeName: selectedRouteMeta?.name || "GTFS Shape",
+            color: "#2563eb",
+            path: validGtfsShapePoints,
+            usedRoutingApi: false,
+            source: "gtfs-shapes",
+          },
+        ]);
+        setRoutingError("");
+        setLastRoutingUpdated(new Date().toISOString());
+        return;
+      }
 
-      setRoutePaths(fallback);
-      setRoutingError("");
+      if (validStops.length >= 2) {
+        setRoutePaths([
+          {
+            routeId: selectedRouteMeta?.id || "gtfs-stops",
+            routeCode: selectedRouteMeta?.code || "GTFS",
+            routeName: selectedRouteMeta?.name || "GTFS Stop Order",
+            color: "#2563eb",
+            path: validStops.map((s) => [
+              parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude ?? s.lat),
+              parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude ?? s.lng),
+            ]),
+            usedRoutingApi: false,
+            source: "stops",
+          },
+        ]);
+        setRoutingError(
+          "GTFS shapes were not available for this route, so the dashboard is using ordered stops as the fallback line."
+        );
+        setLastRoutingUpdated(new Date().toISOString());
+        return;
+      }
+
+      setRoutePaths([]);
+      setRoutingError("No GTFS shape or ordered stop data found for this route.");
       setLastRoutingUpdated(new Date().toISOString());
       return;
     }
@@ -52,6 +90,7 @@ export function useRouteLines(
 
     if (validStops.length < 2) {
       setRoutePaths([]);
+      setRoutingError("");
       return;
     }
 
@@ -61,8 +100,8 @@ export function useRouteLines(
     try {
       const coords = validStops
         .map((s) => {
-          const lat = parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude);
-          const lng = parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude);
+          const lat = parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude ?? s.lat);
+          const lng = parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude ?? s.lng);
           return `${lat},${lng}`;
         })
         .join(":");
@@ -83,15 +122,18 @@ export function useRouteLines(
 
       if (points.length < 2) {
         const fallbackPoints = validStops.map((s) => [
-          parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude),
-          parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude),
+          parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude ?? s.lat),
+          parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude ?? s.lng),
         ]);
+
+        const firstRouteId =
+          validStops[0]?.routeId || validStops[0]?.route_id || "fallback";
 
         setRoutePaths([
           {
-            routeId: "fallback",
-            routeCode: sourceRouteMap[validStops[0]?.routeId]?.routeCode || "N/A",
-            routeName: sourceRouteMap[validStops[0]?.routeId]?.routeName || "Route",
+            routeId: firstRouteId,
+            routeCode: sourceRouteMap[firstRouteId]?.routeCode || "N/A",
+            routeName: sourceRouteMap[firstRouteId]?.routeName || "Route",
             color: "#2563eb",
             path: fallbackPoints,
             usedRoutingApi: false,
@@ -103,11 +145,14 @@ export function useRouteLines(
           "TomTom routing could not build road-following lines, so the dashboard is using stop-to-stop fallback lines."
         );
       } else {
+        const firstRouteId =
+          validStops[0]?.routeId || validStops[0]?.route_id || "route";
+
         setRoutePaths([
           {
-            routeId: "route",
-            routeCode: sourceRouteMap[validStops[0]?.routeId]?.routeCode || "N/A",
-            routeName: sourceRouteMap[validStops[0]?.routeId]?.routeName || "Route",
+            routeId: firstRouteId,
+            routeCode: sourceRouteMap[firstRouteId]?.routeCode || "N/A",
+            routeName: sourceRouteMap[firstRouteId]?.routeName || "Route",
             color: "#2563eb",
             path: points,
             usedRoutingApi: true,
@@ -128,7 +173,13 @@ export function useRouteLines(
   useEffect(() => {
     refreshRouteLines();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiKey, sourceMode, validStops.length]);
+  }, [
+    apiKey,
+    sourceMode,
+    validStops.length,
+    validGtfsShapePoints.length,
+    selectedRouteMeta?.id,
+  ]);
 
   return {
     routePaths,
