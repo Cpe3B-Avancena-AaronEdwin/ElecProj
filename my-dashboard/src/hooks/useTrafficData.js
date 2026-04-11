@@ -1,45 +1,324 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  serverTimestamp,
+  where,
+} from "firebase/firestore";
+import { db } from "../firebase/config";
+
+const SNAPSHOT_COLLECTION = "trafficSnapshots";
+const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
+const SNAPSHOT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const DASHBOARD_HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const DASHBOARD_HISTORY_LIMIT = 288; // 24h at 5-minute intervals
+const SUMMARY_HISTORY_LIMIT = 2016; // 7d at 5-minute intervals
+const MAX_SAMPLE_POINTS = 10;
+
+const EMPTY_SUMMARY = {
+  total: 0,
+  totalPoints: 0,
+  samples: 0,
+  light: 0,
+  moderate: 0,
+  heavy: 0,
+  closed: 0,
+  averageCurrentSpeed: 0,
+  averageFreeFlowSpeed: 0,
+  level: "Low",
+  avgSpeed: 0,
+  congestionScore: 0,
+};
+
+function toLatLng(stop) {
+  const lat = parseFloat(stop.stopLat ?? stop.stop_lat ?? stop.latitude);
+  const lng = parseFloat(stop.stopLon ?? stop.stop_lon ?? stop.longitude);
+
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+
+  return { lat, lng };
+}
+
+function pickEvenlySpacedStops(stops = [], maxPoints = MAX_SAMPLE_POINTS) {
+  if (!Array.isArray(stops) || stops.length <= maxPoints) return stops;
+
+  const result = [];
+  const usedIndexes = new Set();
+  const step = (stops.length - 1) / (maxPoints - 1);
+
+  for (let i = 0; i < maxPoints; i += 1) {
+    const index = Math.round(i * step);
+    if (!usedIndexes.has(index)) {
+      result.push(stops[index]);
+      usedIndexes.add(index);
+    }
+  }
+
+  return result;
+}
+
+function severityFromSegment(segment) {
+  const currentSpeed = Number(segment?.currentSpeed || 0);
+  const freeFlowSpeed = Number(segment?.freeFlowSpeed || 0);
+  const ratio = freeFlowSpeed > 0 ? currentSpeed / freeFlowSpeed : 1;
+
+  let severity = "Light";
+  let color = "#22c55e";
+  let congestionScore = Math.round((1 - Math.min(ratio, 1)) * 100);
+
+  if (segment?.roadClosure === true) {
+    severity = "Closed";
+    color = "#6b7280";
+    congestionScore = 100;
+  } else if (ratio < 0.35) {
+    severity = "Heavy";
+    color = "#ef4444";
+    congestionScore = Math.max(70, congestionScore);
+  } else if (ratio < 0.75) {
+    severity = "Moderate";
+    color = "#f59e0b";
+    congestionScore = Math.max(35, congestionScore);
+  } else {
+    congestionScore = Math.min(30, congestionScore);
+  }
+
+  return {
+    severity,
+    color,
+    currentSpeed,
+    freeFlowSpeed,
+    ratio,
+    congestionScore,
+  };
+}
+
+function buildTrafficSummary(results = []) {
+  const usable = results.filter((item) => item.usable);
+
+  let currentTotal = 0;
+  let freeFlowTotal = 0;
+  let congestionScoreTotal = 0;
+
+  const summary = { ...EMPTY_SUMMARY, total: usable.length, totalPoints: usable.length, samples: usable.length };
+
+  usable.forEach((item) => {
+    currentTotal += Number(item.currentSpeed || 0);
+    freeFlowTotal += Number(item.freeFlowSpeed || 0);
+    congestionScoreTotal += Number(item.congestionScore || 0);
+
+    if (item.severity === "Closed") summary.closed += 1;
+    else if (item.severity === "Heavy") summary.heavy += 1;
+    else if (item.severity === "Moderate") summary.moderate += 1;
+    else summary.light += 1;
+  });
+
+  summary.averageCurrentSpeed = usable.length
+    ? Number((currentTotal / usable.length).toFixed(1))
+    : 0;
+  summary.averageFreeFlowSpeed = usable.length
+    ? Number((freeFlowTotal / usable.length).toFixed(1))
+    : 0;
+  summary.avgSpeed = summary.averageCurrentSpeed;
+  summary.congestionScore = usable.length
+    ? Math.round(congestionScoreTotal / usable.length)
+    : 0;
+
+  if (summary.closed > 0 || summary.heavy >= 2 || summary.congestionScore >= 70) {
+    summary.level = "High";
+  } else if (summary.moderate > 0 || summary.heavy === 1 || summary.congestionScore >= 40) {
+    summary.level = "Medium";
+  } else {
+    summary.level = "Low";
+  }
+
+  return summary;
+}
+
+function normalizeHistoryDoc(docSnap) {
+  const data = docSnap.data() || {};
+
+  return {
+    id: docSnap.id,
+    timestampMs: Number(data.timestampMs || 0),
+    timestampText: data.timestampText || "",
+    congestionScore: Number(data.congestionScore || 0),
+    congestionLevel: data.congestionLevel || "Low",
+    delayRisk: data.delayRisk || "Low",
+    avgDelay: Number(data.avgDelay || 0),
+    trafficSampleCount: Number(data.trafficSampleCount || 0),
+    heavyCount: Number(data.heavyCount || 0),
+    moderateCount: Number(data.moderateCount || 0),
+    lowCount: Number(data.lowCount || 0),
+    closedCount: Number(data.closedCount || 0),
+  };
+}
 
 export function useTrafficData(stops = [], apiKey, sourceMode = "firestore") {
   const [trafficSamples, setTrafficSamples] = useState([]);
-  const [trafficSummary, setTrafficSummary] = useState({
-    total: 0,
-    light: 0,
-    moderate: 0,
-    heavy: 0,
-    closed: 0,
-    averageCurrentSpeed: 0,
-    averageFreeFlowSpeed: 0,
-    level: "Low",
-    avgSpeed: 0,
+  const [trafficSummary, setTrafficSummary] = useState(EMPTY_SUMMARY);
+  const [trafficHistory, setTrafficHistory] = useState([]);
+  const [historyAnalytics, setHistoryAnalytics] = useState({
+    snapshotCount7d: 0,
+    averageScore7d: 0,
+    latestScore: 0,
+    highestScore7d: 0,
   });
   const [trafficLoading, setTrafficLoading] = useState(false);
   const [trafficError, setTrafficError] = useState("");
+  const [historyError, setHistoryError] = useState("");
   const [lastTrafficUpdated, setLastTrafficUpdated] = useState(null);
 
-  const validStops = useMemo(() => {
-    return stops.filter((s) => {
-      const lat = parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude);
-      const lng = parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude);
-      return !Number.isNaN(lat) && !Number.isNaN(lng);
-    });
-  }, [stops]);
+  const validStops = useMemo(() => stops.filter((stop) => !!toLatLng(stop)), [stops]);
 
-  const refreshTraffic = async () => {
+  const loadTrafficHistory = useCallback(async () => {
+    try {
+      const now = Date.now();
+      const dashboardCutoff = now - DASHBOARD_HISTORY_WINDOW_MS;
+      const retentionCutoff = now - SNAPSHOT_RETENTION_MS;
+
+      const recentQuery = query(
+        collection(db, SNAPSHOT_COLLECTION),
+        where("timestampMs", ">=", dashboardCutoff),
+        orderBy("timestampMs", "asc"),
+        limit(DASHBOARD_HISTORY_LIMIT)
+      );
+
+      const summaryQuery = query(
+        collection(db, SNAPSHOT_COLLECTION),
+        where("timestampMs", ">=", retentionCutoff),
+        orderBy("timestampMs", "desc"),
+        limit(SUMMARY_HISTORY_LIMIT)
+      );
+
+      const [recentSnapshot, summarySnapshot] = await Promise.all([
+        getDocs(recentQuery),
+        getDocs(summaryQuery),
+      ]);
+
+      const recentHistory = recentSnapshot.docs.map(normalizeHistoryDoc);
+      const fullHistory = summarySnapshot.docs.map(normalizeHistoryDoc);
+
+      const scoreValues = fullHistory.map((item) => Number(item.congestionScore || 0));
+      const averageScore7d = scoreValues.length
+        ? Number(
+            (
+              scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length
+            ).toFixed(1)
+          )
+        : 0;
+
+      setTrafficHistory(recentHistory);
+      setHistoryAnalytics({
+        snapshotCount7d: fullHistory.length,
+        averageScore7d,
+        latestScore: fullHistory.length ? fullHistory[0].congestionScore : 0,
+        highestScore7d: scoreValues.length ? Math.max(...scoreValues) : 0,
+      });
+      setHistoryError("");
+
+      return {
+        recentHistory,
+        fullHistory,
+      };
+    } catch (error) {
+      setHistoryError(error.message || "Failed to load traffic history.");
+      setTrafficHistory([]);
+      setHistoryAnalytics({
+        snapshotCount7d: 0,
+        averageScore7d: 0,
+        latestScore: 0,
+        highestScore7d: 0,
+      });
+      return {
+        recentHistory: [],
+        fullHistory: [],
+      };
+    }
+  }, []);
+
+  const cleanupOldSnapshots = useCallback(async () => {
+    try {
+      const cutoff = Date.now() - SNAPSHOT_RETENTION_MS;
+      const oldQuery = query(
+        collection(db, SNAPSHOT_COLLECTION),
+        where("timestampMs", "<", cutoff),
+        limit(100)
+      );
+
+      const snapshot = await getDocs(oldQuery);
+      if (!snapshot.empty) {
+        await Promise.all(snapshot.docs.map((docSnap) => deleteDoc(docSnap.ref)));
+      }
+    } catch (error) {
+      console.error("Failed to cleanup old traffic snapshots:", error);
+    }
+  }, []);
+
+  const saveSnapshotIfDue = useCallback(
+    async (summary) => {
+      try {
+        const now = Date.now();
+        const { fullHistory } = await loadTrafficHistory();
+        const latest = fullHistory[0];
+
+        if (latest?.timestampMs && now - latest.timestampMs < SNAPSHOT_INTERVAL_MS) {
+          await cleanupOldSnapshots();
+          return;
+        }
+
+        await addDoc(collection(db, SNAPSHOT_COLLECTION), {
+          timestampMs: now,
+          timestampText: new Date(now).toISOString(),
+          createdAt: serverTimestamp(),
+          congestionScore: Number(summary.congestionScore || 0),
+          congestionLevel: summary.level || "Low",
+          delayRisk:
+            summary.closed > 0 || summary.heavy >= 2
+              ? "High"
+              : summary.moderate > 0 || summary.heavy === 1
+              ? "Medium"
+              : "Low",
+          avgDelay: 0,
+          trafficSampleCount: Number(summary.total || 0),
+          heavyCount: Number(summary.heavy || 0),
+          moderateCount: Number(summary.moderate || 0),
+          lowCount: Number(summary.light || 0),
+          closedCount: Number(summary.closed || 0),
+        });
+
+        await cleanupOldSnapshots();
+        await loadTrafficHistory();
+      } catch (error) {
+        setHistoryError(error.message || "Failed to save traffic snapshot.");
+      }
+    },
+    [cleanupOldSnapshots, loadTrafficHistory]
+  );
+
+  const refreshTraffic = useCallback(async () => {
     if (sourceMode === "gtfs") {
       setTrafficSamples([]);
-      setTrafficError("");
+      setTrafficSummary(EMPTY_SUMMARY);
+      await loadTrafficHistory();
       return;
     }
 
     if (!apiKey) {
       setTrafficError("Missing TomTom API key.");
       setTrafficSamples([]);
+      await loadTrafficHistory();
       return;
     }
 
     if (!validStops.length) {
       setTrafficSamples([]);
+      setTrafficSummary(EMPTY_SUMMARY);
+      await loadTrafficHistory();
       return;
     }
 
@@ -47,117 +326,73 @@ export function useTrafficData(stops = [], apiKey, sourceMode = "firestore") {
     setTrafficError("");
 
     try {
-      const sampleStops = validStops.slice(0, 6);
+      const sampleStops = pickEvenlySpacedStops(validStops, MAX_SAMPLE_POINTS);
 
       const results = await Promise.all(
-        sampleStops.map(async (s, index) => {
-          const lat = parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude);
-          const lng = parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude);
+        sampleStops.map(async (stop, index) => {
+          const coords = toLatLng(stop);
+          const lat = coords?.lat;
+          const lng = coords?.lng;
 
-          const res = await fetch(
+          const response = await fetch(
             `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${lat},${lng}&key=${apiKey}`
           );
 
-          if (!res.ok) {
-            throw new Error(`TomTom request failed (${res.status})`);
+          if (!response.ok) {
+            throw new Error(`TomTom request failed (${response.status})`);
           }
 
-          const data = await res.json();
+          const data = await response.json();
           const segment = data?.flowSegmentData;
-
-          const currentSpeed = Number(segment?.currentSpeed || 0);
-          const freeFlowSpeed = Number(segment?.freeFlowSpeed || 0);
-          const ratio = freeFlowSpeed > 0 ? currentSpeed / freeFlowSpeed : 1;
-
-          let color = "#22c55e";
-          let severity = "Light";
-
-          if (segment?.roadClosure === true) {
-            color = "#6b7280";
-            severity = "Closed";
-          } else if (ratio < 0.35) {
-            color = "#ef4444";
-            severity = "Heavy";
-          } else if (ratio < 0.75) {
-            color = "#f59e0b";
-            severity = "Moderate";
-          }
+          const metrics = severityFromSegment(segment);
 
           return {
-            id: s.id || s.stop_id || `sample-${index}`,
-            name: s.stopName || s.stop_name || `Stop ${index + 1}`,
+            id: stop.id || stop.stop_id || `sample-${index}`,
+            name: stop.stopName || stop.stop_name || `Stop ${index + 1}`,
             lat,
             lng,
             usable: true,
-            color,
-            severity,
-            currentSpeed,
-            freeFlowSpeed,
-            ratio,
+            ...metrics,
           };
         })
       );
 
+      const summary = buildTrafficSummary(results);
+
       setTrafficSamples(results);
-
-      const usable = results.filter((item) => item.usable);
-      let currentTotal = 0;
-      let freeFlowTotal = 0;
-
-      const summary = {
-        total: usable.length,
-        light: 0,
-        moderate: 0,
-        heavy: 0,
-        closed: 0,
-        averageCurrentSpeed: 0,
-        averageFreeFlowSpeed: 0,
-        level: "Low",
-        avgSpeed: 0,
-      };
-
-      usable.forEach((item) => {
-        currentTotal += Number(item.currentSpeed || 0);
-        freeFlowTotal += Number(item.freeFlowSpeed || 0);
-
-        if (item.severity === "Closed") summary.closed += 1;
-        else if (item.severity === "Heavy") summary.heavy += 1;
-        else if (item.severity === "Moderate") summary.moderate += 1;
-        else summary.light += 1;
-      });
-
-      summary.averageCurrentSpeed = usable.length
-        ? (currentTotal / usable.length).toFixed(1)
-        : 0;
-      summary.averageFreeFlowSpeed = usable.length
-        ? (freeFlowTotal / usable.length).toFixed(1)
-        : 0;
-      summary.avgSpeed = Number(summary.averageCurrentSpeed);
-
-      if (summary.heavy > 0 || summary.closed > 0) summary.level = "High";
-      else if (summary.moderate > 0) summary.level = "Medium";
-      else summary.level = "Low";
-
       setTrafficSummary(summary);
       setLastTrafficUpdated(new Date().toISOString());
+
+      await saveSnapshotIfDue(summary);
     } catch (error) {
       setTrafficError(error.message || "Failed to load traffic data.");
       setTrafficSamples([]);
     } finally {
       setTrafficLoading(false);
     }
-  };
+  }, [apiKey, loadTrafficHistory, saveSnapshotIfDue, sourceMode, validStops]);
 
   useEffect(() => {
     refreshTraffic();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceMode, apiKey, validStops.length]);
+  }, [refreshTraffic]);
+
+  useEffect(() => {
+    if (sourceMode === "gtfs") return undefined;
+
+    const intervalId = window.setInterval(() => {
+      refreshTraffic();
+    }, SNAPSHOT_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [refreshTraffic, sourceMode]);
 
   return {
     trafficSamples,
     trafficSummary,
+    trafficHistory,
+    historyAnalytics,
     trafficLoading,
-    trafficError,
+    trafficError: trafficError || historyError,
     lastTrafficUpdated,
     refreshTraffic,
   };

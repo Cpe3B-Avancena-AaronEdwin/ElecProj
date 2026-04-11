@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
 import { useFirestoreTransitData } from "../hooks/useFirestoreTransitData";
@@ -7,18 +6,24 @@ import { useGtfsBundle } from "../hooks/useGtfsBundle";
 import { useTrafficData } from "../hooks/useTrafficData";
 import { useRouteLines } from "../hooks/useRouteLines";
 import { useDashboardMetrics } from "../hooks/useDashboardMetrics";
+import { useCurrentPrediction } from "../hooks/useCurrentPrediction";
 
 import DashboardStats from "../components/dashboard/DashboardStats";
 import GtfsStatusPanel from "../components/dashboard/GtfsStatusPanel";
 import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
 import CurrentPredictionPanel from "../components/dashboard/CurrentPredictionPanel";
 import TrafficStatusPanel from "../components/dashboard/TrafficStatusPanel";
+import PredictionStatusPanel from "../components/dashboard/PredictionStatusPanel";
 
 import Layout from "../components/Layout";
 
+function scoreToRatio(score) {
+  const value = Number(score || 0);
+  return Math.max(0, Math.min(1, value / 100));
+}
+
 export default function Dashboard() {
-  const { user, role } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
 
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
 
@@ -32,8 +37,8 @@ export default function Dashboard() {
 
   const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
 
-  const [selectedRouteId, setSelectedRouteId] = useState("all");
-  const [useFirestoreData, setUseFirestoreData] = useState(true);
+  const [selectedRouteId] = useState("all");
+  const [useFirestoreData] = useState(true);
 
   const hasFirestoreData =
     routes.length > 0 || stops.length > 0 || vehicles.length > 0 || trips.length > 0;
@@ -50,12 +55,18 @@ export default function Dashboard() {
     [sourceRoutes]
   );
 
+  const sourceRouteMap = useMemo(() => {
+    return activeRoutes.reduce((acc, route) => {
+      const key = route.id || route.routeId || route.route_id;
+      if (key) acc[key] = route;
+      return acc;
+    }, {});
+  }, [activeRoutes]);
+
   const filteredStops = useMemo(() => {
     if (sourceMode === "gtfs" && selectedRouteId === "all") return [];
     if (selectedRouteId === "all") return sourceStops;
-    return sourceStops.filter(
-      (stop) => (stop.routeId || stop.route_id) === selectedRouteId
-    );
+    return sourceStops.filter((stop) => (stop.routeId || stop.route_id) === selectedRouteId);
   }, [sourceStops, selectedRouteId, sourceMode]);
 
   const filteredVehicles = useMemo(() => {
@@ -67,27 +78,20 @@ export default function Dashboard() {
 
   const filteredTrips = useMemo(() => {
     if (selectedRouteId === "all") return sourceTrips;
-    return sourceTrips.filter(
-      (trip) => (trip.routeId || trip.route_id) === selectedRouteId
-    );
+    return sourceTrips.filter((trip) => (trip.routeId || trip.route_id) === selectedRouteId);
   }, [sourceTrips, selectedRouteId]);
 
   const {
     trafficSamples = [],
-    trafficSummary,
+    trafficSummary = {},
+    trafficHistory = [],
+    historyAnalytics = {},
     trafficLoading,
-    refreshTraffic,
     trafficError,
     lastTrafficUpdated,
   } = useTrafficData(filteredStops, TOMTOM_API_KEY, sourceMode);
 
-  const {
-    routePaths = [],
-    refreshRouteLines,
-    routingLoading,
-    routingError,
-    lastRoutingUpdated,
-  } = useRouteLines(filteredStops, TOMTOM_API_KEY, sourceMode, {});
+  useRouteLines(filteredStops, TOMTOM_API_KEY, sourceMode, {});
 
   const metrics = useDashboardMetrics({
     routes: sourceRoutes,
@@ -97,26 +101,84 @@ export default function Dashboard() {
     trafficSummary,
   });
 
-  const isLoading = sourceMode === "gtfs" ? gtfsLoading : loadingMapData;
+  const {
+    currentPrediction,
+    predictionError,
+    predictionMessage,
+  } = useCurrentPrediction({
+    routes: sourceRoutes,
+    stops: filteredStops,
+    trips: filteredTrips,
+    trafficSummary,
+    trafficHistory,
+    historyAnalytics,
+    user,
+    selectedRouteId,
+    sourceRouteMap,
+    sourceMode,
+  });
 
   const quickAlert = useMemo(() => {
     if (trafficSummary.closed > 0) {
-      return { level: "critical", message: "⚠ Road closure detected on main artery" };
+      return { level: "critical", message: "⚠ Road closure detected on monitored corridor" };
     }
-    if (trafficSummary.heavy > 0) {
-      return { level: "heavy", message: "⚠ Heavy traffic in Quezon Ave" };
-    }
-    if (trafficSummary.moderate > 0) {
-      return { level: "moderate", message: "⚠ Moderate congestion across key corridors" };
-    }
-    return { level: "normal", message: "✅ Traffic is flowing smoothly" };
-  }, [trafficSummary.closed, trafficSummary.heavy, trafficSummary.moderate]);
 
-  const trafficTrendPoints = useMemo(() => {
-    const baseShift = trafficSummary.level === "High" ? 0.16 : trafficSummary.level === "Medium" ? 0.06 : -0.08;
-    const seed = [0.28, 0.42, 0.5, 0.58, 0.47, 0.62, 0.73, 0.6];
-    return seed.map((value) => Math.min(1, Math.max(0, value + baseShift)));
-  }, [trafficSummary.level]);
+    if (currentPrediction.predictedDelayRisk === "High") {
+      return {
+        level: "heavy",
+        message: `⚠ ${currentPrediction.routeCode} likely delayed by ${currentPrediction.etaImpactMinutes} mins`,
+      };
+    }
+
+    if (currentPrediction.trend === "Rising" || currentPrediction.trend === "Worsening") {
+      return {
+        level: "moderate",
+        message: "⚠ Congestion trend is rising across key corridors",
+      };
+    }
+
+    return { level: "normal", message: "✅ Traffic is flowing smoothly" };
+  }, [currentPrediction, trafficSummary.closed]);
+
+  const graphPoints = useMemo(() => {
+    if (trafficHistory.length >= 2) {
+      return trafficHistory.map((item) => scoreToRatio(item.congestionScore)).slice(-288);
+    }
+
+    const sampleLevels =
+      trafficSamples.length > 0
+        ? trafficSamples
+            .map((sample) => scoreToRatio(sample?.congestionScore))
+            .filter((value) => Number.isFinite(value))
+        : [];
+
+    if (sampleLevels.length > 1) {
+      return sampleLevels.slice(0, 16);
+    }
+
+    const heavy = Number(trafficSummary.heavy || 0);
+    const moderate = Number(trafficSummary.moderate || 0);
+    const low = Number(trafficSummary.light || trafficSummary.low || 0);
+    const closed = Number(trafficSummary.closed || 0);
+
+    const generated = [];
+    for (let i = 0; i < heavy; i += 1) generated.push(0.85);
+    for (let i = 0; i < moderate; i += 1) generated.push(0.55);
+    for (let i = 0; i < low; i += 1) generated.push(0.25);
+    for (let i = 0; i < closed; i += 1) generated.push(1);
+
+    if (generated.length) return generated.slice(0, 16);
+
+    return [0.25, 0.35, 0.3, 0.4];
+  }, [trafficHistory, trafficSamples, trafficSummary]);
+
+  const graphTitle =
+    trafficHistory.length >= 2 ? "Last 24H Congestion Trend" : "Current Congestion Profile";
+
+  const graphNote =
+    trafficHistory.length >= 2
+      ? `Based on ${trafficHistory.length} stored 5-minute snapshots from the last 24 hours.`
+      : `Based on ${trafficSamples.length || graphPoints.length} current monitored traffic sample points.`;
 
   const formatUpdatedAt = (isoString) => {
     if (!isoString) return "No update yet";
@@ -140,19 +202,24 @@ export default function Dashboard() {
     return `${hours}h ${minutes % 60}m`;
   };
 
-  const sparklinePath = trafficTrendPoints
+  const sparklinePath = graphPoints
     .map((value, index) => {
-      const x = (index / (trafficTrendPoints.length - 1)) * 100;
+      const x = (index / Math.max(graphPoints.length - 1, 1)) * 100;
       const y = 100 - value * 100;
       return `${index === 0 ? "M" : "L"} ${x} ${y}`;
     })
     .join(" ");
 
+  const recommendationTone =
+    currentPrediction.predictedDelayRisk === "High"
+      ? "rgba(239, 68, 68, 0.08)"
+      : currentPrediction.predictedDelayRisk === "Medium"
+      ? "rgba(245, 158, 11, 0.08)"
+      : "rgba(34, 197, 94, 0.08)";
+
   return (
     <Layout>
       <div className="dashboard-container">
-
-        {/* KEY METRICS */}
         <DashboardStats metrics={metrics} />
 
         <div className="dashboard-status-row">
@@ -171,38 +238,103 @@ export default function Dashboard() {
             <div className={`alert-pill alert-pill--${quickAlert.level}`}>
               {quickAlert.message}
             </div>
-            <div className="status-card-note">
-              {trafficSummary.level === "Low"
-                ? "No major delays detected."
-                : `${trafficSummary.level} congestion detected.`}
-            </div>
+            <div className="status-card-note">{currentPrediction.congestionForecast}</div>
           </div>
 
           <div className="status-card card">
-            <div className="status-card-title">Last 24h Congestion</div>
+            <div className="status-card-title">{graphTitle}</div>
             <div className="sparkline-chart">
               <svg viewBox="0 0 100 100" className="sparkline">
                 <path d={sparklinePath} />
-                {trafficTrendPoints.map((value, index) => {
-                  const x = (index / (trafficTrendPoints.length - 1)) * 100;
+                {graphPoints.map((value, index) => {
+                  const x = (index / Math.max(graphPoints.length - 1, 1)) * 100;
                   const y = 100 - value * 100;
                   return <circle key={index} cx={x} cy={y} r="2.5" />;
                 })}
               </svg>
             </div>
-            <div className="status-card-note">Trend shows relative congestion changes over the last day.</div>
+            <div className="status-card-note">{graphNote}</div>
           </div>
         </div>
 
-        {/* QUICK STATUS OVERVIEW */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: "1rem",
+            marginBottom: "1rem",
+          }}
+        >
+          <div className="card" style={{ padding: "1rem" }}>
+            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
+              Prediction Confidence
+            </div>
+            <div
+              style={{
+                fontSize: "2rem",
+                fontWeight: 800,
+                color: "var(--text-on-dark)",
+              }}
+            >
+              {currentPrediction.confidence}%
+            </div>
+            <div style={{ color: "var(--text-sub)", marginTop: "0.35rem" }}>
+              Based on {currentPrediction.basedOnTrafficSamples} live traffic samples,{" "}
+              {currentPrediction.historicalSnapshotCount24h} last-24h snapshots, and{" "}
+              {currentPrediction.historicalSnapshotCount7d} seven-day snapshots.
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: "1rem", background: recommendationTone }}>
+            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
+              Recommended Action
+            </div>
+            <div
+              style={{
+                fontSize: "1.05rem",
+                fontWeight: 700,
+                color: "var(--text-on-dark)",
+              }}
+            >
+              {currentPrediction.recommendation}
+            </div>
+            <div style={{ color: "var(--text-sub)", marginTop: "0.45rem" }}>
+              Estimated delay impact: +{currentPrediction.etaImpactMinutes} minutes.
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: "1rem" }}>
+            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
+              Historical Peak Window
+            </div>
+            <div
+              style={{
+                color: "var(--text-on-dark)",
+                fontWeight: 700,
+                marginBottom: "0.35rem",
+              }}
+            >
+              {currentPrediction.predictedPeakWindow || "Building history"}
+            </div>
+            <div style={{ color: "var(--text-sub)" }}>
+              24h avg: {currentPrediction.historicalAverageScore24h ?? 0}/100 • 7d avg:{" "}
+              {currentPrediction.historicalAverageScore7d ?? 0}/100
+            </div>
+          </div>
+        </div>
+
         <div className="grid">
           <GtfsStatusPanel gtfsBundle={gtfsBundle} loading={gtfsLoading} error={gtfsError} />
           <TrafficSummaryPanel summary={trafficSummary} />
-          <CurrentPredictionPanel prediction={{}} />
+          <CurrentPredictionPanel prediction={currentPrediction} />
         </div>
 
-        {/* SYSTEM STATUS */}
         <div className="grid">
+          <PredictionStatusPanel
+            prediction={currentPrediction}
+            error={predictionError}
+            message={predictionMessage}
+          />
           <TrafficStatusPanel
             loading={trafficLoading}
             error={trafficError}
@@ -213,11 +345,11 @@ export default function Dashboard() {
           />
         </div>
 
-        {/* FOOTER */}
         <footer className="site-footer">
-          <div className="dashboard-footer">© {new Date().getFullYear()} MoveMint. All rights reserved.</div>
+          <div className="dashboard-footer">
+            © {new Date().getFullYear()} MoveMint. All rights reserved.
+          </div>
         </footer>
-
       </div>
     </Layout>
   );
