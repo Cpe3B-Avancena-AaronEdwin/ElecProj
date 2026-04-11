@@ -1,16 +1,15 @@
-import "../styles/routes.css";
 import { useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import "../styles/adminusers.css";
+
 import { useFirestoreTransitData } from "../hooks/useFirestoreTransitData";
 import { useGtfsBundle } from "../hooks/useGtfsBundle";
+import { useTrafficData } from "../hooks/useTrafficData";
 import { useRouteLines } from "../hooks/useRouteLines";
 
 import DashboardToolbar from "../components/dashboard/DashboardToolbar";
 import DashboardMap from "../components/dashboard/DashboardMap";
 import RouteSummaryPanel from "../components/dashboard/RouteSummaryPanel";
 import RoutingStatusPanel from "../components/dashboard/RoutingStatusPanel";
-import RecentTripsPanel from "../components/dashboard/RecentTripsPanel";
 
 import Layout from "../components/Layout";
 
@@ -31,59 +30,74 @@ export default function Routes() {
 
   const [selectedRouteId, setSelectedRouteId] = useState("all");
   const [useFirestoreData, setUseFirestoreData] = useState(true);
+  const [showTrafficOverlay, setShowTrafficOverlay] = useState(true);
 
   const hasFirestoreData =
-    routes.length > 0 || stops.length > 0 || vehicles.length > 0 || trips.length > 0;
+    routes.length > 0 ||
+    stops.length > 0 ||
+    vehicles.length > 0 ||
+    trips.length > 0;
 
   const sourceMode = useFirestoreData && hasFirestoreData ? "firestore" : "gtfs";
 
-  const sourceRoutes = sourceMode === "firestore" ? routes : gtfsBundle?.routes || [];
-  const sourceStops = sourceMode === "firestore" ? stops : gtfsBundle?.stops || [];
-  const sourceTrips = sourceMode === "firestore" ? trips : gtfsBundle?.trips || [];
-  const sourceVehicles = sourceMode === "firestore" ? vehicles : [];
+  const sourceRoutes =
+    sourceMode === "firestore" ? routes : gtfsBundle?.routes || [];
+
+  const sourceStops =
+    sourceMode === "firestore" ? stops : gtfsBundle?.stops || [];
+
+  const sourceTrips =
+    sourceMode === "firestore" ? trips : gtfsBundle?.trips || [];
+
+  const sourceVehicles =
+    sourceMode === "firestore" ? vehicles : [];
 
   const sourceRouteMap = useMemo(() => {
     const map = {};
+
     sourceRoutes.forEach((route) => {
       map[route.id || route.route_id] = route;
     });
+
     return map;
   }, [sourceRoutes]);
 
-  const sourceVehicleMap = useMemo(() => {
-    const map = {};
-    sourceVehicles.forEach((vehicle) => {
-      map[vehicle.id] = vehicle;
-    });
-    return map;
-  }, [sourceVehicles]);
-
-  const activeRoutes = useMemo(
-    () => sourceRoutes.filter((route) => route.active !== false),
-    [sourceRoutes]
-  );
+  const activeRoutes = useMemo(() => {
+    return sourceRoutes.filter((route) => route.active !== false);
+  }, [sourceRoutes]);
 
   const filteredStops = useMemo(() => {
-    if (sourceMode === "gtfs" && selectedRouteId === "all") return [];
-    if (selectedRouteId === "all") return sourceStops;
+    if (sourceMode === "gtfs" && selectedRouteId === "all") {
+      return [];
+    }
+
+    if (selectedRouteId === "all") {
+      return sourceStops;
+    }
+
     return sourceStops.filter(
       (stop) => (stop.routeId || stop.route_id) === selectedRouteId
     );
   }, [sourceStops, selectedRouteId, sourceMode]);
 
   const filteredVehicles = useMemo(() => {
-    if (selectedRouteId === "all") return sourceVehicles;
+    if (selectedRouteId === "all") {
+      return sourceVehicles;
+    }
+
     return sourceVehicles.filter(
       (vehicle) => (vehicle.routeId || vehicle.route_id) === selectedRouteId
     );
   }, [sourceVehicles, selectedRouteId]);
 
-  const filteredTrips = useMemo(() => {
-    if (selectedRouteId === "all") return sourceTrips;
-    return sourceTrips.filter(
-      (trip) => (trip.routeId || trip.route_id) === selectedRouteId
-    );
-  }, [sourceTrips, selectedRouteId]);
+  const {
+    trafficSamples = [],
+    trafficSummary,
+    trafficLoading,
+    refreshTraffic,
+    trafficError,
+    lastTrafficUpdated,
+  } = useTrafficData(filteredStops, TOMTOM_API_KEY, sourceMode);
 
   const {
     routePaths = [],
@@ -96,85 +110,75 @@ export default function Routes() {
   const isLoading = sourceMode === "gtfs" ? gtfsLoading : loadingMapData;
 
   return (
-  <Layout>
-    <div className="dashboard-container">
+    <Layout>
+      <div className="dashboard-container">
+        <div className="page-header">
+          <h1>Route Management</h1>
+          <p>View routes, route lines, stops, and traffic overlay on the map</p>
+        </div>
 
-      <div className="page-header">
-        <h1>Route Management</h1>
-        <p>Monitor and manage transit routes, stops, and vehicle assignments</p>
-      </div>
+        <DashboardToolbar
+          routes={activeRoutes}
+          selectedRouteId={selectedRouteId}
+          onChangeRoute={setSelectedRouteId}
+          sourceMode={sourceMode}
+          onChangeSourceMode={(mode) => setUseFirestoreData(mode === "firestore")}
+          showTrafficOverlay={showTrafficOverlay}
+          onChangeTrafficOverlay={(value) => setShowTrafficOverlay(value)}
+          hasFirestoreData={hasFirestoreData}
+          trafficLoading={trafficLoading}
+          routingLoading={routingLoading}
+          predictionSaving={false}
+          onRefreshTraffic={refreshTraffic}
+          onRefreshRouteLines={refreshRouteLines}
+          onSavePrediction={() => {}}
+          tomtomEnabled={true}
+          stats={{
+            sourceMode,
+            routesLoaded: sourceRoutes.length,
+            stopsLoaded: sourceStops.length,
+            tripsLoaded: sourceTrips.length,
+            vehiclesLoaded: sourceVehicles.length,
+            gtfsStatus: gtfsLoading ? "Loading..." : gtfsError ? "Error" : "Ready",
+            trafficUpdated: lastTrafficUpdated
+              ? new Date(lastTrafficUpdated).toLocaleTimeString()
+              : "—",
+            routesUpdated: lastRoutingUpdated
+              ? new Date(lastRoutingUpdated).toLocaleTimeString()
+              : "—",
+            mapZoom: 13,
+          }}
+        />
 
-      <DashboardToolbar
-        routes={activeRoutes}
-        selectedRouteId={selectedRouteId}
-        onChangeRoute={setSelectedRouteId}
-        sourceMode={sourceMode}
-        onChangeSourceMode={(mode) => setUseFirestoreData(mode === "firestore")}
-        showTrafficOverlay={false}
-        onChangeTrafficOverlay={() => {}}
-        hasFirestoreData={hasFirestoreData}
-        trafficLoading={false}
-        routingLoading={routingLoading}
-        predictionSaving={false}
-        onRefreshTraffic={() => {}}
-        onRefreshRouteLines={refreshRouteLines}
-        onSavePrediction={() => {}}
-        tomtomEnabled={!!TOMTOM_API_KEY}
-        stats={{
-          sourceMode,
-          routesLoaded: sourceRoutes.length,
-          stopsLoaded: sourceStops.length,
-          tripsLoaded: sourceTrips.length,
-          vehiclesLoaded: sourceVehicles.length,
-          gtfsStatus: gtfsLoading ? "Loading..." : gtfsError ? "Error" : "Ready",
-          trafficUpdated: "—",
-          routesUpdated: lastRoutingUpdated
-            ? new Date(lastRoutingUpdated).toLocaleTimeString()
-            : "—",
-          mapZoom: 13,
-        }}
-      />
-
-      {/* 🔥 ADD THIS WRAPPER */}
-      <div className="dashboard-content">
-
-        {/* ROUTE STATUS PANELS */}
         <div className="grid">
-          <RoutingStatusPanel routes={routePaths} error={routingError} />
           <RouteSummaryPanel
             routes={activeRoutes}
             sourceStops={sourceStops}
             sourceTrips={sourceTrips}
             sourceVehicles={sourceVehicles}
           />
+
+          <RoutingStatusPanel
+            routes={routePaths}
+            error={routingError}
+          />
         </div>
 
-        {/* ROUTES MAP */}
         {!isLoading ? (
-          <div className="card map-card">
+          <div className="card">
             <DashboardMap
               stops={filteredStops}
               vehicles={filteredVehicles}
               routePaths={routePaths}
-              trafficSamples={[]}
+              trafficSamples={showTrafficOverlay ? trafficSamples : []}
+              showTrafficFlow={showTrafficOverlay}
+              tomtomApiKey={TOMTOM_API_KEY}
             />
           </div>
         ) : (
           <div className="card">Loading route data...</div>
         )}
-
-        {/* RECENT TRIPS */}
-        <div className="grid">
-          <RecentTripsPanel
-            trips={filteredTrips}
-            sourceRouteMap={sourceRouteMap}
-            sourceVehicleMap={sourceVehicleMap}
-            sourceMode={sourceMode}
-          />
-        </div>
-
       </div>
-    </div>
-  </Layout>
-);
+    </Layout>
+  );
 }

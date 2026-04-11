@@ -34,40 +34,63 @@ export default function Traffic() {
   const [showTrafficOverlay, setShowTrafficOverlay] = useState(true);
 
   const hasFirestoreData =
-    routes.length > 0 || stops.length > 0 || vehicles.length > 0 || trips.length > 0;
+    routes.length > 0 ||
+    stops.length > 0 ||
+    vehicles.length > 0 ||
+    trips.length > 0;
 
-  const sourceMode = useFirestoreData && hasFirestoreData ? "firestore" : "gtfs";
+  const sourceMode =
+    useFirestoreData && hasFirestoreData ? "firestore" : "gtfs";
 
-  const sourceRoutes = sourceMode === "firestore" ? routes : gtfsBundle?.routes || [];
-  const sourceStops = sourceMode === "firestore" ? stops : gtfsBundle?.stops || [];
-  const sourceTrips = sourceMode === "firestore" ? trips : gtfsBundle?.trips || [];
-  const sourceVehicles = sourceMode === "firestore" ? vehicles : [];
+  const sourceRoutes =
+    sourceMode === "firestore" ? routes : gtfsBundle?.routes || [];
+
+  const sourceStops =
+    sourceMode === "firestore" ? stops : gtfsBundle?.stops || [];
+
+  const sourceTrips =
+    sourceMode === "firestore" ? trips : gtfsBundle?.trips || [];
+
+  const sourceVehicles =
+    sourceMode === "firestore" ? vehicles : [];
 
   const sourceRouteMap = useMemo(() => {
     const map = {};
+
     sourceRoutes.forEach((route) => {
       map[route.id || route.route_id] = route;
     });
+
     return map;
   }, [sourceRoutes]);
 
-  const activeRoutes = useMemo(
-    () => sourceRoutes.filter((route) => route.active !== false),
-    [sourceRoutes]
-  );
+  const activeRoutes = useMemo(() => {
+    return sourceRoutes.filter((route) => route.active !== false);
+  }, [sourceRoutes]);
 
   const filteredStops = useMemo(() => {
-    if (sourceMode === "gtfs" && selectedRouteId === "all") return [];
-    if (selectedRouteId === "all") return sourceStops;
+    if (sourceMode === "gtfs" && selectedRouteId === "all") {
+      return [];
+    }
+
+    if (selectedRouteId === "all") {
+      return sourceStops;
+    }
+
     return sourceStops.filter(
-      (stop) => (stop.routeId || stop.route_id) === selectedRouteId
+      (stop) =>
+        (stop.routeId || stop.route_id) === selectedRouteId
     );
   }, [sourceStops, selectedRouteId, sourceMode]);
 
   const filteredVehicles = useMemo(() => {
-    if (selectedRouteId === "all") return sourceVehicles;
+    if (selectedRouteId === "all") {
+      return sourceVehicles;
+    }
+
     return sourceVehicles.filter(
-      (vehicle) => (vehicle.routeId || vehicle.route_id) === selectedRouteId
+      (vehicle) =>
+        (vehicle.routeId || vehicle.route_id) === selectedRouteId
     );
   }, [sourceVehicles, selectedRouteId]);
 
@@ -78,7 +101,11 @@ export default function Traffic() {
     refreshTraffic,
     trafficError,
     lastTrafficUpdated,
-  } = useTrafficData(filteredStops, TOMTOM_API_KEY, sourceMode);
+  } = useTrafficData(
+    filteredStops,
+    TOMTOM_API_KEY,
+    sourceMode
+  );
 
   const {
     routePaths = [],
@@ -86,17 +113,27 @@ export default function Traffic() {
     routingLoading,
     routingError,
     lastRoutingUpdated,
-  } = useRouteLines(filteredStops, TOMTOM_API_KEY, sourceMode, sourceRouteMap);
+  } = useRouteLines(
+    filteredStops,
+    TOMTOM_API_KEY,
+    sourceMode,
+    sourceRouteMap
+  );
 
-  const isLoading = sourceMode === "gtfs" ? gtfsLoading : loadingMapData;
+  const isLoading =
+    sourceMode === "gtfs"
+      ? gtfsLoading
+      : loadingMapData;
 
   return (
     <Layout>
       <div className="dashboard-container">
-
         <div className="page-header">
           <h1>Live Traffic Monitoring</h1>
-          <p>Real-time traffic conditions and route performance</p>
+          <p>
+            Real-time traffic conditions and route
+            performance
+          </p>
         </div>
 
         <DashboardToolbar
@@ -104,9 +141,13 @@ export default function Traffic() {
           selectedRouteId={selectedRouteId}
           onChangeRoute={setSelectedRouteId}
           sourceMode={sourceMode}
-          onChangeSourceMode={(mode) => setUseFirestoreData(mode === "firestore")}
+          onChangeSourceMode={(mode) =>
+            setUseFirestoreData(mode === "firestore")
+          }
           showTrafficOverlay={showTrafficOverlay}
-          onChangeTrafficOverlay={setShowTrafficOverlay}
+          onChangeTrafficOverlay={(value) =>
+            setShowTrafficOverlay(value)
+          }
           hasFirestoreData={hasFirestoreData}
           trafficLoading={trafficLoading}
           routingLoading={routingLoading}
@@ -114,52 +155,76 @@ export default function Traffic() {
           onRefreshTraffic={refreshTraffic}
           onRefreshRouteLines={refreshRouteLines}
           onSavePrediction={() => {}}
-          tomtomEnabled={!!TOMTOM_API_KEY}
+
+          tomtomEnabled={true}
+
           stats={{
             sourceMode,
             routesLoaded: sourceRoutes.length,
             stopsLoaded: sourceStops.length,
             tripsLoaded: sourceTrips.length,
             vehiclesLoaded: sourceVehicles.length,
-            gtfsStatus: gtfsLoading ? "Loading..." : gtfsError ? "Error" : "Ready",
+            gtfsStatus: gtfsLoading
+              ? "Loading..."
+              : gtfsError
+              ? "Error"
+              : "Ready",
             trafficUpdated: lastTrafficUpdated
-              ? new Date(lastTrafficUpdated).toLocaleTimeString()
+              ? new Date(
+                  lastTrafficUpdated
+                ).toLocaleTimeString()
               : "—",
             routesUpdated: lastRoutingUpdated
-              ? new Date(lastRoutingUpdated).toLocaleTimeString()
+              ? new Date(
+                  lastRoutingUpdated
+                ).toLocaleTimeString()
               : "—",
             mapZoom: 13,
           }}
         />
 
-        {/* TRAFFIC STATUS PANELS */}
         <div className="grid">
-          <TrafficSummaryPanel summary={trafficSummary} />
+          <TrafficSummaryPanel
+            summary={trafficSummary}
+          />
+
           <TrafficStatusPanel
             loading={trafficLoading}
             error={trafficError}
             sourceMode={sourceMode}
             showTrafficOverlay={showTrafficOverlay}
             samplePoints={trafficSamples.length}
-            apiConfigured={!!TOMTOM_API_KEY}
+            apiConfigured={true}
           />
-          <RoutingStatusPanel routes={routePaths} error={routingError} />
+
+          <RoutingStatusPanel
+            routes={routePaths}
+            error={routingError}
+          />
         </div>
 
-        {/* TRAFFIC MAP */}
         {!isLoading ? (
           <div className="card">
             <DashboardMap
               stops={filteredStops}
               vehicles={filteredVehicles}
               routePaths={routePaths}
-              trafficSamples={showTrafficOverlay ? trafficSamples : []}
+              trafficSamples={
+                showTrafficOverlay
+                  ? trafficSamples
+                  : []
+              }
+              showTrafficFlow={
+                showTrafficOverlay
+              }
+              tomtomApiKey={TOMTOM_API_KEY}
             />
           </div>
         ) : (
-          <div className="card">Loading traffic data...</div>
+          <div className="card">
+            Loading traffic data...
+          </div>
         )}
-
       </div>
     </Layout>
   );

@@ -62,6 +62,8 @@ export default function DashboardMap({
   vehicles = [],
   routePaths = [],
   trafficSamples = [],
+  showTrafficFlow = false,
+  tomtomApiKey = "",
 }) {
   const center = [14.6, 121];
 
@@ -76,6 +78,11 @@ export default function DashboardMap({
     if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
     return [lat, lng];
   };
+
+  const trafficFlowUrl =
+    showTrafficFlow && tomtomApiKey
+      ? `https://api.tomtom.com/traffic/map/4/tile/flow/relative0-dark/{z}/{x}/{y}.png?key=${tomtomApiKey}`
+      : null;
 
   return (
     <div
@@ -95,9 +102,18 @@ export default function DashboardMap({
         <FixMap />
 
         <TileLayer
-          attribution="&copy; OpenStreetMap"
+          attribution="&copy; OpenStreetMap contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+
+        {trafficFlowUrl ? (
+          <TileLayer
+            url={trafficFlowUrl}
+            attribution='Traffic flow &copy; TomTom'
+            opacity={0.9}
+            zIndex={300}
+          />
+        ) : null}
 
         {routePaths.map((line, i) => {
           const positions = (line.path || line.positions || []).filter(
@@ -113,7 +129,7 @@ export default function DashboardMap({
               pathOptions={{
                 color: line.color || "#B8805A",
                 weight: 4,
-                opacity: 0.9,
+                opacity: 0.95,
               }}
             >
               <Popup>
@@ -150,6 +166,10 @@ export default function DashboardMap({
                   <strong>{sample.name || "Traffic Point"}</strong>
                   <br />
                   Congestion: {sample.severity || "Unknown"}
+                  <br />
+                  Current Speed: {sample.currentSpeed ?? "N/A"} km/h
+                  <br />
+                  Free Flow: {sample.freeFlowSpeed ?? "N/A"} km/h
                 </div>
               </Popup>
             </CircleMarker>
