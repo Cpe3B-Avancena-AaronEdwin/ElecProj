@@ -16,9 +16,9 @@ const SNAPSHOT_COLLECTION = "trafficSnapshots";
 const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 const SNAPSHOT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const DASHBOARD_HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;
-const DASHBOARD_HISTORY_LIMIT = 288; // 24h at 5-minute intervals
-const SUMMARY_HISTORY_LIMIT = 2016; // 7d at 5-minute intervals
-const MAX_SAMPLE_POINTS = 10;
+const DASHBOARD_HISTORY_LIMIT = 288;
+const SUMMARY_HISTORY_LIMIT = 2016;
+const MAX_SAMPLE_POINTS = 15;
 
 const EMPTY_SUMMARY = {
   total: 0,
@@ -158,7 +158,7 @@ function normalizeHistoryDoc(docSnap) {
   };
 }
 
-export function useTrafficData(stops = [], apiKey, sourceMode = "firestore") {
+export function useTrafficData(stops = [], apiKey) {
   const [trafficSamples, setTrafficSamples] = useState([]);
   const [trafficSummary, setTrafficSummary] = useState(EMPTY_SUMMARY);
   const [trafficHistory, setTrafficHistory] = useState([]);
@@ -220,11 +220,7 @@ export function useTrafficData(stops = [], apiKey, sourceMode = "firestore") {
         highestScore7d: scoreValues.length ? Math.max(...scoreValues) : 0,
       });
       setHistoryError("");
-
-      return {
-        recentHistory,
-        fullHistory,
-      };
+      return { recentHistory, fullHistory };
     } catch (error) {
       setHistoryError(error.message || "Failed to load traffic history.");
       setTrafficHistory([]);
@@ -234,10 +230,7 @@ export function useTrafficData(stops = [], apiKey, sourceMode = "firestore") {
         latestScore: 0,
         highestScore7d: 0,
       });
-      return {
-        recentHistory: [],
-        fullHistory: [],
-      };
+      return { recentHistory: [], fullHistory: [] };
     }
   }, []);
 
@@ -301,13 +294,6 @@ export function useTrafficData(stops = [], apiKey, sourceMode = "firestore") {
   );
 
   const refreshTraffic = useCallback(async () => {
-    if (sourceMode === "gtfs") {
-      setTrafficSamples([]);
-      setTrafficSummary(EMPTY_SUMMARY);
-      await loadTrafficHistory();
-      return;
-    }
-
     if (!apiKey) {
       setTrafficError("Missing TomTom API key.");
       setTrafficSamples([]);
@@ -370,21 +356,19 @@ export function useTrafficData(stops = [], apiKey, sourceMode = "firestore") {
     } finally {
       setTrafficLoading(false);
     }
-  }, [apiKey, loadTrafficHistory, saveSnapshotIfDue, sourceMode, validStops]);
+  }, [apiKey, loadTrafficHistory, saveSnapshotIfDue, validStops]);
 
   useEffect(() => {
     refreshTraffic();
   }, [refreshTraffic]);
 
   useEffect(() => {
-    if (sourceMode === "gtfs") return undefined;
-
     const intervalId = window.setInterval(() => {
       refreshTraffic();
     }, SNAPSHOT_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [refreshTraffic, sourceMode]);
+  }, [refreshTraffic]);
 
   return {
     trafficSamples,

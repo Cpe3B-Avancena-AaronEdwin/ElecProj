@@ -32,54 +32,45 @@ export default function Dashboard() {
     stops = [],
     vehicles = [],
     trips = [],
-    loadingMapData,
   } = useFirestoreTransitData();
 
   const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
 
   const [selectedRouteId] = useState("all");
-  const [useFirestoreData] = useState(true);
 
-  const hasFirestoreData =
-    routes.length > 0 || stops.length > 0 || vehicles.length > 0 || trips.length > 0;
+  const gtfsRoutes = gtfsBundle?.routes || [];
+  const gtfsStops = gtfsBundle?.stops || [];
+  const gtfsTrips = gtfsBundle?.trips || [];
 
-  const sourceMode = useFirestoreData && hasFirestoreData ? "firestore" : "gtfs";
+  const firestoreRoutes = routes || [];
+  const firestoreStops = stops || [];
+  const firestoreTrips = trips || [];
+  const firestoreVehicles = vehicles || [];
 
-  const sourceRoutes = sourceMode === "firestore" ? routes : gtfsBundle?.routes || [];
-  const sourceStops = sourceMode === "firestore" ? stops : gtfsBundle?.stops || [];
-  const sourceTrips = sourceMode === "firestore" ? trips : gtfsBundle?.trips || [];
-  const sourceVehicles = sourceMode === "firestore" ? vehicles : [];
-
-  const activeRoutes = useMemo(
-    () => sourceRoutes.filter((route) => route.active !== false),
-    [sourceRoutes]
-  );
-
-  const sourceRouteMap = useMemo(() => {
-    return activeRoutes.reduce((acc, route) => {
+  const gtfsRouteMap = useMemo(() => {
+    return gtfsRoutes.reduce((acc, route) => {
       const key = route.id || route.routeId || route.route_id;
       if (key) acc[key] = route;
       return acc;
     }, {});
-  }, [activeRoutes]);
+  }, [gtfsRoutes]);
 
-  const filteredStops = useMemo(() => {
-    if (sourceMode === "gtfs" && selectedRouteId === "all") return [];
-    if (selectedRouteId === "all") return sourceStops;
-    return sourceStops.filter((stop) => (stop.routeId || stop.route_id) === selectedRouteId);
-  }, [sourceStops, selectedRouteId, sourceMode]);
+  const gtfsFilteredStops = useMemo(() => {
+    if (selectedRouteId === "all") return gtfsStops;
+    return gtfsStops.filter((stop) => (stop.routeId || stop.route_id) === selectedRouteId);
+  }, [gtfsStops, selectedRouteId]);
 
-  const filteredVehicles = useMemo(() => {
-    if (selectedRouteId === "all") return sourceVehicles;
-    return sourceVehicles.filter(
+  const gtfsFilteredTrips = useMemo(() => {
+    if (selectedRouteId === "all") return gtfsTrips;
+    return gtfsTrips.filter((trip) => (trip.routeId || trip.route_id) === selectedRouteId);
+  }, [gtfsTrips, selectedRouteId]);
+
+  const firestoreFilteredVehicles = useMemo(() => {
+    if (selectedRouteId === "all") return firestoreVehicles;
+    return firestoreVehicles.filter(
       (vehicle) => (vehicle.routeId || vehicle.route_id) === selectedRouteId
     );
-  }, [sourceVehicles, selectedRouteId]);
-
-  const filteredTrips = useMemo(() => {
-    if (selectedRouteId === "all") return sourceTrips;
-    return sourceTrips.filter((trip) => (trip.routeId || trip.route_id) === selectedRouteId);
-  }, [sourceTrips, selectedRouteId]);
+  }, [firestoreVehicles, selectedRouteId]);
 
   const {
     trafficSamples = [],
@@ -89,15 +80,15 @@ export default function Dashboard() {
     trafficLoading,
     trafficError,
     lastTrafficUpdated,
-  } = useTrafficData(filteredStops, TOMTOM_API_KEY, sourceMode);
+  } = useTrafficData(gtfsFilteredStops, TOMTOM_API_KEY, "gtfs");
 
-  useRouteLines(filteredStops, TOMTOM_API_KEY, sourceMode, {});
+  useRouteLines(gtfsFilteredStops, TOMTOM_API_KEY, "gtfs", {});
 
   const metrics = useDashboardMetrics({
-    routes: sourceRoutes,
-    stops: filteredStops,
-    vehicles: filteredVehicles,
-    trips: filteredTrips,
+    routes: gtfsRoutes,
+    stops: gtfsFilteredStops,
+    vehicles: firestoreFilteredVehicles,
+    trips: gtfsFilteredTrips,
     trafficSummary,
   });
 
@@ -106,16 +97,16 @@ export default function Dashboard() {
     predictionError,
     predictionMessage,
   } = useCurrentPrediction({
-    routes: sourceRoutes,
-    stops: filteredStops,
-    trips: filteredTrips,
+    routes: gtfsRoutes,
+    stops: gtfsFilteredStops,
+    trips: gtfsFilteredTrips,
     trafficSummary,
     trafficHistory,
     historyAnalytics,
     user,
     selectedRouteId,
-    sourceRouteMap,
-    sourceMode,
+    sourceRouteMap: gtfsRouteMap,
+    sourceMode: "gtfs",
   });
 
   const quickAlert = useMemo(() => {
@@ -338,7 +329,7 @@ export default function Dashboard() {
           <TrafficStatusPanel
             loading={trafficLoading}
             error={trafficError}
-            sourceMode={sourceMode}
+            sourceMode="gtfs"
             showTrafficOverlay={true}
             samplePoints={trafficSamples.length}
             apiConfigured={!!TOMTOM_API_KEY}
