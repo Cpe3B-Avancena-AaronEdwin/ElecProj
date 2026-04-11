@@ -1,15 +1,5 @@
 import { useMemo } from "react";
 
-const panelStyle = {
-  background: "var(--bg-card)",
-  border: "1px solid var(--border)",
-  borderRadius: "16px",
-  padding: "1rem",
-  display: "flex",
-  flexDirection: "column",
-  minHeight: 0,
-};
-
 export default function RouteSummaryPanel({
   routes = [],
   sourceStops = [],
@@ -41,9 +31,12 @@ export default function RouteSummaryPanel({
 
     return routes.map((route) => {
       const routeId = route.id || route.route_id;
-      const code = route.routeCode || route.route_short_name || "—";
+      const code = route.routeCode || route.route_short_name || "N/A";
       const name =
-        route.routeName || route.route_long_name || route.route_desc || "Unnamed Route";
+        route.routeName ||
+        route.route_long_name ||
+        route.route_desc ||
+        "Unnamed Route";
 
       return {
         id: routeId,
@@ -56,28 +49,76 @@ export default function RouteSummaryPanel({
   }, [routes, sourceStops, sourceTrips, sourceVehicles]);
 
   return (
-    <div style={panelStyle} className="route-summary-panel">
-      <h3 style={{ marginTop: 0, marginBottom: "0.9rem", color: "var(--text-on-dark)" }}>
-        Route Summary
-      </h3>
+    <div
+      className="card"
+      style={{
+        height: "420px",
+        maxHeight: "420px",
+        minHeight: "420px",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "12px",
+        }}
+      >
+        <h3 style={{ margin: 0 }}>Route Summary</h3>
+        <span style={{ opacity: 0.8 }}>{routeStats.length} routes</span>
+      </div>
 
       {routeStats.length === 0 ? (
-        <p style={{ margin: 0, color: "var(--text-sub)" }}>No routes available.</p>
+        <p>No routes available.</p>
       ) : (
-        <div className="route-summary-list">
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            overflowX: "hidden",
+            paddingRight: "6px",
+          }}
+        >
           {routeStats.map((route, index) => (
             <div
-              key={route.id || `${route.label}-${index}`}
-              className="route-summary-row"
+              key={route.id || index}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "10px",
+                padding: "10px 0",
+                borderBottom: "1px solid var(--border)",
+              }}
             >
-              <div className="route-summary-name" title={route.label}>
+              <div
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  fontWeight: 600,
+                }}
+                title={route.label}
+              >
                 {route.label}
               </div>
 
-              <div className="route-summary-stats">
-                <span>Stops: {route.stops}</span>
-                <span>Trips: {route.trips}</span>
-                <span>Vehicles: {route.vehicles}</span>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                <span>S: {route.stops}</span>
+                <span>T: {route.trips}</span>
+                <span>V: {route.vehicles}</span>
               </div>
             </div>
           ))}

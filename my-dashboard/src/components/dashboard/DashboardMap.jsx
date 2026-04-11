@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -27,9 +27,12 @@ function FixMap() {
   useEffect(() => {
     const timer = setTimeout(() => {
       map.invalidateSize();
-    }, 200);
+    }, 250);
 
-    const handleResize = () => map.invalidateSize();
+    const handleResize = () => {
+      setTimeout(() => map.invalidateSize(), 100);
+    };
+
     window.addEventListener("resize", handleResize);
 
     return () => {
@@ -64,6 +67,8 @@ export default function DashboardMap({
   trafficSamples = [],
   showTrafficFlow = false,
   tomtomApiKey = "",
+  showStops = true,
+  showRoutes = true,
 }) {
   const center = [14.6, 121];
 
@@ -84,6 +89,16 @@ export default function DashboardMap({
       ? `https://api.tomtom.com/traffic/map/4/tile/flow/relative0-dark/{z}/{x}/{y}.png?key=${tomtomApiKey}`
       : null;
 
+  const safeStops = useMemo(() => {
+    if (!showStops) return [];
+    return stops.slice(0, 500);
+  }, [stops, showStops]);
+
+  const safeRoutePaths = useMemo(() => {
+    if (!showRoutes) return [];
+    return routePaths.slice(0, 30);
+  }, [routePaths, showRoutes]);
+
   return (
     <div
       style={{
@@ -92,11 +107,13 @@ export default function DashboardMap({
         overflow: "hidden",
         border: "1px solid var(--border)",
         height: "560px",
+        background: "#0f172a",
       }}
     >
       <MapContainer
         center={center}
         zoom={13}
+        preferCanvas={true}
         style={{ height: "100%", width: "100%" }}
       >
         <FixMap />
@@ -109,13 +126,12 @@ export default function DashboardMap({
         {trafficFlowUrl ? (
           <TileLayer
             url={trafficFlowUrl}
-            attribution='Traffic flow &copy; TomTom'
+            attribution="Traffic flow &copy; TomTom"
             opacity={0.9}
-            zIndex={300}
           />
         ) : null}
 
-        {routePaths.map((line, i) => {
+        {safeRoutePaths.map((line, i) => {
           const positions = (line.path || line.positions || []).filter(
             (p) => Array.isArray(p) && !Number.isNaN(p[0]) && !Number.isNaN(p[1])
           );
@@ -127,9 +143,9 @@ export default function DashboardMap({
               key={line.routeId || i}
               positions={positions}
               pathOptions={{
-                color: line.color || "#B8805A",
-                weight: 4,
-                opacity: 0.95,
+                color: line.color || "#3b82f6",
+                weight: 3,
+                opacity: 0.85,
               }}
             >
               <Popup>
@@ -149,16 +165,17 @@ export default function DashboardMap({
             const lng = parseFloat(sample.lng);
             return !Number.isNaN(lat) && !Number.isNaN(lng);
           })
+          .slice(0, 200)
           .map((sample, i) => (
             <CircleMarker
               key={sample.id || i}
               center={[parseFloat(sample.lat), parseFloat(sample.lng)]}
-              radius={8}
+              radius={6}
               pathOptions={{
                 color: sample.color || "#22c55e",
                 fillColor: sample.color || "#22c55e",
-                fillOpacity: 0.9,
-                weight: 2,
+                fillOpacity: 0.85,
+                weight: 1,
               }}
             >
               <Popup>
@@ -175,7 +192,7 @@ export default function DashboardMap({
             </CircleMarker>
           ))}
 
-        {stops.map((s) => {
+        {safeStops.map((s) => {
           const pos = getLatLng(s);
           if (!pos) return null;
 
