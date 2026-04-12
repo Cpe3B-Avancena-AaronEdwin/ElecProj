@@ -64,21 +64,17 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
 
-      // Admin can create any user document
       allow create: if isAdmin()
         && request.resource.data.keys().hasOnly(userAllowedKeys());
 
-      // Owner can create only their own basic profile, and only with safe fields
       allow create: if isOwner(userId)
         && request.resource.data.keys().hasOnly(userAllowedKeys())
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.role in ["admin", "operator", "viewer"];
 
-      // Admin can update any user doc
       allow update: if isAdmin()
         && request.resource.data.keys().hasOnly(userAllowedKeys());
 
-      // Owner can only update safe profile fields, not role/email/uid/createdAt
       allow update: if isOwner(userId)
         && request.resource.data.diff(resource.data).changedKeys().hasOnly(ownerEditableKeys())
         && request.resource.data.uid == resource.data.uid
@@ -86,7 +82,6 @@ service cloud.firestore {
         && request.resource.data.role == resource.data.role
         && request.resource.data.createdAt == resource.data.createdAt;
 
-      // Optional: only admin can delete user docs
       allow delete: if isAdmin();
     }
 
@@ -114,18 +109,19 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // TRAFFIC SNAPSHOTS
+    match /trafficSnapshots/{snapshotId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSignedIn();
+    }
+
     // PREDICTIONS
-    // Safer than your old rule:
-    // - all signed-in users can read
-    // - only admin/operator can create/update
-    // - only admin can delete
     match /predictions/{predictionId} {
       allow read: if isSignedIn();
       allow create, update: if isAdminOrOperator();
       allow delete: if isAdmin();
     }
 
-    // Default deny everything else
     match /{document=**} {
       allow read, write: if false;
     }
