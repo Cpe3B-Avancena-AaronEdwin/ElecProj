@@ -18,10 +18,17 @@ export default function Reports() {
 
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
 
-  const {
-    vehicles = [],
-    predictions = [],
-  } = useFirestoreTransitData();
+const { vehicles = [], predictions = [] } = useFirestoreTransitData({
+  routes: false,
+  stops: false,
+  vehicles: true,
+  trips: false,
+  predictions: true,
+  realtimeVehicles: false,
+  realtimePredictions: false,
+  predictionsLimit: 10,
+  cacheMs: 5 * 60 * 1000,
+});
 
   const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
 
@@ -84,15 +91,9 @@ export default function Reports() {
         <div className="report-controls">
           <h3>Report Generation</h3>
           <div className="control-buttons">
-            <button className="report-btn">
-              📊 Generate Performance Report
-            </button>
-            <button className="report-btn">
-              🚗 Export Route Analytics
-            </button>
-            <button className="report-btn">
-              📈 Download Traffic Summary
-            </button>
+            <button className="report-btn">📊 Generate Performance Report</button>
+            <button className="report-btn">🚗 Export Route Analytics</button>
+            <button className="report-btn">📈 Download Traffic Summary</button>
           </div>
         </div>
       </div>
