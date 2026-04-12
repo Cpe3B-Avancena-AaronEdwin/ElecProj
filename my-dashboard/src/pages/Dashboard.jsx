@@ -27,13 +27,15 @@ export default function Dashboard() {
 
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
 
-  const {
-    routes = [],
-    stops = [],
-    vehicles = [],
-    trips = [],
-  } = useFirestoreTransitData();
-
+const { vehicles = [] } = useFirestoreTransitData({
+  routes: false,
+  stops: false,
+  vehicles: true,
+  trips: false,
+  predictions: false,
+  realtimeVehicles: false,
+  cacheMs: 5 * 60 * 1000,
+});
   const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
 
   const [selectedRouteId] = useState("all");
