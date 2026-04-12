@@ -1,13 +1,59 @@
 import { useEffect, useMemo, useState } from "react";
 
+const ROUTE_CACHE_TTL_MS = 30 * 60 * 1000;
+
+function resolveOptions(options) {
+  return {
+    enabled: options?.enabled ?? true,
+    cacheKey: options?.cacheKey ?? "default",
+  };
+}
+
+function getRouteCache(cacheKey) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(`route-cache:${cacheKey}`);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed?.savedAt || Date.now() - parsed.savedAt > ROUTE_CACHE_TTL_MS) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function setRouteCache(cacheKey, payload) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(
+      `route-cache:${cacheKey}`,
+      JSON.stringify({
+        ...payload,
+        savedAt: Date.now(),
+      })
+    );
+  } catch {
+    // ignore cache failures
+  }
+}
+
 export function useRouteLines(
   stops = [],
   apiKey,
   sourceMode = "firestore",
   sourceRouteMap = {},
   gtfsShapePoints = [],
-  selectedRouteMeta = null
+  selectedRouteMeta = null,
+  options = {}
 ) {
+  const { enabled, cacheKey } = resolveOptions(options);
+
   const [routePaths, setRoutePaths] = useState([]);
   const [routingLoading, setRoutingLoading] = useState(false);
   const [routingError, setRoutingError] = useState("");
@@ -15,12 +61,8 @@ export function useRouteLines(
 
   const validStops = useMemo(() => {
     return stops.filter((s) => {
-      const lat = parseFloat(
-        s.stopLat ?? s.stop_lat ?? s.latitude ?? s.lat
-      );
-      const lng = parseFloat(
-        s.stopLon ?? s.stop_lon ?? s.longitude ?? s.lng
-      );
+      const lat = parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude ?? s.lat);
+      const lng = parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude ?? s.lng);
       return !Number.isNaN(lat) && !Number.isNaN(lng);
     });
   }, [stops]);
@@ -35,7 +77,13 @@ export function useRouteLines(
     );
   }, [gtfsShapePoints]);
 
-  const refreshRouteLines = async () => {
+  const refreshRouteLines = async (force = false) => {
+    if (!enabled) {
+      setRoutePaths([]);
+      setRoutingError("");
+      return;
+    }
+
     if (sourceMode === "gtfs") {
       if (validGtfsShapePoints.length >= 2) {
         setRoutePaths([
@@ -94,6 +142,14 @@ export function useRouteLines(
       return;
     }
 
+    const cached = !force ? getRouteCache(cacheKey) : null;
+    if (cached) {
+      setRoutePaths(cached.routePaths || []);
+      setRoutingError(cached.routingError || "");
+      setLastRoutingUpdated(cached.lastRoutingUpdated || null);
+      return;
+    }
+
     setRoutingLoading(true);
     setRoutingError("");
 
@@ -120,16 +176,18 @@ export function useRouteLines(
           (leg.points || []).map((p) => [p.latitude, p.longitude])
         ) || [];
 
+      let nextPaths = [];
+      let nextError = "";
+
       if (points.length < 2) {
         const fallbackPoints = validStops.map((s) => [
           parseFloat(s.stopLat ?? s.stop_lat ?? s.latitude ?? s.lat),
           parseFloat(s.stopLon ?? s.stop_lon ?? s.longitude ?? s.lng),
         ]);
 
-        const firstRouteId =
-          validStops[0]?.routeId || validStops[0]?.route_id || "fallback";
+        const firstRouteId = validStops[0]?.routeId || validStops[0]?.route_id || "fallback";
 
-        setRoutePaths([
+        nextPaths = [
           {
             routeId: firstRouteId,
             routeCode: sourceRouteMap[firstRouteId]?.routeCode || "N/A",
@@ -139,16 +197,14 @@ export function useRouteLines(
             usedRoutingApi: false,
             source: "stops",
           },
-        ]);
+        ];
 
-        setRoutingError(
-          "TomTom routing could not build road-following lines, so the dashboard is using stop-to-stop fallback lines."
-        );
+        nextError =
+          "TomTom routing could not build road-following lines, so the dashboard is using stop-to-stop fallback lines.";
       } else {
-        const firstRouteId =
-          validStops[0]?.routeId || validStops[0]?.route_id || "route";
+        const firstRouteId = validStops[0]?.routeId || validStops[0]?.route_id || "route";
 
-        setRoutePaths([
+        nextPaths = [
           {
             routeId: firstRouteId,
             routeCode: sourceRouteMap[firstRouteId]?.routeCode || "N/A",
@@ -158,10 +214,20 @@ export function useRouteLines(
             usedRoutingApi: true,
             source: "tomtom",
           },
-        ]);
+        ];
       }
 
-      setLastRoutingUpdated(new Date().toISOString());
+      const updatedAt = new Date().toISOString();
+
+      setRoutePaths(nextPaths);
+      setRoutingError(nextError);
+      setLastRoutingUpdated(updatedAt);
+
+      setRouteCache(cacheKey, {
+        routePaths: nextPaths,
+        routingError: nextError,
+        lastRoutingUpdated: updatedAt,
+      });
     } catch (error) {
       setRoutingError(error.message || "Failed to build route lines.");
       setRoutePaths([]);
@@ -174,11 +240,13 @@ export function useRouteLines(
     refreshRouteLines();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    enabled,
     apiKey,
     sourceMode,
     validStops.length,
     validGtfsShapePoints.length,
     selectedRouteMeta?.id,
+    cacheKey,
   ]);
 
   return {

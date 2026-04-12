@@ -29,7 +29,7 @@ function normalizeStop(stop) {
 }
 
 export default function Traffic() {
-  const { user } = useAuth();
+  useAuth();
 
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
 
@@ -182,7 +182,7 @@ export default function Traffic() {
       .filter((shape) => (shape.shape_id || shape.shapeId) === selectedShapeId)
       .sort((a, b) => {
         const seqA = Number(a.shape_pt_sequence ?? a.shapePtSequence ?? 0);
-        const seqB = Number(b.shape_pt_sequence ?? b.shapePtSequence ?? 0);
+        const seqB = Number(a.shape_pt_sequence ?? a.shapePtSequence ?? 0);
         return seqA - seqB;
       })
       .map((shape) => [
@@ -238,6 +238,8 @@ export default function Traffic() {
     return filteredStops;
   }, [filteredStops, isAllGtfs]);
 
+  const trafficEnabled = showTrafficOverlay && !isAllGtfs;
+
   const {
     trafficSamples = [],
     trafficSummary,
@@ -245,7 +247,13 @@ export default function Traffic() {
     refreshTraffic,
     trafficError,
     lastTrafficUpdated,
-  } = useTrafficData(filteredStops, TOMTOM_API_KEY, sourceMode);
+  } = useTrafficData(filteredStops, TOMTOM_API_KEY, {
+    enabled: trafficEnabled,
+    liveTraffic: trafficEnabled,
+    history: false,
+    cacheKey: `traffic-page:${sourceMode}:${selectedRouteId}`,
+    maxSamplePoints: 15,
+  });
 
   const {
     routePaths = [],
@@ -259,7 +267,11 @@ export default function Traffic() {
     sourceMode,
     sourceRouteMap,
     gtfsDerived.shapePoints,
-    selectedRouteMeta
+    selectedRouteMeta,
+    {
+      enabled: !isAllGtfs && selectedRouteId !== "all",
+      cacheKey: `traffic-routes:${sourceMode}:${selectedRouteId}`,
+    }
   );
 
   const isLoading =
@@ -289,8 +301,8 @@ export default function Traffic() {
           trafficLoading={trafficLoading}
           routingLoading={routingLoading}
           predictionSaving={false}
-          onRefreshTraffic={refreshTraffic}
-          onRefreshRouteLines={refreshRouteLines}
+          onRefreshTraffic={() => refreshTraffic(true)}
+          onRefreshRouteLines={() => refreshRouteLines(true)}
           onSavePrediction={() => {}}
           tomtomEnabled={true}
           stats={{
@@ -317,7 +329,7 @@ export default function Traffic() {
             error={trafficError}
             sourceMode={sourceMode}
             showTrafficOverlay={showTrafficOverlay}
-            samplePoints={trafficSamples.length}
+            samplePoints={trafficEnabled ? trafficSamples.length : 0}
             apiConfigured={true}
           />
           <RoutingStatusPanel

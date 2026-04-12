@@ -18,7 +18,8 @@ const SNAPSHOT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const DASHBOARD_HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const DASHBOARD_HISTORY_LIMIT = 288;
 const SUMMARY_HISTORY_LIMIT = 2016;
-const MAX_SAMPLE_POINTS = 15;
+const DEFAULT_MAX_SAMPLE_POINTS = 15;
+const CACHE_TTL_MS = 2 * 60 * 1000;
 
 const EMPTY_SUMMARY = {
   total: 0,
@@ -35,6 +36,28 @@ const EMPTY_SUMMARY = {
   congestionScore: 0,
 };
 
+function resolveOptions(options) {
+  if (typeof options === "string") {
+    return {
+      enabled: true,
+      liveTraffic: true,
+      history: true,
+      cacheKey: options,
+      maxSamplePoints: DEFAULT_MAX_SAMPLE_POINTS,
+      skipWhenHidden: true,
+    };
+  }
+
+  return {
+    enabled: options?.enabled ?? true,
+    liveTraffic: options?.liveTraffic ?? true,
+    history: options?.history ?? true,
+    cacheKey: options?.cacheKey ?? "default",
+    maxSamplePoints: options?.maxSamplePoints ?? DEFAULT_MAX_SAMPLE_POINTS,
+    skipWhenHidden: options?.skipWhenHidden ?? true,
+  };
+}
+
 function toLatLng(stop) {
   const lat = parseFloat(stop.stopLat ?? stop.stop_lat ?? stop.latitude);
   const lng = parseFloat(stop.stopLon ?? stop.stop_lon ?? stop.longitude);
@@ -44,7 +67,7 @@ function toLatLng(stop) {
   return { lat, lng };
 }
 
-function pickEvenlySpacedStops(stops = [], maxPoints = MAX_SAMPLE_POINTS) {
+function pickEvenlySpacedStops(stops = [], maxPoints = DEFAULT_MAX_SAMPLE_POINTS) {
   if (!Array.isArray(stops) || stops.length <= maxPoints) return stops;
 
   const result = [];
@@ -104,7 +127,12 @@ function buildTrafficSummary(results = []) {
   let freeFlowTotal = 0;
   let congestionScoreTotal = 0;
 
-  const summary = { ...EMPTY_SUMMARY, total: usable.length, totalPoints: usable.length, samples: usable.length };
+  const summary = {
+    ...EMPTY_SUMMARY,
+    total: usable.length,
+    totalPoints: usable.length,
+    samples: usable.length,
+  };
 
   usable.forEach((item) => {
     currentTotal += Number(item.currentSpeed || 0);
@@ -155,10 +183,76 @@ function normalizeHistoryDoc(docSnap) {
     moderateCount: Number(data.moderateCount || 0),
     lowCount: Number(data.lowCount || 0),
     closedCount: Number(data.closedCount || 0),
+    averageCurrentSpeed: Number(data.averageCurrentSpeed || 0),
+    averageFreeFlowSpeed: Number(data.averageFreeFlowSpeed || 0),
   };
 }
 
-export function useTrafficData(stops = [], apiKey) {
+function summaryFromHistoryItem(item) {
+  if (!item) return EMPTY_SUMMARY;
+
+  return {
+    ...EMPTY_SUMMARY,
+    total: Number(item.trafficSampleCount || 0),
+    totalPoints: Number(item.trafficSampleCount || 0),
+    samples: Number(item.trafficSampleCount || 0),
+    light: Number(item.lowCount || 0),
+    moderate: Number(item.moderateCount || 0),
+    heavy: Number(item.heavyCount || 0),
+    closed: Number(item.closedCount || 0),
+    level: item.congestionLevel || "Low",
+    congestionScore: Number(item.congestionScore || 0),
+    averageCurrentSpeed: Number(item.averageCurrentSpeed || 0),
+    averageFreeFlowSpeed: Number(item.averageFreeFlowSpeed || 0),
+    avgSpeed: Number(item.averageCurrentSpeed || 0),
+  };
+}
+
+function getCache(cacheKey) {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.sessionStorage.getItem(`traffic-cache:${cacheKey}`);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed?.savedAt || Date.now() - parsed.savedAt > CACHE_TTL_MS) {
+      return null;
+    }
+
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function setCache(cacheKey, payload) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(
+      `traffic-cache:${cacheKey}`,
+      JSON.stringify({
+        ...payload,
+        savedAt: Date.now(),
+      })
+    );
+  } catch {
+    // ignore cache failures
+  }
+}
+
+export function useTrafficData(stops = [], apiKey, options = {}) {
+  const resolvedOptions = resolveOptions(options);
+  const {
+    enabled,
+    liveTraffic,
+    history,
+    cacheKey,
+    maxSamplePoints,
+    skipWhenHidden,
+  } = resolvedOptions;
+
   const [trafficSamples, setTrafficSamples] = useState([]);
   const [trafficSummary, setTrafficSummary] = useState(EMPTY_SUMMARY);
   const [trafficHistory, setTrafficHistory] = useState([]);
@@ -176,6 +270,17 @@ export function useTrafficData(stops = [], apiKey) {
   const validStops = useMemo(() => stops.filter((stop) => !!toLatLng(stop)), [stops]);
 
   const loadTrafficHistory = useCallback(async () => {
+    if (!history) {
+      setTrafficHistory([]);
+      setHistoryAnalytics({
+        snapshotCount7d: 0,
+        averageScore7d: 0,
+        latestScore: 0,
+        highestScore7d: 0,
+      });
+      return { recentHistory: [], fullHistory: [] };
+    }
+
     try {
       const now = Date.now();
       const dashboardCutoff = now - DASHBOARD_HISTORY_WINDOW_MS;
@@ -206,9 +311,7 @@ export function useTrafficData(stops = [], apiKey) {
       const scoreValues = fullHistory.map((item) => Number(item.congestionScore || 0));
       const averageScore7d = scoreValues.length
         ? Number(
-            (
-              scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length
-            ).toFixed(1)
+            (scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length).toFixed(1)
           )
         : 0;
 
@@ -219,6 +322,12 @@ export function useTrafficData(stops = [], apiKey) {
         latestScore: fullHistory.length ? fullHistory[0].congestionScore : 0,
         highestScore7d: scoreValues.length ? Math.max(...scoreValues) : 0,
       });
+
+      if (!liveTraffic && fullHistory.length) {
+        setTrafficSummary(summaryFromHistoryItem(fullHistory[0]));
+        setLastTrafficUpdated(fullHistory[0].timestampText || null);
+      }
+
       setHistoryError("");
       return { recentHistory, fullHistory };
     } catch (error) {
@@ -232,9 +341,11 @@ export function useTrafficData(stops = [], apiKey) {
       });
       return { recentHistory: [], fullHistory: [] };
     }
-  }, []);
+  }, [history, liveTraffic]);
 
   const cleanupOldSnapshots = useCallback(async () => {
+    if (!history) return;
+
     try {
       const cutoff = Date.now() - SNAPSHOT_RETENTION_MS;
       const oldQuery = query(
@@ -250,10 +361,12 @@ export function useTrafficData(stops = [], apiKey) {
     } catch (error) {
       console.error("Failed to cleanup old traffic snapshots:", error);
     }
-  }, []);
+  }, [history]);
 
   const saveSnapshotIfDue = useCallback(
     async (summary) => {
+      if (!history) return;
+
       try {
         const now = Date.now();
         const { fullHistory } = await loadTrafficHistory();
@@ -282,6 +395,8 @@ export function useTrafficData(stops = [], apiKey) {
           moderateCount: Number(summary.moderate || 0),
           lowCount: Number(summary.light || 0),
           closedCount: Number(summary.closed || 0),
+          averageCurrentSpeed: Number(summary.averageCurrentSpeed || 0),
+          averageFreeFlowSpeed: Number(summary.averageFreeFlowSpeed || 0),
         });
 
         await cleanupOldSnapshots();
@@ -290,85 +405,134 @@ export function useTrafficData(stops = [], apiKey) {
         setHistoryError(error.message || "Failed to save traffic snapshot.");
       }
     },
-    [cleanupOldSnapshots, loadTrafficHistory]
+    [cleanupOldSnapshots, history, loadTrafficHistory]
   );
 
-  const refreshTraffic = useCallback(async () => {
-    if (!apiKey) {
-      setTrafficError("Missing TomTom API key.");
-      setTrafficSamples([]);
-      await loadTrafficHistory();
-      return;
-    }
+  const refreshTraffic = useCallback(
+    async (force = false) => {
+      if (!enabled) {
+        await loadTrafficHistory();
+        return;
+      }
 
-    if (!validStops.length) {
-      setTrafficSamples([]);
-      setTrafficSummary(EMPTY_SUMMARY);
-      await loadTrafficHistory();
-      return;
-    }
+      if (!liveTraffic) {
+        await loadTrafficHistory();
+        return;
+      }
 
-    setTrafficLoading(true);
-    setTrafficError("");
+      if (!apiKey) {
+        setTrafficError("Missing TomTom API key.");
+        setTrafficSamples([]);
+        await loadTrafficHistory();
+        return;
+      }
 
-    try {
-      const sampleStops = pickEvenlySpacedStops(validStops, MAX_SAMPLE_POINTS);
+      if (!validStops.length) {
+        setTrafficSamples([]);
+        setTrafficSummary(EMPTY_SUMMARY);
+        await loadTrafficHistory();
+        return;
+      }
 
-      const results = await Promise.all(
-        sampleStops.map(async (stop, index) => {
-          const coords = toLatLng(stop);
-          const lat = coords?.lat;
-          const lng = coords?.lng;
+      const cached = !force ? getCache(cacheKey) : null;
+      if (cached) {
+        setTrafficSamples(cached.samples || []);
+        setTrafficSummary(cached.summary || EMPTY_SUMMARY);
+        setLastTrafficUpdated(cached.lastTrafficUpdated || null);
 
-          const response = await fetch(
-            `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${lat},${lng}&key=${apiKey}`
-          );
+        if (history) {
+          await loadTrafficHistory();
+        }
 
-          if (!response.ok) {
-            throw new Error(`TomTom request failed (${response.status})`);
-          }
+        return;
+      }
 
-          const data = await response.json();
-          const segment = data?.flowSegmentData;
-          const metrics = severityFromSegment(segment);
+      setTrafficLoading(true);
+      setTrafficError("");
 
-          return {
-            id: stop.id || stop.stop_id || `sample-${index}`,
-            name: stop.stopName || stop.stop_name || `Stop ${index + 1}`,
-            lat,
-            lng,
-            usable: true,
-            ...metrics,
-          };
-        })
-      );
+      try {
+        const sampleStops = pickEvenlySpacedStops(validStops, maxSamplePoints);
 
-      const summary = buildTrafficSummary(results);
+        const results = await Promise.all(
+          sampleStops.map(async (stop, index) => {
+            const coords = toLatLng(stop);
+            const lat = coords?.lat;
+            const lng = coords?.lng;
 
-      setTrafficSamples(results);
-      setTrafficSummary(summary);
-      setLastTrafficUpdated(new Date().toISOString());
+            const response = await fetch(
+              `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${lat},${lng}&key=${apiKey}`
+            );
 
-      await saveSnapshotIfDue(summary);
-    } catch (error) {
-      setTrafficError(error.message || "Failed to load traffic data.");
-      setTrafficSamples([]);
-    } finally {
-      setTrafficLoading(false);
-    }
-  }, [apiKey, loadTrafficHistory, saveSnapshotIfDue, validStops]);
+            if (!response.ok) {
+              throw new Error(`TomTom request failed (${response.status})`);
+            }
+
+            const data = await response.json();
+            const segment = data?.flowSegmentData;
+            const metrics = severityFromSegment(segment);
+
+            return {
+              id: stop.id || stop.stop_id || `sample-${index}`,
+              name: stop.stopName || stop.stop_name || `Stop ${index + 1}`,
+              lat,
+              lng,
+              usable: true,
+              ...metrics,
+            };
+          })
+        );
+
+        const summary = buildTrafficSummary(results);
+        const updatedAt = new Date().toISOString();
+
+        setTrafficSamples(results);
+        setTrafficSummary(summary);
+        setLastTrafficUpdated(updatedAt);
+
+        setCache(cacheKey, {
+          samples: results,
+          summary,
+          lastTrafficUpdated: updatedAt,
+        });
+
+        await saveSnapshotIfDue(summary);
+      } catch (error) {
+        setTrafficError(error.message || "Failed to load traffic data.");
+        setTrafficSamples([]);
+      } finally {
+        setTrafficLoading(false);
+      }
+    },
+    [
+      apiKey,
+      cacheKey,
+      enabled,
+      history,
+      liveTraffic,
+      loadTrafficHistory,
+      maxSamplePoints,
+      saveSnapshotIfDue,
+      validStops,
+    ]
+  );
 
   useEffect(() => {
     refreshTraffic();
   }, [refreshTraffic]);
 
   useEffect(() => {
+    if (!enabled || !liveTraffic) return undefined;
+
     const intervalId = window.setInterval(() => {
+      if (skipWhenHidden && typeof document !== "undefined" && document.hidden) {
+        return;
+      }
+
       refreshTraffic();
     }, SNAPSHOT_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [refreshTraffic]);
+  }, [enabled, liveTraffic, refreshTraffic, skipWhenHidden]);
 
   return {
     trafficSamples,
