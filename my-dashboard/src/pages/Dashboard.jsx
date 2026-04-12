@@ -42,9 +42,6 @@ export default function Dashboard() {
   const gtfsStops = gtfsBundle?.stops || [];
   const gtfsTrips = gtfsBundle?.trips || [];
 
-  const firestoreRoutes = routes || [];
-  const firestoreStops = stops || [];
-  const firestoreTrips = trips || [];
   const firestoreVehicles = vehicles || [];
 
   const gtfsRouteMap = useMemo(() => {
@@ -80,7 +77,13 @@ export default function Dashboard() {
     trafficLoading,
     trafficError,
     lastTrafficUpdated,
-  } = useTrafficData(gtfsFilteredStops, TOMTOM_API_KEY, "gtfs");
+  } = useTrafficData(gtfsFilteredStops, TOMTOM_API_KEY, {
+    enabled: true,
+    liveTraffic: true,
+    history: true,
+    cacheKey: "dashboard-gtfs-network",
+    maxSamplePoints: 15,
+  });
 
   useRouteLines(gtfsFilteredStops, TOMTOM_API_KEY, "gtfs", {});
 

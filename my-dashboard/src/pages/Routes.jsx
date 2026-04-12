@@ -28,7 +28,7 @@ function normalizeStop(stop) {
 }
 
 export default function Routes() {
-  const { user } = useAuth();
+  useAuth();
 
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
 
@@ -234,13 +234,21 @@ export default function Routes() {
     return filteredStops;
   }, [filteredStops, isAllGtfs]);
 
+  const trafficEnabled = showTrafficOverlay && !isAllGtfs && selectedRouteId !== "all";
+
   const {
     trafficSamples = [],
     trafficLoading,
     refreshTraffic,
     trafficError,
     lastTrafficUpdated,
-  } = useTrafficData(filteredStops, TOMTOM_API_KEY, sourceMode);
+  } = useTrafficData(filteredStops, TOMTOM_API_KEY, {
+    enabled: trafficEnabled,
+    liveTraffic: trafficEnabled,
+    history: false,
+    cacheKey: `routes-page:${sourceMode}:${selectedRouteId}`,
+    maxSamplePoints: 8,
+  });
 
   const {
     routePaths = [],
@@ -254,7 +262,11 @@ export default function Routes() {
     sourceMode,
     sourceRouteMap,
     gtfsDerived.shapePoints,
-    selectedRouteMeta
+    selectedRouteMeta,
+    {
+      enabled: !isAllGtfs && selectedRouteId !== "all",
+      cacheKey: `routes-lines:${sourceMode}:${selectedRouteId}`,
+    }
   );
 
   const isLoading =
@@ -284,8 +296,8 @@ export default function Routes() {
           trafficLoading={trafficLoading}
           routingLoading={routingLoading}
           predictionSaving={false}
-          onRefreshTraffic={refreshTraffic}
-          onRefreshRouteLines={refreshRouteLines}
+          onRefreshTraffic={() => refreshTraffic(true)}
+          onRefreshRouteLines={() => refreshRouteLines(true)}
           onSavePrediction={() => {}}
           tomtomEnabled={true}
           stats={{
