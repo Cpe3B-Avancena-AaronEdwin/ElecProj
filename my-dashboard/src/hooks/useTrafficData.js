@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   addDoc,
   collection,
@@ -17,9 +17,11 @@ const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 const SNAPSHOT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const DASHBOARD_HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;
 const DASHBOARD_HISTORY_LIMIT = 288;
-const SUMMARY_HISTORY_LIMIT = 2016;
+const LATEST_SNAPSHOT_LIMIT = 1;
 const DEFAULT_MAX_SAMPLE_POINTS = 15;
-const CACHE_TTL_MS = 2 * 60 * 1000;
+const LIVE_CACHE_TTL_MS = 2 * 60 * 1000;
+const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
+const CLEANUP_BATCH_LIMIT = 25;
 
 const EMPTY_SUMMARY = {
   total: 0,
@@ -208,15 +210,15 @@ function summaryFromHistoryItem(item) {
   };
 }
 
-function getCache(cacheKey) {
+function getTimedCache(key, ttlMs) {
   if (typeof window === "undefined") return null;
 
   try {
-    const raw = window.sessionStorage.getItem(`traffic-cache:${cacheKey}`);
+    const raw = window.sessionStorage.getItem(key);
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
-    if (!parsed?.savedAt || Date.now() - parsed.savedAt > CACHE_TTL_MS) {
+    if (!parsed?.savedAt || Date.now() - parsed.savedAt > ttlMs) {
       return null;
     }
 
@@ -226,12 +228,12 @@ function getCache(cacheKey) {
   }
 }
 
-function setCache(cacheKey, payload) {
+function setTimedCache(key, payload) {
   if (typeof window === "undefined") return;
 
   try {
     window.sessionStorage.setItem(
-      `traffic-cache:${cacheKey}`,
+      key,
       JSON.stringify({
         ...payload,
         savedAt: Date.now(),
@@ -240,6 +242,38 @@ function setCache(cacheKey, payload) {
   } catch {
     // ignore cache failures
   }
+}
+
+function getLiveCache(cacheKey) {
+  return getTimedCache(`traffic-cache:${cacheKey}`, LIVE_CACHE_TTL_MS);
+}
+
+function setLiveCache(cacheKey, payload) {
+  setTimedCache(`traffic-cache:${cacheKey}`, payload);
+}
+
+function getHistoryCache(cacheKey) {
+  return getTimedCache(`traffic-history:${cacheKey}`, HISTORY_CACHE_TTL_MS);
+}
+
+function setHistoryCache(cacheKey, payload) {
+  setTimedCache(`traffic-history:${cacheKey}`, payload);
+}
+
+function buildHistoryAnalytics(items = []) {
+  const scoreValues = items.map((item) => Number(item.congestionScore || 0));
+  const averageScore = scoreValues.length
+    ? Number(
+        (scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length).toFixed(1)
+      )
+    : 0;
+
+  return {
+    snapshotCount7d: items.length,
+    averageScore7d: averageScore,
+    latestScore: items.length ? Number(items[0].congestionScore || 0) : 0,
+    highestScore7d: scoreValues.length ? Math.max(...scoreValues) : 0,
+  };
 }
 
 export function useTrafficData(stops = [], apiKey, options = {}) {
@@ -267,91 +301,123 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
   const [historyError, setHistoryError] = useState("");
   const [lastTrafficUpdated, setLastTrafficUpdated] = useState(null);
 
+  const historyLoadPromiseRef = useRef(null);
+  const refreshInFlightRef = useRef(false);
+  const cleanupRanAtRef = useRef(0);
+
   const validStops = useMemo(() => stops.filter((stop) => !!toLatLng(stop)), [stops]);
 
-  const loadTrafficHistory = useCallback(async () => {
-    if (!history) {
-      setTrafficHistory([]);
-      setHistoryAnalytics({
-        snapshotCount7d: 0,
-        averageScore7d: 0,
-        latestScore: 0,
-        highestScore7d: 0,
-      });
-      return { recentHistory: [], fullHistory: [] };
-    }
-
-    try {
-      const now = Date.now();
-      const dashboardCutoff = now - DASHBOARD_HISTORY_WINDOW_MS;
-      const retentionCutoff = now - SNAPSHOT_RETENTION_MS;
-
-      const recentQuery = query(
-        collection(db, SNAPSHOT_COLLECTION),
-        where("timestampMs", ">=", dashboardCutoff),
-        orderBy("timestampMs", "asc"),
-        limit(DASHBOARD_HISTORY_LIMIT)
-      );
-
-      const summaryQuery = query(
-        collection(db, SNAPSHOT_COLLECTION),
-        where("timestampMs", ">=", retentionCutoff),
-        orderBy("timestampMs", "desc"),
-        limit(SUMMARY_HISTORY_LIMIT)
-      );
-
-      const [recentSnapshot, summarySnapshot] = await Promise.all([
-        getDocs(recentQuery),
-        getDocs(summaryQuery),
-      ]);
-
-      const recentHistory = recentSnapshot.docs.map(normalizeHistoryDoc);
-      const fullHistory = summarySnapshot.docs.map(normalizeHistoryDoc);
-
-      const scoreValues = fullHistory.map((item) => Number(item.congestionScore || 0));
-      const averageScore7d = scoreValues.length
-        ? Number(
-            (scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length).toFixed(1)
-          )
-        : 0;
+  const applyHistoryPayload = useCallback(
+    (recentHistory, latestItem = null) => {
+      const latest = latestItem || recentHistory[recentHistory.length - 1] || null;
 
       setTrafficHistory(recentHistory);
-      setHistoryAnalytics({
-        snapshotCount7d: fullHistory.length,
-        averageScore7d,
-        latestScore: fullHistory.length ? fullHistory[0].congestionScore : 0,
-        highestScore7d: scoreValues.length ? Math.max(...scoreValues) : 0,
-      });
+      setHistoryAnalytics(buildHistoryAnalytics(recentHistory));
 
-      if (!liveTraffic && fullHistory.length) {
-        setTrafficSummary(summaryFromHistoryItem(fullHistory[0]));
-        setLastTrafficUpdated(fullHistory[0].timestampText || null);
+      if (!liveTraffic && latest) {
+        setTrafficSummary(summaryFromHistoryItem(latest));
+        setLastTrafficUpdated(latest.timestampText || null);
+      }
+    },
+    [liveTraffic]
+  );
+
+  const loadTrafficHistory = useCallback(
+    async (force = false) => {
+      if (!history) {
+        setTrafficHistory([]);
+        setHistoryAnalytics({
+          snapshotCount7d: 0,
+          averageScore7d: 0,
+          latestScore: 0,
+          highestScore7d: 0,
+        });
+        return { recentHistory: [], latestItem: null };
       }
 
-      setHistoryError("");
-      return { recentHistory, fullHistory };
-    } catch (error) {
-      setHistoryError(error.message || "Failed to load traffic history.");
-      setTrafficHistory([]);
-      setHistoryAnalytics({
-        snapshotCount7d: 0,
-        averageScore7d: 0,
-        latestScore: 0,
-        highestScore7d: 0,
-      });
-      return { recentHistory: [], fullHistory: [] };
-    }
-  }, [history, liveTraffic]);
+      const cached = !force ? getHistoryCache(cacheKey) : null;
+      if (cached) {
+        const recentHistory = cached.recentHistory || [];
+        const latestItem = cached.latestItem || recentHistory[recentHistory.length - 1] || null;
+
+        applyHistoryPayload(recentHistory, latestItem);
+        setHistoryError("");
+        return { recentHistory, latestItem };
+      }
+
+      if (historyLoadPromiseRef.current && !force) {
+        return historyLoadPromiseRef.current;
+      }
+
+      const loadPromise = (async () => {
+        try {
+          const dashboardCutoff = Date.now() - DASHBOARD_HISTORY_WINDOW_MS;
+
+          const recentQuery = query(
+            collection(db, SNAPSHOT_COLLECTION),
+            where("timestampMs", ">=", dashboardCutoff),
+            orderBy("timestampMs", "asc"),
+            limit(DASHBOARD_HISTORY_LIMIT)
+          );
+
+          const latestQuery = query(
+            collection(db, SNAPSHOT_COLLECTION),
+            orderBy("timestampMs", "desc"),
+            limit(LATEST_SNAPSHOT_LIMIT)
+          );
+
+          const [recentSnapshot, latestSnapshot] = await Promise.all([
+            getDocs(recentQuery),
+            getDocs(latestQuery),
+          ]);
+
+          const recentHistory = recentSnapshot.docs.map(normalizeHistoryDoc);
+          const latestItem = latestSnapshot.empty
+            ? recentHistory[recentHistory.length - 1] || null
+            : normalizeHistoryDoc(latestSnapshot.docs[0]);
+
+          applyHistoryPayload(recentHistory, latestItem);
+          setHistoryCache(cacheKey, { recentHistory, latestItem });
+          setHistoryError("");
+
+          return { recentHistory, latestItem };
+        } catch (error) {
+          setHistoryError(error.message || "Failed to load traffic history.");
+          setTrafficHistory([]);
+          setHistoryAnalytics({
+            snapshotCount7d: 0,
+            averageScore7d: 0,
+            latestScore: 0,
+            highestScore7d: 0,
+          });
+          return { recentHistory: [], latestItem: null };
+        } finally {
+          historyLoadPromiseRef.current = null;
+        }
+      })();
+
+      historyLoadPromiseRef.current = loadPromise;
+      return loadPromise;
+    },
+    [applyHistoryPayload, cacheKey, history]
+  );
 
   const cleanupOldSnapshots = useCallback(async () => {
     if (!history) return;
 
+    const now = Date.now();
+    if (now - cleanupRanAtRef.current < 12 * 60 * 60 * 1000) {
+      return;
+    }
+
+    cleanupRanAtRef.current = now;
+
     try {
-      const cutoff = Date.now() - SNAPSHOT_RETENTION_MS;
+      const cutoff = now - SNAPSHOT_RETENTION_MS;
       const oldQuery = query(
         collection(db, SNAPSHOT_COLLECTION),
         where("timestampMs", "<", cutoff),
-        limit(100)
+        limit(CLEANUP_BATCH_LIMIT)
       );
 
       const snapshot = await getDocs(oldQuery);
@@ -369,15 +435,21 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
 
       try {
         const now = Date.now();
-        const { fullHistory } = await loadTrafficHistory();
-        const latest = fullHistory[0];
+
+        const latestQuery = query(
+          collection(db, SNAPSHOT_COLLECTION),
+          orderBy("timestampMs", "desc"),
+          limit(LATEST_SNAPSHOT_LIMIT)
+        );
+
+        const latestSnapshot = await getDocs(latestQuery);
+        const latest = latestSnapshot.empty ? null : normalizeHistoryDoc(latestSnapshot.docs[0]);
 
         if (latest?.timestampMs && now - latest.timestampMs < SNAPSHOT_INTERVAL_MS) {
-          await cleanupOldSnapshots();
           return;
         }
 
-        await addDoc(collection(db, SNAPSHOT_COLLECTION), {
+        const newSnapshot = {
           timestampMs: now,
           timestampText: new Date(now).toISOString(),
           createdAt: serverTimestamp(),
@@ -397,60 +469,84 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
           closedCount: Number(summary.closed || 0),
           averageCurrentSpeed: Number(summary.averageCurrentSpeed || 0),
           averageFreeFlowSpeed: Number(summary.averageFreeFlowSpeed || 0),
-        });
+        };
 
-        await cleanupOldSnapshots();
-        await loadTrafficHistory();
+        await addDoc(collection(db, SNAPSHOT_COLLECTION), newSnapshot);
+
+        const cachedHistory = getHistoryCache(cacheKey);
+        if (cachedHistory) {
+          const nextHistory = [
+            ...(cachedHistory.recentHistory || []).filter(
+              (item) => Number(item.timestampMs || 0) >= now - DASHBOARD_HISTORY_WINDOW_MS
+            ),
+            newSnapshot,
+          ].slice(-DASHBOARD_HISTORY_LIMIT);
+
+          setHistoryCache(cacheKey, {
+            recentHistory: nextHistory,
+            latestItem: newSnapshot,
+          });
+
+          applyHistoryPayload(nextHistory, newSnapshot);
+        }
+
+        void cleanupOldSnapshots();
       } catch (error) {
         setHistoryError(error.message || "Failed to save traffic snapshot.");
       }
     },
-    [cleanupOldSnapshots, history, loadTrafficHistory]
+    [applyHistoryPayload, cacheKey, cleanupOldSnapshots, history]
   );
 
   const refreshTraffic = useCallback(
     async (force = false) => {
-      if (!enabled) {
-        await loadTrafficHistory();
+      if (refreshInFlightRef.current && !force) {
         return;
       }
 
-      if (!liveTraffic) {
-        await loadTrafficHistory();
-        return;
-      }
-
-      if (!apiKey) {
-        setTrafficError("Missing TomTom API key.");
-        setTrafficSamples([]);
-        await loadTrafficHistory();
-        return;
-      }
-
-      if (!validStops.length) {
-        setTrafficSamples([]);
-        setTrafficSummary(EMPTY_SUMMARY);
-        await loadTrafficHistory();
-        return;
-      }
-
-      const cached = !force ? getCache(cacheKey) : null;
-      if (cached) {
-        setTrafficSamples(cached.samples || []);
-        setTrafficSummary(cached.summary || EMPTY_SUMMARY);
-        setLastTrafficUpdated(cached.lastTrafficUpdated || null);
-
-        if (history) {
-          await loadTrafficHistory();
-        }
-
-        return;
-      }
-
-      setTrafficLoading(true);
-      setTrafficError("");
+      refreshInFlightRef.current = true;
 
       try {
+        if (!enabled) {
+          await loadTrafficHistory(force);
+          return;
+        }
+
+        if (!liveTraffic) {
+          await loadTrafficHistory(force);
+          return;
+        }
+
+        if (!apiKey) {
+          setTrafficError("Missing TomTom API key.");
+          setTrafficSamples([]);
+          await loadTrafficHistory(force);
+          return;
+        }
+
+        if (!validStops.length) {
+          setTrafficSamples([]);
+          setTrafficSummary(EMPTY_SUMMARY);
+          await loadTrafficHistory(force);
+          return;
+        }
+
+        const cached = !force ? getLiveCache(cacheKey) : null;
+        if (cached) {
+          setTrafficSamples(cached.samples || []);
+          setTrafficSummary(cached.summary || EMPTY_SUMMARY);
+          setLastTrafficUpdated(cached.lastTrafficUpdated || null);
+
+          if (history) {
+            await loadTrafficHistory(force);
+          }
+
+          return;
+        }
+
+        setTrafficLoading(true);
+        setTrafficError("");
+
         const sampleStops = pickEvenlySpacedStops(validStops, maxSamplePoints);
 
         const results = await Promise.all(
@@ -489,18 +585,23 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
         setTrafficSummary(summary);
         setLastTrafficUpdated(updatedAt);
 
-        setCache(cacheKey, {
+        setLiveCache(cacheKey, {
           samples: results,
           summary,
           lastTrafficUpdated: updatedAt,
         });
 
         await saveSnapshotIfDue(summary);
+
+        if (history) {
+          await loadTrafficHistory(force);
+        }
       } catch (error) {
         setTrafficError(error.message || "Failed to load traffic data.");
         setTrafficSamples([]);
       } finally {
         setTrafficLoading(false);
+        refreshInFlightRef.current = false;
       }
     },
     [
@@ -517,7 +618,7 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
   );
 
   useEffect(() => {
-    refreshTraffic();
+    void refreshTraffic();
   }, [refreshTraffic]);
 
   useEffect(() => {
@@ -528,7 +629,7 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
         return;
       }
 
-      refreshTraffic();
+      void refreshTraffic();
     }, SNAPSHOT_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
