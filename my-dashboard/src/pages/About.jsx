@@ -11,7 +11,7 @@ const teamMembers = [
 ];
 
 const emails = [
-  "aaronavancena@gmail.com",
+  "aaronavancena23@gmail.com",
   "kenneth.bautista0604@gmail.com",
   "casia.christeablessdc@gmail.com",
   "derickdeguzman17@gmail.com",
