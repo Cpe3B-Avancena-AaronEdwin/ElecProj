@@ -13,15 +13,21 @@ import {
 import { db } from "../firebase/config";
 
 const SNAPSHOT_COLLECTION = "trafficSnapshots";
-const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
+const SNAPSHOT_INTERVAL_MS = 15 * 60 * 1000;
 const SNAPSHOT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+
 const DASHBOARD_HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;
+const ANALYTICS_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
 const DASHBOARD_HISTORY_LIMIT = 288;
+const ANALYTICS_HISTORY_LIMIT = 2016;
 const LATEST_SNAPSHOT_LIMIT = 1;
+
 const DEFAULT_MAX_SAMPLE_POINTS = 15;
 const LIVE_CACHE_TTL_MS = 2 * 60 * 1000;
 const HISTORY_CACHE_TTL_MS = 10 * 60 * 1000;
 const CLEANUP_BATCH_LIMIT = 25;
+const CACHE_VERSION = "v2";
 
 const EMPTY_SUMMARY = {
   total: 0,
@@ -36,6 +42,16 @@ const EMPTY_SUMMARY = {
   level: "Low",
   avgSpeed: 0,
   congestionScore: 0,
+};
+
+const EMPTY_ANALYTICS = {
+  snapshotCount24h: 0,
+  averageScore24h: 0,
+  highestScore24h: 0,
+  snapshotCount7d: 0,
+  averageScore7d: 0,
+  highestScore7d: 0,
+  latestScore: 0,
 };
 
 function resolveOptions(options) {
@@ -245,34 +261,42 @@ function setTimedCache(key, payload) {
 }
 
 function getLiveCache(cacheKey) {
-  return getTimedCache(`traffic-cache:${cacheKey}`, LIVE_CACHE_TTL_MS);
+  return getTimedCache(`traffic-cache:${CACHE_VERSION}:${cacheKey}`, LIVE_CACHE_TTL_MS);
 }
 
 function setLiveCache(cacheKey, payload) {
-  setTimedCache(`traffic-cache:${cacheKey}`, payload);
+  setTimedCache(`traffic-cache:${CACHE_VERSION}:${cacheKey}`, payload);
 }
 
 function getHistoryCache(cacheKey) {
-  return getTimedCache(`traffic-history:${cacheKey}`, HISTORY_CACHE_TTL_MS);
+  return getTimedCache(`traffic-history:${CACHE_VERSION}:${cacheKey}`, HISTORY_CACHE_TTL_MS);
 }
 
 function setHistoryCache(cacheKey, payload) {
-  setTimedCache(`traffic-history:${cacheKey}`, payload);
+  setTimedCache(`traffic-history:${CACHE_VERSION}:${cacheKey}`, payload);
 }
 
-function buildHistoryAnalytics(items = []) {
-  const scoreValues = items.map((item) => Number(item.congestionScore || 0));
-  const averageScore = scoreValues.length
-    ? Number(
-        (scoreValues.reduce((sum, value) => sum + value, 0) / scoreValues.length).toFixed(1)
-      )
-    : 0;
+function averageFromItems(items = []) {
+  if (!items.length) return 0;
 
+  const total = items.reduce((sum, item) => sum + Number(item.congestionScore || 0), 0);
+  return Number((total / items.length).toFixed(1));
+}
+
+function highestFromItems(items = []) {
+  if (!items.length) return 0;
+  return Math.max(...items.map((item) => Number(item.congestionScore || 0)));
+}
+
+function buildHistoryAnalytics(history24h = [], history7d = [], latestItem = null) {
   return {
-    snapshotCount7d: items.length,
-    averageScore7d: averageScore,
-    latestScore: items.length ? Number(items[0].congestionScore || 0) : 0,
-    highestScore7d: scoreValues.length ? Math.max(...scoreValues) : 0,
+    snapshotCount24h: history24h.length,
+    averageScore24h: averageFromItems(history24h),
+    highestScore24h: highestFromItems(history24h),
+    snapshotCount7d: history7d.length,
+    averageScore7d: averageFromItems(history7d),
+    highestScore7d: highestFromItems(history7d),
+    latestScore: latestItem ? Number(latestItem.congestionScore || 0) : 0,
   };
 }
 
@@ -290,12 +314,7 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
   const [trafficSamples, setTrafficSamples] = useState([]);
   const [trafficSummary, setTrafficSummary] = useState(EMPTY_SUMMARY);
   const [trafficHistory, setTrafficHistory] = useState([]);
-  const [historyAnalytics, setHistoryAnalytics] = useState({
-    snapshotCount7d: 0,
-    averageScore7d: 0,
-    latestScore: 0,
-    highestScore7d: 0,
-  });
+  const [historyAnalytics, setHistoryAnalytics] = useState(EMPTY_ANALYTICS);
   const [trafficLoading, setTrafficLoading] = useState(false);
   const [trafficError, setTrafficError] = useState("");
   const [historyError, setHistoryError] = useState("");
@@ -308,11 +327,15 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
   const validStops = useMemo(() => stops.filter((stop) => !!toLatLng(stop)), [stops]);
 
   const applyHistoryPayload = useCallback(
-    (recentHistory, latestItem = null) => {
-      const latest = latestItem || recentHistory[recentHistory.length - 1] || null;
+    (history24h, history7d, latestItem = null) => {
+      const latest =
+        latestItem ||
+        history24h[history24h.length - 1] ||
+        history7d[history7d.length - 1] ||
+        null;
 
-      setTrafficHistory(recentHistory);
-      setHistoryAnalytics(buildHistoryAnalytics(recentHistory));
+      setTrafficHistory(history24h);
+      setHistoryAnalytics(buildHistoryAnalytics(history24h, history7d, latest));
 
       if (!liveTraffic && latest) {
         setTrafficSummary(summaryFromHistoryItem(latest));
@@ -326,23 +349,23 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
     async (force = false) => {
       if (!history) {
         setTrafficHistory([]);
-        setHistoryAnalytics({
-          snapshotCount7d: 0,
-          averageScore7d: 0,
-          latestScore: 0,
-          highestScore7d: 0,
-        });
-        return { recentHistory: [], latestItem: null };
+        setHistoryAnalytics(EMPTY_ANALYTICS);
+        return { history24h: [], history7d: [], latestItem: null };
       }
 
       const cached = !force ? getHistoryCache(cacheKey) : null;
       if (cached) {
-        const recentHistory = cached.recentHistory || [];
-        const latestItem = cached.latestItem || recentHistory[recentHistory.length - 1] || null;
+        const history24h = cached.history24h || [];
+        const history7d = cached.history7d || [];
+        const latestItem =
+          cached.latestItem ||
+          history24h[history24h.length - 1] ||
+          history7d[history7d.length - 1] ||
+          null;
 
-        applyHistoryPayload(recentHistory, latestItem);
+        applyHistoryPayload(history24h, history7d, latestItem);
         setHistoryError("");
-        return { recentHistory, latestItem };
+        return { history24h, history7d, latestItem };
       }
 
       if (historyLoadPromiseRef.current && !force) {
@@ -351,13 +374,22 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
 
       const loadPromise = (async () => {
         try {
-          const dashboardCutoff = Date.now() - DASHBOARD_HISTORY_WINDOW_MS;
+          const now = Date.now();
+          const cutoff24h = now - DASHBOARD_HISTORY_WINDOW_MS;
+          const cutoff7d = now - ANALYTICS_WINDOW_MS;
 
-          const recentQuery = query(
+          const history24hQuery = query(
             collection(db, SNAPSHOT_COLLECTION),
-            where("timestampMs", ">=", dashboardCutoff),
+            where("timestampMs", ">=", cutoff24h),
             orderBy("timestampMs", "asc"),
             limit(DASHBOARD_HISTORY_LIMIT)
+          );
+
+          const history7dQuery = query(
+            collection(db, SNAPSHOT_COLLECTION),
+            where("timestampMs", ">=", cutoff7d),
+            orderBy("timestampMs", "asc"),
+            limit(ANALYTICS_HISTORY_LIMIT)
           );
 
           const latestQuery = query(
@@ -366,31 +398,28 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
             limit(LATEST_SNAPSHOT_LIMIT)
           );
 
-          const [recentSnapshot, latestSnapshot] = await Promise.all([
-            getDocs(recentQuery),
+          const [history24hSnapshot, history7dSnapshot, latestSnapshot] = await Promise.all([
+            getDocs(history24hQuery),
+            getDocs(history7dQuery),
             getDocs(latestQuery),
           ]);
 
-          const recentHistory = recentSnapshot.docs.map(normalizeHistoryDoc);
+          const history24h = history24hSnapshot.docs.map(normalizeHistoryDoc);
+          const history7d = history7dSnapshot.docs.map(normalizeHistoryDoc);
           const latestItem = latestSnapshot.empty
-            ? recentHistory[recentHistory.length - 1] || null
+            ? history24h[history24h.length - 1] || history7d[history7d.length - 1] || null
             : normalizeHistoryDoc(latestSnapshot.docs[0]);
 
-          applyHistoryPayload(recentHistory, latestItem);
-          setHistoryCache(cacheKey, { recentHistory, latestItem });
+          applyHistoryPayload(history24h, history7d, latestItem);
+          setHistoryCache(cacheKey, { history24h, history7d, latestItem });
           setHistoryError("");
 
-          return { recentHistory, latestItem };
+          return { history24h, history7d, latestItem };
         } catch (error) {
           setHistoryError(error.message || "Failed to load traffic history.");
           setTrafficHistory([]);
-          setHistoryAnalytics({
-            snapshotCount7d: 0,
-            averageScore7d: 0,
-            latestScore: 0,
-            highestScore7d: 0,
-          });
-          return { recentHistory: [], latestItem: null };
+          setHistoryAnalytics(EMPTY_ANALYTICS);
+          return { history24h: [], history7d: [], latestItem: null };
         } finally {
           historyLoadPromiseRef.current = null;
         }
@@ -475,19 +504,27 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
 
         const cachedHistory = getHistoryCache(cacheKey);
         if (cachedHistory) {
-          const nextHistory = [
-            ...(cachedHistory.recentHistory || []).filter(
+          const next24h = [
+            ...(cachedHistory.history24h || []).filter(
               (item) => Number(item.timestampMs || 0) >= now - DASHBOARD_HISTORY_WINDOW_MS
             ),
             newSnapshot,
           ].slice(-DASHBOARD_HISTORY_LIMIT);
 
+          const next7d = [
+            ...(cachedHistory.history7d || []).filter(
+              (item) => Number(item.timestampMs || 0) >= now - ANALYTICS_WINDOW_MS
+            ),
+            newSnapshot,
+          ].slice(-ANALYTICS_HISTORY_LIMIT);
+
           setHistoryCache(cacheKey, {
-            recentHistory: nextHistory,
+            history24h: next24h,
+            history7d: next7d,
             latestItem: newSnapshot,
           });
 
-          applyHistoryPayload(nextHistory, newSnapshot);
+          applyHistoryPayload(next24h, next7d, newSnapshot);
         }
 
         void cleanupOldSnapshots();
@@ -593,9 +630,7 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
 
         await saveSnapshotIfDue(summary);
 
-        if (history) {
-          await loadTrafficHistory(force);
-        }
+        await loadTrafficHistory(true);
       } catch (error) {
         setTrafficError(error.message || "Failed to load traffic data.");
         setTrafficSamples([]);
