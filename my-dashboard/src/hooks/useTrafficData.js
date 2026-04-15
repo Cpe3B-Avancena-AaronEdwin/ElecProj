@@ -325,6 +325,11 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
   const cleanupRanAtRef = useRef(0);
 
   const validStops = useMemo(() => stops.filter((stop) => !!toLatLng(stop)), [stops]);
+  const validStopsRef = useRef(validStops);
+
+  useEffect(() => {
+    validStopsRef.current = validStops;
+  }, [validStops]);
 
   const applyHistoryPayload = useCallback(
     (history24h, history7d, latestItem = null) => {
@@ -561,7 +566,9 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
           return;
         }
 
-        if (!validStops.length) {
+        const currentValidStops = validStopsRef.current;
+
+        if (!currentValidStops.length) {
           setTrafficSamples([]);
           setTrafficSummary(EMPTY_SUMMARY);
           await loadTrafficHistory(force);
@@ -584,7 +591,7 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
         setTrafficLoading(true);
         setTrafficError("");
 
-        const sampleStops = pickEvenlySpacedStops(validStops, maxSamplePoints);
+        const sampleStops = pickEvenlySpacedStops(currentValidStops, maxSamplePoints);
 
         const results = await Promise.all(
           sampleStops.map(async (stop, index) => {
@@ -648,7 +655,6 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
       loadTrafficHistory,
       maxSamplePoints,
       saveSnapshotIfDue,
-      validStops,
     ]
   );
 
