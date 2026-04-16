@@ -1,5 +1,6 @@
 ﻿.auth-wrapper {
   display: flex;
+  flex-direction: column;
   position: fixed;
   inset: 0;
   width: 100%;
@@ -141,4 +142,17 @@
   color: #64748b;
   font-size: 0.9rem;
   text-align: center;
+}
+
+.auth-wrapper .site-footer {
+  width: 100%;
+  max-width: 420px;
+  margin-top: 14px;
+  padding: 10px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.auth-wrapper .dashboard-footer {
+  color: #cbd5e1;
+  font-size: 0.85rem;
 }

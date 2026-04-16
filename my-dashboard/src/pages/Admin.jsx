@@ -21,6 +21,7 @@ import RoutesTab from "../components/admin/tabs/RoutesTab";
 import StopsTab from "../components/admin/tabs/StopsTab";
 import VehiclesTab from "../components/admin/tabs/VehiclesTab";
 import TripsTab from "../components/admin/tabs/TripsTab";
+import SiteFooter from "../components/SiteFooter";
 import {
   initialRouteForm,
   initialStopForm,
@@ -154,6 +155,7 @@ export default function Admin() {
             )}
           </div>
         </div>
+        <SiteFooter />
       </div>
     </div>
   );

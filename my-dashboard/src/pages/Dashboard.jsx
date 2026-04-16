@@ -341,11 +341,6 @@ const { vehicles = [] } = useFirestoreTransitData({
           />
         </div>
 
-        <footer className="site-footer">
-          <div className="dashboard-footer">
-            © {new Date().getFullYear()} MoveMint. All rights reserved.
-          </div>
-        </footer>
       </div>
     </Layout>
   );

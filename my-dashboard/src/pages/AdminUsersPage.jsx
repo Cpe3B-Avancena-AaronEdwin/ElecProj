@@ -5,6 +5,7 @@ import { db } from "../firebase/config";
 import { collection, getDocs, addDoc, doc, serverTimestamp } from "firebase/firestore";
 import "../styles/adminusers.css";
 import { useNavigate } from "react-router-dom";
+import SiteFooter from "../components/SiteFooter";
 
 // ✅ Correct path to your UserService.jsx
 import { updateUserProfile, deleteUserAccount } from "../components/user/UserService";
@@ -250,6 +251,7 @@ export default function AdminUsersPage() {
           </div>
         ))}
       </div>
+      <SiteFooter />
     </div>
   );
 }
