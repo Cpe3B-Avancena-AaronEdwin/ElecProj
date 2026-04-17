@@ -21,14 +21,30 @@ export function AuthProvider({ children }) {
     const unsubscribe = observeAuthState(async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          setUser(firebaseUser);
-
           const userRef = doc(db, "users", firebaseUser.uid);
           const userSnap = await getDoc(userRef);
 
           if (userSnap.exists()) {
-            setRole(userSnap.data().role || "viewer");
+            const userData = userSnap.data();
+
+            setUser({
+              ...firebaseUser,
+              displayName:
+                userData.displayName ||
+                firebaseUser.displayName ||
+                "",
+              fullName:
+                userData.displayName ||
+                firebaseUser.displayName ||
+                "",
+              username: userData.username || "",
+              photoURL: userData.photoURL || firebaseUser.photoURL || "",
+              email: userData.email || firebaseUser.email || "",
+            });
+
+            setRole(userData.role || "viewer");
           } else {
+            setUser(firebaseUser);
             setRole("viewer");
           }
         } else {
@@ -47,11 +63,15 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, []);
 
-  // 🔹 New helper functions for User Settings
   const updateProfileInfo = async (data) => {
     await updateUserProfile(data);
-    // Refresh local state with updated info
-    setUser({ ...user, displayName: data.fullName, photoURL: data.photoURL });
+
+    setUser((prev) => ({
+      ...prev,
+      displayName: data.displayName || prev?.displayName || "",
+      fullName: data.displayName || prev?.fullName || "",
+      photoURL: data.photoURL || prev?.photoURL || "",
+    }));
   };
 
   const changePassword = async (newPassword) => {

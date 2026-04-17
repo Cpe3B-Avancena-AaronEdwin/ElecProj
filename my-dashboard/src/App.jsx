@@ -1,18 +1,19 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Dashboard from "./pages/Dashboard";
-import Admin from "./pages/Admin";              // ✅ Admin Panel
-import AdminUsersPage from "./pages/AdminUsersPage"; // ✅ User Management
+import Admin from "./pages/Admin";
+import AdminUsersPage from "./pages/AdminUsersPage";
 import UserSettings from "./components/user/UserSettings";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import Reports from "./pages/Reports";
 import Traffic from "./pages/Traffic";
-import RoutesPage from "./pages/Routes";       // ✅ Public routes page
+import RoutesPage from "./pages/Routes";
 import About from "./pages/About";
-import './App';      
-import "./components/user/UserSettings";
+import Profile from "./pages/Profile";
+import "./App.css";
+import "./components/user/UserSettings.css";
 
-// 🔹 Protected Route wrapper
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, role, loading } = useAuth();
 
@@ -31,22 +32,12 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
 
-  <Route
-    path="/dashboard"
-    element={
-      <ProtectedRoute allowedRoles={["admin", "operator", "viewer"]}>
-        <Dashboard />
-      </ProtectedRoute>
-    }
-  />
-
-          {/* Public routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
           <Route path="/about" element={<About />} />
 
-          {/* Protected routes */}
           <Route
             path="/dashboard"
             element={
@@ -83,7 +74,6 @@ export default function App() {
             }
           />
 
-          {/* 🔹 Admin Panel */}
           <Route
             path="/admin"
             element={
@@ -93,7 +83,6 @@ export default function App() {
             }
           />
 
-          {/* 🔹 Admin Users Page */}
           <Route
             path="/admin/users"
             element={
@@ -103,7 +92,6 @@ export default function App() {
             }
           />
 
-          {/* 🔹 User Settings */}
           <Route
             path="/settings/*"
             element={
@@ -113,8 +101,16 @@ export default function App() {
             }
           />
 
-          {/* Default redirect */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "operator", "viewer"]}>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>
     </AuthProvider>

@@ -1,8 +1,19 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { logoutUser } from "../firebase/auth";
 import SiteFooter from "./SiteFooter";
+
+function getFirstName(user) {
+  const rawName =
+    user?.displayName?.trim() ||
+    user?.email?.split("@")[0] ||
+    "User";
+
+  const firstToken = rawName.split(/\s+/)[0] || "User";
+
+  return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
+}
 
 export default function Layout({ children }) {
   const location = useLocation();
@@ -10,6 +21,8 @@ export default function Layout({ children }) {
   const { user, role } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+
+  const firstName = useMemo(() => getFirstName(user), [user]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -27,25 +40,32 @@ export default function Layout({ children }) {
     };
   }, [dropdownOpen]);
 
+  const closeDropdown = () => setDropdownOpen(false);
+
   const handleLogout = async () => {
+    closeDropdown();
     await logoutUser();
     navigate("/login");
   };
 
-  // Navigation handlers
+  const handleProfile = () => {
+    navigate("/profile");
+    closeDropdown();
+  };
+
   const handleUserSettings = () => {
     navigate("/settings");
-    setDropdownOpen(false);
+    closeDropdown();
   };
 
   const handleAdminUsers = () => {
-    navigate("/admin/users");   // ✅ User Management
-    setDropdownOpen(false);
+    navigate("/admin/users");
+    closeDropdown();
   };
 
   const handleAdminPanel = () => {
-    navigate("/admin");         // ✅ Admin Panel
-    setDropdownOpen(false);
+    navigate("/admin");
+    closeDropdown();
   };
 
   const navItems = [
@@ -59,7 +79,6 @@ export default function Layout({ children }) {
   return (
     <div className="app">
       <div className="main full-width">
-        {/* HEADER */}
         <div className="header">
           <div className="header-left">
             <div className="header-icon">🚌</div>
@@ -69,11 +88,8 @@ export default function Layout({ children }) {
             </div>
           </div>
 
-          {/* USER INFO + DROPDOWN */}
           <div className="header-right" ref={dropdownRef}>
-            <span className="user-label">
-              Hello, {user?.displayName || "User"}
-            </span>
+            <span className="user-label">Hello, {firstName}</span>
 
             <button
               className="dropdown-trigger"
@@ -84,7 +100,25 @@ export default function Layout({ children }) {
 
             {dropdownOpen && (
               <div className="dropdown-menu">
+                <button className="dropdown-item" onClick={handleProfile}>
+                  Profile
+                </button>
+
                 {role === "viewer" && (
+                  <>
+                    <button className="dropdown-item" onClick={handleUserSettings}>
+                      User Information Settings
+                    </button>
+                    <button
+                      className="dropdown-item dropdown-item--danger"
+                      onClick={handleLogout}
+                    >
+                      Log out
+                    </button>
+                  </>
+                )}
+
+                {role === "operator" && (
                   <>
                     <button className="dropdown-item" onClick={handleUserSettings}>
                       User Information Settings
@@ -100,6 +134,9 @@ export default function Layout({ children }) {
 
                 {role === "admin" && (
                   <>
+                    <button className="dropdown-item" onClick={handleUserSettings}>
+                      User Information Settings
+                    </button>
                     <button className="dropdown-item" onClick={handleAdminUsers}>
                       Users Information Settings
                     </button>
@@ -119,7 +156,6 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        {/* NAVIGATION BAR */}
         <div className="nav-bar">
           <nav className="horizontal-nav">
             {navItems.map((item) => (
