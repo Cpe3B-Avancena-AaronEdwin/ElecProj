@@ -1,36 +1,59 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { loginUser, signInWithGoogle } from "../firebase/auth";
+import { registerUser, signInWithGoogle } from "../firebase/auth";
 import Input from "../components/input";
 import Button from "../components/button";
 import SiteFooter from "../components/SiteFooter";
 import "../styles/auth.css";
 
-export default function Login() {
+export default function Signup() {
   const navigate = useNavigate();
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (!fullName.trim()) {
+      setError("Full name is required.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setError("Email is required.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await loginUser(email, password);
+      await registerUser(fullName, email, password);
       navigate("/dashboard");
     } catch (err) {
-      console.error("Login error:", err);
-      setError(err.message || "Login failed.");
+      console.error("Signup error:", err);
+      setError(err.message || "Sign up failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = async () => {
+  const handleGoogleSignup = async () => {
     setError("");
     setGoogleLoading(true);
 
@@ -38,8 +61,8 @@ export default function Login() {
       await signInWithGoogle();
       navigate("/dashboard");
     } catch (err) {
-      console.error("Google login error:", err);
-      setError(err.message || "Google sign-in failed.");
+      console.error("Google signup error:", err);
+      setError(err.message || "Google sign-up failed.");
     } finally {
       setGoogleLoading(false);
     }
@@ -50,22 +73,32 @@ export default function Login() {
       <div className="auth-card">
         <div className="login-brand">
           <div className="brand-mark" aria-hidden="true">
-            🚍
+            📝
           </div>
           <div className="brand-copy">
-            <h1 className="brand-name">CityBloop</h1>
+            <h1 className="brand-name">Create Account</h1>
             <p className="brand-subtitle">
-              Smart Public Transportation Analytics
+              Set up your CityBloop access in Firebase.
             </p>
           </div>
         </div>
 
-        <form className="auth-form" onSubmit={handleLogin} noValidate>
+        <form className="auth-form" onSubmit={handleSignup} noValidate>
+          <Input
+            id="fullName"
+            label="Full Name"
+            type="text"
+            placeholder="Juan Dela Cruz"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            required
+          />
+
           <Input
             id="email"
             label="Email"
             type="email"
-            placeholder="operator@citybloop.com"
+            placeholder="name@citybloop.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -75,9 +108,19 @@ export default function Login() {
             id="password"
             label="Password"
             type="password"
-            placeholder="Enter password"
+            placeholder="At least 6 characters"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+
+          <Input
+            id="confirmPassword"
+            label="Confirm Password"
+            type="password"
+            placeholder="Re-enter password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
             required
           />
 
@@ -87,12 +130,8 @@ export default function Login() {
             </div>
           )}
 
-          <Button
-            type="submit"
-            className="btn--primary"
-            disabled={loading || googleLoading}
-          >
-            {loading ? "Signing in..." : "Sign In"}
+          <Button type="submit" className="btn--primary" disabled={loading || googleLoading}>
+            {loading ? "Creating account..." : "Create Account"}
           </Button>
 
           <div className="auth-divider">
@@ -102,27 +141,20 @@ export default function Login() {
           <Button
             type="button"
             className="btn--google"
-            onClick={handleGoogleLogin}
+            onClick={handleGoogleSignup}
             disabled={loading || googleLoading}
           >
-            {googleLoading
-              ? "Connecting to Google..."
-              : "Continue with Google"}
+            {googleLoading ? "Connecting to Google..." : "Sign Up with Google"}
           </Button>
 
           <Button
             type="button"
             className="btn--secondary"
-            onClick={() => navigate("/signup")}
+            onClick={() => navigate("/login")}
             disabled={loading || googleLoading}
           >
-            Sign Up
+            Back to Login
           </Button>
-
-          <p className="login-hint">
-            Use password or Google. To use both on the same account, link them
-            from your profile after logging in.
-          </p>
         </form>
       </div>
       <SiteFooter />
