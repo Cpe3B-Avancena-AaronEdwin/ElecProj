@@ -9,6 +9,7 @@ import "../styles/auth.css";
 export default function Signup() {
   const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -22,6 +23,16 @@ export default function Signup() {
 
     if (!fullName.trim()) {
       setError("Full name is required.");
+      return;
+    }
+
+    if (!username.trim()) {
+      setError("Username is required.");
+      return;
+    }
+
+    if (username.trim().includes("@")) {
+      setError("Username cannot contain @.");
       return;
     }
 
@@ -43,7 +54,7 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      await registerUser(fullName, email, password);
+      await registerUser(fullName, username, email, password);
       navigate("/dashboard");
     } catch (err) {
       console.error("Signup error:", err);
@@ -95,6 +106,16 @@ export default function Signup() {
           />
 
           <Input
+            id="username"
+            label="Username"
+            type="text"
+            placeholder="juan23"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+
+          <Input
             id="email"
             label="Email"
             type="email"
@@ -130,7 +151,11 @@ export default function Signup() {
             </div>
           )}
 
-          <Button type="submit" className="btn--primary" disabled={loading || googleLoading}>
+          <Button
+            type="submit"
+            className="btn--primary"
+            disabled={loading || googleLoading}
+          >
             {loading ? "Creating account..." : "Create Account"}
           </Button>
 
@@ -155,6 +180,11 @@ export default function Signup() {
           >
             Back to Login
           </Button>
+
+          <p className="login-hint">
+            Usernames are unique and are saved in lowercase. Google signup still
+            works, but Google users can set their username later in Profile.
+          </p>
         </form>
       </div>
       <SiteFooter />

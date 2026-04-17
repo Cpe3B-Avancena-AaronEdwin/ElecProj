@@ -21,6 +21,11 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
+  limit,
 } from "firebase/firestore";
 
 import { auth, db } from "./config";
@@ -32,6 +37,65 @@ googleProvider.setCustomParameters({
 
 const getSafeNameFromEmail = (email = "") => {
   return email.split("@")[0] || "User";
+};
+
+const normalizeUsername = (username = "") => {
+  return username.trim().toLowerCase();
+};
+
+const isEmailInput = (value = "") => {
+  return value.includes("@");
+};
+
+const getUserByUsername = async (username) => {
+  const normalized = normalizeUsername(username);
+
+  if (!normalized) return null;
+
+  const usersRef = collection(db, "users");
+  const q = query(
+    usersRef,
+    where("username", "==", normalized),
+    limit(1)
+  );
+
+  const snapshot = await getDocs(q);
+
+  if (snapshot.empty) return null;
+
+  const docSnap = snapshot.docs[0];
+  return {
+    id: docSnap.id,
+    ...docSnap.data(),
+  };
+};
+
+const resolveEmailForLogin = async (identifier) => {
+  const trimmed = identifier.trim();
+
+  if (!trimmed) {
+    throw new Error("Email or username is required.");
+  }
+
+  if (isEmailInput(trimmed)) {
+    return trimmed;
+  }
+
+  const matchedUser = await getUserByUsername(trimmed);
+
+  if (!matchedUser?.email) {
+    throw new Error("Username not found.");
+  }
+
+  return matchedUser.email;
+};
+
+const isUsernameTaken = async (username) => {
+  const normalized = normalizeUsername(username);
+  if (!normalized) return false;
+
+  const existingUser = await getUserByUsername(normalized);
+  return !!existingUser;
 };
 
 const buildUserDoc = (user, overrides = {}) => {
@@ -81,7 +145,7 @@ const ensureUserDocument = async (user, overrides = {}) => {
         getSafeNameFromEmail(user.email),
       username:
         overrides.username !== undefined
-          ? overrides.username
+          ? normalizeUsername(overrides.username)
           : (existing.username || ""),
       photoURL:
         overrides.photoURL !== undefined
@@ -95,11 +159,13 @@ const ensureUserDocument = async (user, overrides = {}) => {
   return userRef;
 };
 
-// Email/Password Login
-export const loginUser = async (email, password) => {
+// Email/Password Login using email OR username
+export const loginUser = async (identifier, password) => {
+  const resolvedEmail = await resolveEmailForLogin(identifier);
+
   const userCredential = await signInWithEmailAndPassword(
     auth,
-    email.trim(),
+    resolvedEmail,
     password
   );
 
@@ -108,9 +174,20 @@ export const loginUser = async (email, password) => {
 };
 
 // Email/Password Register
-export const registerUser = async (fullName, email, password) => {
+export const registerUser = async (fullName, username, email, password) => {
   const trimmedEmail = email.trim();
   const trimmedName = fullName.trim();
+  const normalizedUsername = normalizeUsername(username);
+
+  if (!normalizedUsername) {
+    throw new Error("Username is required.");
+  }
+
+  const usernameTaken = await isUsernameTaken(normalizedUsername);
+
+  if (usernameTaken) {
+    throw new Error("Username is already taken.");
+  }
 
   const userCredential = await createUserWithEmailAndPassword(
     auth,
@@ -127,7 +204,7 @@ export const registerUser = async (fullName, email, password) => {
   await ensureUserDocument(user, {
     displayName: trimmedName,
     fullName: trimmedName,
-    username: "",
+    username: normalizedUsername,
     photoURL: "",
     role: "viewer",
     sessions: [],
@@ -160,7 +237,7 @@ export const signInWithGoogle = async () => {
 
         if (methods.includes("password")) {
           throw new Error(
-            "This email already has a password account. Log in using email and password first, then go to Profile and use Link Google."
+            "This email already has a password account. Log in using email/username and password first, then go to Profile and use Link Google."
           );
         }
 
@@ -240,9 +317,7 @@ export const linkPasswordToCurrentUser = async (email, password) => {
     }
 
     if (error.code === "auth/email-already-in-use") {
-      throw new Error(
-        "That email is already being used by another account."
-      );
+      throw new Error("That email is already being used by another account.");
     }
 
     if (error.code === "auth/invalid-email") {
@@ -273,6 +348,15 @@ export const updateUserProfile = async (data) => {
   if (!user) return;
 
   const resolvedName = data.fullName || data.displayName || "";
+  const normalizedUsername =
+    data.username !== undefined ? normalizeUsername(data.username) : "";
+
+  if (normalizedUsername) {
+    const existing = await getUserByUsername(normalizedUsername);
+    if (existing && existing.uid !== user.uid) {
+      throw new Error("Username is already taken.");
+    }
+  }
 
   await updateProfile(user, {
     displayName: resolvedName,
@@ -283,7 +367,7 @@ export const updateUserProfile = async (data) => {
   await updateDoc(userRef, {
     displayName: resolvedName,
     fullName: resolvedName,
-    username: data.username || "",
+    username: normalizedUsername,
     photoURL: data.photoURL || "",
     updatedAt: serverTimestamp(),
   });
