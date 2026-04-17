@@ -5,6 +5,7 @@ import UserPasswordForm from "./UserPasswordForm";
 import UserDeleteAccount from "./UserDeleteAccount";
 import UserSessions from "./UserSessions";
 import { updateUserProfile } from "./UserService";
+import SiteFooter from "../SiteFooter";
 import "./UserSettings.css";
 
 export default function UserSettings() {
@@ -120,6 +121,8 @@ export default function UserSettings() {
         <h3 className="section-title">Delete Account</h3>
         <UserDeleteAccount setMessage={setMessage} />
       </section>
+
+      <SiteFooter />
 
     </div>
   );

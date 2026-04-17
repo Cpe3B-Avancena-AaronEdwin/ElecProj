@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { logoutUser } from "../firebase/auth";
+import SiteFooter from "./SiteFooter";
 
 export default function Layout({ children }) {
   const location = useLocation();
@@ -63,7 +64,7 @@ export default function Layout({ children }) {
           <div className="header-left">
             <div className="header-icon">🚌</div>
             <div className="header-content">
-              <h1 className="header-title">MoveMint</h1>
+              <h1 className="header-title">CityBloop</h1>
               <p className="header-subtitle">Live Transit Analytics</p>
             </div>
           </div>
@@ -135,6 +136,7 @@ export default function Layout({ children }) {
         </div>
 
         <div className="content">{children}</div>
+        <SiteFooter />
       </div>
     </div>
   );

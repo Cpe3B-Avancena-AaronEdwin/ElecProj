@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { loginUser } from "../firebase/auth";
 import Input from "../components/input";
 import Button from "../components/button";
+import SiteFooter from "../components/SiteFooter";
 import "../styles/auth.css";
 
 export default function Login() {
@@ -36,7 +37,7 @@ export default function Login() {
             🚍
           </div>
           <div className="brand-copy">
-            <h1 className="brand-name">MoveMint</h1>
+            <h1 className="brand-name">CityBloop</h1>
             <p className="brand-subtitle">Smart Public Transportation Analytics</p>
           </div>
         </div>
@@ -46,7 +47,7 @@ export default function Login() {
             id="email"
             label="Email"
             type="email"
-            placeholder="operator@movemint.com"
+            placeholder="operator@citybloop.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -71,6 +72,7 @@ export default function Login() {
           <p className="login-hint">Demo: Use any email and password to sign in</p>
         </form>
       </div>
+      <SiteFooter />
     </div>
   );
 }
