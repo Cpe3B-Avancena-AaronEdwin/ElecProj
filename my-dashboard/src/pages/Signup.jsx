@@ -84,7 +84,7 @@ export default function Signup() {
       <div className="auth-card">
         <div className="login-brand">
           <div className="brand-mark" aria-hidden="true">
-            📝
+            <img src="/logo.jpeg" alt="CityBloop Logo" />
           </div>
           <div className="brand-copy">
             <h1 className="brand-name">Create Account</h1>

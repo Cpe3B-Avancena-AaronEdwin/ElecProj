@@ -11,6 +11,7 @@ import DashboardMap from "../components/dashboard/DashboardMap";
 import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
 import TrafficStatusPanel from "../components/dashboard/TrafficStatusPanel";
 import RoutingStatusPanel from "../components/dashboard/RoutingStatusPanel";
+import RouteSummaryPanel from "../components/dashboard/RouteSummaryPanel";
 
 import Layout from "../components/Layout";
 
@@ -281,8 +282,8 @@ export default function Traffic() {
     <Layout>
       <div className="dashboard-container">
         <div className="page-header">
-          <h1>Live Traffic Monitoring</h1>
-          <p>Real-time traffic conditions and route performance</p>
+          <h1>Live Traffic & Routes</h1>
+          <p>Real-time traffic conditions, route management, and transit analytics</p>
         </div>
 
         <DashboardToolbar
@@ -331,6 +332,12 @@ export default function Traffic() {
             showTrafficOverlay={showTrafficOverlay}
             samplePoints={trafficEnabled ? trafficSamples.length : 0}
             apiConfigured={true}
+          />
+          <RouteSummaryPanel
+            routes={activeRoutes}
+            sourceStops={sourceStops}
+            sourceTrips={sourceTrips}
+            sourceVehicles={sourceVehicles}
           />
           <RoutingStatusPanel
             routes={routePaths}

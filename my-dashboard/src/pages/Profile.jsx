@@ -5,6 +5,7 @@ import {
   linkGoogleToCurrentUser,
   linkPasswordToCurrentUser,
   updateUserProfile,
+  updateUserPassword,
 } from "../firebase/auth";
 import { useAuth } from "../context/AuthContext";
 import Input from "../components/input";
@@ -23,12 +24,17 @@ export default function Profile() {
   const [linkPassword, setLinkPassword] = useState("");
   const [confirmLinkPassword, setConfirmLinkPassword] = useState("");
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const [savingProfile, setSavingProfile] = useState(false);
   const [linkingGoogle, setLinkingGoogle] = useState(false);
   const [linkingPassword, setLinkingPassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const [providers, setProviders] = useState([]);
 
@@ -104,7 +110,20 @@ export default function Profile() {
       setMessage("Google account linked successfully.");
     } catch (err) {
       console.error("Link Google error:", err);
-      setError(err.message || "Failed to link Google account.");
+      
+      let errorMessage = "Failed to link Google account.";
+      
+      if (err.code === "auth/credential-already-in-use") {
+        errorMessage = "This Google account is already linked to another user.";
+      } else if (err.code === "auth/popup-closed-by-user") {
+        errorMessage = "Google sign-in was cancelled.";
+      } else if (err.code === "auth/popup-blocked") {
+        errorMessage = "Pop-up was blocked by your browser. Please allow pop-ups and try again.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLinkingGoogle(false);
     }
@@ -140,9 +159,72 @@ export default function Profile() {
       setMessage("Password login added successfully.");
     } catch (err) {
       console.error("Add password error:", err);
-      setError(err.message || "Failed to add password login.");
+      
+      let errorMessage = "Failed to add password login.";
+      
+      if (err.code === "auth/weak-password") {
+        errorMessage = "Password is too weak. Please choose a stronger password.";
+      } else if (err.code === "auth/email-already-in-use") {
+        errorMessage = "This email is already associated with another account.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLinkingPassword(false);
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+
+    if (!currentPassword.trim()) {
+      setError("Current password is required.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setError("New password must be at least 6 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setError("New passwords do not match.");
+      return;
+    }
+
+    setChangingPassword(true);
+
+    try {
+      await updateUserPassword(currentPassword, newPassword);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmNewPassword("");
+      setMessage("Password changed successfully.");
+    } catch (err) {
+      console.error("Change password error:", err);
+      
+      // Handle specific Firebase auth errors with user-friendly messages
+      let errorMessage = "Failed to change password.";
+      
+      if (err.code === "auth/wrong-password") {
+        errorMessage = "Current password is incorrect. Please enter your correct current password.";
+      } else if (err.code === "auth/invalid-credential") {
+        errorMessage = "Current password is incorrect. Please enter your correct current password.";
+      } else if (err.code === "auth/weak-password") {
+        errorMessage = "New password is too weak. Please choose a stronger password.";
+      } else if (err.code === "auth/requires-recent-login") {
+        errorMessage = "For security reasons, please log out and log back in before changing your password.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -374,6 +456,61 @@ export default function Profile() {
               This account already has both Password and Google linked. You can
               use either login method.
             </div>
+          )}
+
+          {hasPasswordProvider && (
+            <form
+              onSubmit={handleChangePassword}
+              style={{
+                display: "grid",
+                gap: "16px",
+                marginBottom: "20px",
+                padding: "16px",
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: "12px",
+              }}
+            >
+              <h3 style={{ margin: 0, color: "#0f172a" }}>Change Password</h3>
+              <p style={{ margin: 0, color: "#475569" }}>
+                Enter your current password and choose a new one.
+              </p>
+
+              <Input
+                id="currentPassword"
+                label="Current Password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
+
+              <Input
+                id="newPassword"
+                label="New Password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+
+              <Input
+                id="confirmNewPassword"
+                label="Confirm New Password"
+                type="password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+                required
+              />
+
+              <Button
+                type="submit"
+                className="btn--primary"
+                disabled={changingPassword}
+              >
+                {changingPassword ? "Changing Password..." : "Change Password"}
+              </Button>
+            </form>
           )}
 
           {!hasPasswordProvider && !hasGoogleProvider && (

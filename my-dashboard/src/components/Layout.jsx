@@ -53,11 +53,6 @@ export default function Layout({ children }) {
     closeDropdown();
   };
 
-  const handleUserSettings = () => {
-    navigate("/settings");
-    closeDropdown();
-  };
-
   const handleAdminUsers = () => {
     navigate("/admin/users");
     closeDropdown();
@@ -70,8 +65,7 @@ export default function Layout({ children }) {
 
   const navItems = [
     { label: "Dashboard", path: "/dashboard" },
-    { label: "Live Traffic", path: "/traffic" },
-    { label: "Routes", path: "/routes" },
+    { label: "Traffic & Routes", path: "/traffic" },
     { label: "Reports", path: "/reports" },
     { label: "About Us", path: "/about" },
   ];
@@ -81,7 +75,9 @@ export default function Layout({ children }) {
       <div className="main full-width">
         <div className="header">
           <div className="header-left">
-            <div className="header-icon">🚌</div>
+            <div className="header-icon">
+              <img src="/logo.jpeg" alt="CityBloop Logo" />
+            </div>
             <div className="header-content">
               <h1 className="header-title">CityBloop</h1>
               <p className="header-subtitle">Live Transit Analytics</p>
@@ -106,9 +102,6 @@ export default function Layout({ children }) {
 
                 {role === "viewer" && (
                   <>
-                    <button className="dropdown-item" onClick={handleUserSettings}>
-                      User Information Settings
-                    </button>
                     <button
                       className="dropdown-item dropdown-item--danger"
                       onClick={handleLogout}
@@ -120,9 +113,6 @@ export default function Layout({ children }) {
 
                 {role === "operator" && (
                   <>
-                    <button className="dropdown-item" onClick={handleUserSettings}>
-                      User Information Settings
-                    </button>
                     <button
                       className="dropdown-item dropdown-item--danger"
                       onClick={handleLogout}
@@ -134,9 +124,6 @@ export default function Layout({ children }) {
 
                 {role === "admin" && (
                   <>
-                    <button className="dropdown-item" onClick={handleUserSettings}>
-                      User Information Settings
-                    </button>
                     <button className="dropdown-item" onClick={handleAdminUsers}>
                       Users Information Settings
                     </button>
