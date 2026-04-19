@@ -12,6 +12,7 @@ import {
   linkWithCredential,
   linkWithPopup,
   EmailAuthProvider,
+  reauthenticateWithCredential,
 } from "firebase/auth";
 
 import {
@@ -373,10 +374,16 @@ export const updateUserProfile = async (data) => {
   });
 };
 
-// Update Password
-export const updateUserPassword = async (newPassword) => {
+// Update Password with reauthentication
+export const updateUserPassword = async (currentPassword, newPassword) => {
   const user = auth.currentUser;
-  if (!user) return;
+  if (!user) throw new Error("No user is signed in.");
+
+  // Reauthenticate with current password
+  const credential = EmailAuthProvider.credential(user.email, currentPassword);
+  await reauthenticateWithCredential(user, credential);
+
+  // Update to new password
   await fbUpdatePassword(user, newPassword);
 };
 

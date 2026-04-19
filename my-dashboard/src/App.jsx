@@ -3,16 +3,13 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 import AdminUsersPage from "./pages/AdminUsersPage";
-import UserSettings from "./components/user/UserSettings";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Reports from "./pages/Reports";
 import Traffic from "./pages/Traffic";
-import RoutesPage from "./pages/Routes";
 import About from "./pages/About";
 import Profile from "./pages/Profile";
 import "./App.css";
-import "./components/user/UserSettings.css";
 
 function ProtectedRoute({ children, allowedRoles }) {
   const { user, role, loading } = useAuth();
@@ -57,15 +54,6 @@ export default function App() {
           />
 
           <Route
-            path="/routes"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "operator", "viewer"]}>
-                <RoutesPage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
             path="/reports"
             element={
               <ProtectedRoute allowedRoles={["admin", "operator"]}>
@@ -88,15 +76,6 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminUsersPage />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/settings/*"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "operator", "viewer"]}>
-                <UserSettings />
               </ProtectedRoute>
             }
           />
