@@ -28,8 +28,14 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
 
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
+  const [profileMessage, setProfileMessage] = useState("");
+  const [profileError, setProfileError] = useState("");
+
+  const [loginMessage, setLoginMessage] = useState("");
+  const [loginError, setLoginError] = useState("");
+
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   const [savingProfile, setSavingProfile] = useState(false);
   const [linkingGoogle, setLinkingGoogle] = useState(false);
@@ -77,10 +83,18 @@ export default function Profile() {
     [providers]
   );
 
+  const clearAllMessages = () => {
+    setProfileMessage("");
+    setProfileError("");
+    setLoginMessage("");
+    setLoginError("");
+    setPasswordMessage("");
+    setPasswordError("");
+  };
+
   const handleSaveProfile = async (e) => {
     e.preventDefault();
-    setError("");
-    setMessage("");
+    clearAllMessages();
     setSavingProfile(true);
 
     try {
@@ -90,40 +104,40 @@ export default function Profile() {
         photoURL,
       });
 
-      setMessage("Profile updated successfully.");
+      setProfileMessage("Profile updated successfully.");
     } catch (err) {
       console.error("Profile update error:", err);
-      setError(err.message || "Failed to update profile.");
+      setProfileError(err.message || "Failed to update profile.");
     } finally {
       setSavingProfile(false);
     }
   };
 
   const handleLinkGoogle = async () => {
-    setError("");
-    setMessage("");
+    clearAllMessages();
     setLinkingGoogle(true);
 
     try {
       await linkGoogleToCurrentUser();
       await refreshProviders();
-      setMessage("Google account linked successfully.");
+      setLoginMessage("Google account linked successfully.");
     } catch (err) {
       console.error("Link Google error:", err);
-      
+
       let errorMessage = "Failed to link Google account.";
-      
+
       if (err.code === "auth/credential-already-in-use") {
         errorMessage = "This Google account is already linked to another user.";
       } else if (err.code === "auth/popup-closed-by-user") {
         errorMessage = "Google sign-in was cancelled.";
       } else if (err.code === "auth/popup-blocked") {
-        errorMessage = "Pop-up was blocked by your browser. Please allow pop-ups and try again.";
+        errorMessage =
+          "Pop-up was blocked by your browser. Please allow pop-ups and try again.";
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
-      setError(errorMessage);
+
+      setLoginError(errorMessage);
     } finally {
       setLinkingGoogle(false);
     }
@@ -131,21 +145,20 @@ export default function Profile() {
 
   const handleAddPassword = async (e) => {
     e.preventDefault();
-    setError("");
-    setMessage("");
+    clearAllMessages();
 
     if (!linkEmail.trim()) {
-      setError("Email is required.");
+      setLoginError("Email is required.");
       return;
     }
 
     if (linkPassword.length < 6) {
-      setError("Password must be at least 6 characters.");
+      setLoginError("Password must be at least 6 characters.");
       return;
     }
 
     if (linkPassword !== confirmLinkPassword) {
-      setError("Passwords do not match.");
+      setLoginError("Passwords do not match.");
       return;
     }
 
@@ -156,21 +169,22 @@ export default function Profile() {
       await refreshProviders();
       setLinkPassword("");
       setConfirmLinkPassword("");
-      setMessage("Password login added successfully.");
+      setLoginMessage("Password login added successfully.");
     } catch (err) {
       console.error("Add password error:", err);
-      
+
       let errorMessage = "Failed to add password login.";
-      
+
       if (err.code === "auth/weak-password") {
-        errorMessage = "Password is too weak. Please choose a stronger password.";
+        errorMessage =
+          "Password is too weak. Please choose a stronger password.";
       } else if (err.code === "auth/email-already-in-use") {
         errorMessage = "This email is already associated with another account.";
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
-      setError(errorMessage);
+
+      setLoginError(errorMessage);
     } finally {
       setLinkingPassword(false);
     }
@@ -178,21 +192,20 @@ export default function Profile() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    setError("");
-    setMessage("");
+    clearAllMessages();
 
     if (!currentPassword.trim()) {
-      setError("Current password is required.");
+      setPasswordError("Current password is required.");
       return;
     }
 
     if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters.");
+      setPasswordError("New password must be at least 6 characters.");
       return;
     }
 
     if (newPassword !== confirmNewPassword) {
-      setError("New passwords do not match.");
+      setPasswordError("New passwords do not match.");
       return;
     }
 
@@ -203,26 +216,29 @@ export default function Profile() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmNewPassword("");
-      setMessage("Password changed successfully.");
+      setPasswordMessage("Password changed successfully.");
     } catch (err) {
       console.error("Change password error:", err);
-      
-      // Handle specific Firebase auth errors with user-friendly messages
+
       let errorMessage = "Failed to change password.";
-      
+
       if (err.code === "auth/wrong-password") {
-        errorMessage = "Current password is incorrect. Please enter your correct current password.";
+        errorMessage =
+          "Current password is incorrect. Please enter your correct current password.";
       } else if (err.code === "auth/invalid-credential") {
-        errorMessage = "Current password is incorrect. Please enter your correct current password.";
+        errorMessage =
+          "Current password is incorrect. Please enter your correct current password.";
       } else if (err.code === "auth/weak-password") {
-        errorMessage = "New password is too weak. Please choose a stronger password.";
+        errorMessage =
+          "New password is too weak. Please choose a stronger password.";
       } else if (err.code === "auth/requires-recent-login") {
-        errorMessage = "For security reasons, please log out and log back in before changing your password.";
+        errorMessage =
+          "For security reasons, please log out and log back in before changing your password.";
       } else if (err.message) {
         errorMessage = err.message;
       }
-      
-      setError(errorMessage);
+
+      setPasswordError(errorMessage);
     } finally {
       setChangingPassword(false);
     }
@@ -235,6 +251,12 @@ export default function Profile() {
       </div>
     );
   }
+
+  const infoBoxStyle = {
+    marginBottom: "20px",
+    padding: "12px 14px",
+    borderRadius: "12px",
+  };
 
   return (
     <div
@@ -304,18 +326,18 @@ export default function Profile() {
           </div>
         </div>
 
-        {(error || message) && (
+        {(profileError || profileMessage) && (
           <div
             style={{
-              marginBottom: "20px",
-              padding: "12px 14px",
-              borderRadius: "12px",
-              background: error ? "#fef2f2" : "#f0fdf4",
-              color: error ? "#dc2626" : "#166534",
-              border: error ? "1px solid #fecaca" : "1px solid #bbf7d0",
+              ...infoBoxStyle,
+              background: profileError ? "#fef2f2" : "#f0fdf4",
+              color: profileError ? "#dc2626" : "#166534",
+              border: profileError
+                ? "1px solid #fecaca"
+                : "1px solid #bbf7d0",
             }}
           >
-            {error || message}
+            {profileError || profileMessage}
           </div>
         )}
 
@@ -367,6 +389,21 @@ export default function Profile() {
           }}
         >
           <h2 style={{ marginTop: 0, color: "#0f172a" }}>Login Methods</h2>
+
+          {(loginError || loginMessage) && (
+            <div
+              style={{
+                ...infoBoxStyle,
+                background: loginError ? "#fef2f2" : "#f0fdf4",
+                color: loginError ? "#dc2626" : "#166534",
+                border: loginError
+                  ? "1px solid #fecaca"
+                  : "1px solid #bbf7d0",
+              }}
+            >
+              {loginError || loginMessage}
+            </div>
+          )}
 
           {hasPasswordProvider && !hasGoogleProvider && (
             <div
@@ -451,6 +488,7 @@ export default function Profile() {
                 color: "#166534",
                 padding: "14px",
                 borderRadius: "12px",
+                marginBottom: "20px",
               }}
             >
               This account already has both Password and Google linked. You can
@@ -475,6 +513,22 @@ export default function Profile() {
               <p style={{ margin: 0, color: "#475569" }}>
                 Enter your current password and choose a new one.
               </p>
+
+              {(passwordError || passwordMessage) && (
+                <div
+                  style={{
+                    ...infoBoxStyle,
+                    marginBottom: 0,
+                    background: passwordError ? "#fef2f2" : "#f0fdf4",
+                    color: passwordError ? "#dc2626" : "#166534",
+                    border: passwordError
+                      ? "1px solid #fecaca"
+                      : "1px solid #bbf7d0",
+                  }}
+                >
+                  {passwordError || passwordMessage}
+                </div>
+              )}
 
               <Input
                 id="currentPassword"
