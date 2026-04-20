@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -20,6 +20,24 @@ L.Icon.Default.mergeOptions({
   shadowUrl:
     "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png",
 });
+
+function FitPlannerBounds({ points = [] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const valid = (points || []).filter(
+      (p) => Array.isArray(p) && p.length >= 2 && !Number.isNaN(p[0]) && !Number.isNaN(p[1])
+    );
+
+    if (valid.length >= 2) {
+      map.fitBounds(valid, { padding: [40, 40] });
+    } else if (valid.length === 1) {
+      map.setView(valid[0], 15);
+    }
+  }, [map, points]);
+
+  return null;
+}
 
 function FixMap() {
   const map = useMap();
@@ -60,6 +78,38 @@ const vehicleIcon = new L.DivIcon({
   iconAnchor: [9, 9],
 });
 
+function plannerIconHtml(color, label) {
+  return `
+    <div style="
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      background: ${color};
+      border: 3px solid white;
+      box-shadow: 0 0 0 2px ${color};
+      color: white;
+      font-size: 10px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">${label}</div>
+  `;
+}
+
+function createPlannerIcon(color, label) {
+  return new L.DivIcon({
+    className: "planner-stop-icon",
+    html: plannerIconHtml(color, label),
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+  });
+}
+
+const startIcon = createPlannerIcon("#22c55e", "S");
+const transferIcon = createPlannerIcon("#f59e0b", "T");
+const endIcon = createPlannerIcon("#ef4444", "E");
+
 export default function DashboardMap({
   stops = [],
   vehicles = [],
@@ -69,6 +119,7 @@ export default function DashboardMap({
   tomtomApiKey = "",
   showStops = true,
   showRoutes = true,
+  plannerMapData = null,
 }) {
   const center = [14.6, 121];
 
@@ -89,15 +140,11 @@ export default function DashboardMap({
       ? `https://api.tomtom.com/traffic/map/4/tile/flow/relative0-dark/{z}/{x}/{y}.png?key=${tomtomApiKey}`
       : null;
 
-  const safeStops = useMemo(() => {
-    if (!showStops) return [];
-    return stops.slice(0, 500);
-  }, [stops, showStops]);
+  const plannerMarkers = plannerMapData?.markers || [];
+  const plannerPolylines = plannerMapData?.polylines || [];
+  const plannerFitPoints = plannerMapData?.fitBoundsPoints || [];
 
-  const safeRoutePaths = useMemo(() => {
-    if (!showRoutes) return [];
-    return routePaths.slice(0, 30);
-  }, [routePaths, showRoutes]);
+  const hasActivePlannerRoute = plannerPolylines.length > 0;
 
   return (
     <div
@@ -117,6 +164,7 @@ export default function DashboardMap({
         style={{ height: "100%", width: "100%" }}
       >
         <FixMap />
+        {plannerFitPoints.length ? <FitPlannerBounds points={plannerFitPoints} /> : null}
 
         <TileLayer
           attribution="&copy; OpenStreetMap contributors"
@@ -131,8 +179,8 @@ export default function DashboardMap({
           />
         ) : null}
 
-        {safeRoutePaths.map((line, i) => {
-          const positions = (line.path || line.positions || []).filter(
+        {plannerPolylines.map((line) => {
+          const positions = (line.path || []).filter(
             (p) => Array.isArray(p) && !Number.isNaN(p[0]) && !Number.isNaN(p[1])
           );
 
@@ -140,85 +188,117 @@ export default function DashboardMap({
 
           return (
             <Polyline
-              key={line.routeId || i}
+              key={line.id}
               positions={positions}
               pathOptions={{
-                color: line.color || "#3b82f6",
-                weight: 3,
-                opacity: 0.85,
+                color: line.color || "#22c55e",
+                weight: 7,
+                opacity: 1,
               }}
             >
               <Popup>
                 <div>
-                  <strong>
-                    {line.routeCode || "N/A"} - {line.routeName || "Route"}
-                  </strong>
+                  <strong>{line.routeLabel || "Planned Route"}</strong>
+                  <br />
+                  {line.fromStopName} → {line.toStopName}
+                  <br />
+                  {line.directionLabel}
+                  <br />
+                  Stops: {line.stopCount ?? "N/A"}
                 </div>
               </Popup>
             </Polyline>
           );
         })}
 
-        {trafficSamples
-          .filter((sample) => {
-            const lat = parseFloat(sample.lat);
-            const lng = parseFloat(sample.lng);
-            return !Number.isNaN(lat) && !Number.isNaN(lng);
-          })
-          .slice(0, 200)
-          .map((sample, i) => (
-            <CircleMarker
-              key={sample.id || i}
-              center={[parseFloat(sample.lat), parseFloat(sample.lng)]}
-              radius={6}
-              pathOptions={{
-                color: sample.color || "#22c55e",
-                fillColor: sample.color || "#22c55e",
-                fillOpacity: 0.85,
-                weight: 1,
-              }}
-            >
-              <Popup>
-                <div>
-                  <strong>{sample.name || "Traffic Point"}</strong>
-                  <br />
-                  Congestion: {sample.severity || "Unknown"}
-                  <br />
-                  Current Speed: {sample.currentSpeed ?? "N/A"} km/h
-                  <br />
-                  Free Flow: {sample.freeFlowSpeed ?? "N/A"} km/h
-                </div>
-              </Popup>
-            </CircleMarker>
-          ))}
+        {!hasActivePlannerRoute &&
+          trafficSamples
+            .filter((sample) => {
+              const lat = parseFloat(sample.lat);
+              const lng = parseFloat(sample.lng);
+              return !Number.isNaN(lat) && !Number.isNaN(lng);
+            })
+            .slice(0, 200)
+            .map((sample, i) => (
+              <CircleMarker
+                key={sample.id || i}
+                center={[parseFloat(sample.lat), parseFloat(sample.lng)]}
+                radius={6}
+                pathOptions={{
+                  color: sample.color || "#22c55e",
+                  fillColor: sample.color || "#22c55e",
+                  fillOpacity: 0.85,
+                  weight: 1,
+                }}
+              >
+                <Popup>
+                  <div>
+                    <strong>{sample.name || "Traffic Point"}</strong>
+                    <br />
+                    Congestion: {sample.severity || "Unknown"}
+                    <br />
+                    Current Speed: {sample.currentSpeed ?? "N/A"} km/h
+                    <br />
+                    Free Flow: {sample.freeFlowSpeed ?? "N/A"} km/h
+                  </div>
+                </Popup>
+              </CircleMarker>
+            ))}
 
-        {safeStops.map((s) => {
-          const pos = getLatLng(s);
+        {showStops &&
+          !hasActivePlannerRoute &&
+          stops.slice(0, 300).map((s) => {
+            const pos = getLatLng(s);
+            if (!pos) return null;
+
+            return (
+              <Marker key={s.stop_id || s.id} position={pos}>
+                <Popup>
+                  <div>
+                    <strong>{s.stopName || s.stop_name || "Stop"}</strong>
+                    <br />
+                    Stop Code: {s.stopCode || s.stop_code || "N/A"}
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          })}
+
+        {plannerMarkers.map((marker) => {
+          const pos = getLatLng(marker.stop);
           if (!pos) return null;
 
+          const icon =
+            marker.kind === "start"
+              ? startIcon
+              : marker.kind === "end"
+              ? endIcon
+              : transferIcon;
+
           return (
-            <Marker key={s.stop_id || s.id} position={pos}>
+            <Marker key={marker.id} position={pos} icon={icon}>
               <Popup>
                 <div>
-                  <strong>{s.stopName || s.stop_name || "Stop"}</strong>
+                  <strong>{marker.label}</strong>
                   <br />
-                  Stop Code: {s.stopCode || s.stop_code || "N/A"}
+                  {marker.name}
                 </div>
               </Popup>
             </Marker>
           );
         })}
 
-        {vehicles.map((v) => {
-          const pos = getLatLng(v);
-          if (!pos) return null;
+        {!hasActivePlannerRoute &&
+          vehicles.map((v) => {
+            const pos = getLatLng(v);
+            if (!pos) return null;
 
-          return (
-            <Marker key={v.id} position={pos} icon={vehicleIcon}>
-              <Popup>Vehicle</Popup>
-            </Marker>
-          );
-        })}
+            return (
+              <Marker key={v.id} position={pos} icon={vehicleIcon}>
+                <Popup>Vehicle</Popup>
+              </Marker>
+            );
+          })}
       </MapContainer>
     </div>
   );

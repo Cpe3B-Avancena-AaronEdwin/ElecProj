@@ -1,10 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
 
 import { useFirestoreTransitData } from "../hooks/useFirestoreTransitData";
 import { useGtfsBundle } from "../hooks/useGtfsBundle";
 import { useTrafficData } from "../hooks/useTrafficData";
-import { useRouteLines } from "../hooks/useRouteLines";
 import { useDashboardMetrics } from "../hooks/useDashboardMetrics";
 import { useCurrentPrediction } from "../hooks/useCurrentPrediction";
 
@@ -24,27 +23,23 @@ function scoreToRatio(score) {
 
 export default function Dashboard() {
   const { user } = useAuth();
-
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
 
-const { vehicles = [] } = useFirestoreTransitData({
-  routes: false,
-  stops: false,
-  vehicles: true,
-  trips: false,
-  predictions: false,
-  realtimeVehicles: false,
-  cacheMs: 5 * 60 * 1000,
-});
-  const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
+  const { vehicles = [] } = useFirestoreTransitData({
+    routes: false,
+    stops: false,
+    vehicles: true,
+    trips: false,
+    predictions: false,
+    realtimeVehicles: false,
+    cacheMs: 5 * 60 * 1000,
+  });
 
-  const [selectedRouteId] = useState("all");
+  const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
 
   const gtfsRoutes = gtfsBundle?.routes || [];
   const gtfsStops = gtfsBundle?.stops || [];
   const gtfsTrips = gtfsBundle?.trips || [];
-
-  const firestoreVehicles = vehicles || [];
 
   const gtfsRouteMap = useMemo(() => {
     return gtfsRoutes.reduce((acc, route) => {
@@ -54,23 +49,6 @@ const { vehicles = [] } = useFirestoreTransitData({
     }, {});
   }, [gtfsRoutes]);
 
-  const gtfsFilteredStops = useMemo(() => {
-    if (selectedRouteId === "all") return gtfsStops;
-    return gtfsStops.filter((stop) => (stop.routeId || stop.route_id) === selectedRouteId);
-  }, [gtfsStops, selectedRouteId]);
-
-  const gtfsFilteredTrips = useMemo(() => {
-    if (selectedRouteId === "all") return gtfsTrips;
-    return gtfsTrips.filter((trip) => (trip.routeId || trip.route_id) === selectedRouteId);
-  }, [gtfsTrips, selectedRouteId]);
-
-  const firestoreFilteredVehicles = useMemo(() => {
-    if (selectedRouteId === "all") return firestoreVehicles;
-    return firestoreVehicles.filter(
-      (vehicle) => (vehicle.routeId || vehicle.route_id) === selectedRouteId
-    );
-  }, [firestoreVehicles, selectedRouteId]);
-
   const {
     trafficSamples = [],
     trafficSummary = {},
@@ -79,7 +57,7 @@ const { vehicles = [] } = useFirestoreTransitData({
     trafficLoading,
     trafficError,
     lastTrafficUpdated,
-  } = useTrafficData(gtfsFilteredStops, TOMTOM_API_KEY, {
+  } = useTrafficData(gtfsStops, TOMTOM_API_KEY, {
     enabled: true,
     liveTraffic: true,
     history: true,
@@ -87,29 +65,23 @@ const { vehicles = [] } = useFirestoreTransitData({
     maxSamplePoints: 15,
   });
 
-  useRouteLines(gtfsFilteredStops, TOMTOM_API_KEY, "gtfs", {});
-
   const metrics = useDashboardMetrics({
     routes: gtfsRoutes,
-    stops: gtfsFilteredStops,
-    vehicles: firestoreFilteredVehicles,
-    trips: gtfsFilteredTrips,
+    stops: gtfsStops,
+    vehicles,
+    trips: gtfsTrips,
     trafficSummary,
   });
 
-  const {
-    currentPrediction,
-    predictionError,
-    predictionMessage,
-  } = useCurrentPrediction({
+  const { currentPrediction, predictionError, predictionMessage } = useCurrentPrediction({
     routes: gtfsRoutes,
-    stops: gtfsFilteredStops,
-    trips: gtfsFilteredTrips,
+    stops: gtfsStops,
+    trips: gtfsTrips,
     trafficSummary,
     trafficHistory,
     historyAnalytics,
     user,
-    selectedRouteId,
+    selectedRouteId: "all",
     sourceRouteMap: gtfsRouteMap,
     sourceMode: "gtfs",
   });
@@ -148,9 +120,7 @@ const { vehicles = [] } = useFirestoreTransitData({
             .filter((value) => Number.isFinite(value))
         : [];
 
-    if (sampleLevels.length > 1) {
-      return sampleLevels.slice(0, 16);
-    }
+    if (sampleLevels.length > 1) return sampleLevels.slice(0, 16);
 
     const heavy = Number(trafficSummary.heavy || 0);
     const moderate = Number(trafficSummary.moderate || 0);
@@ -340,7 +310,6 @@ const { vehicles = [] } = useFirestoreTransitData({
             apiConfigured={!!TOMTOM_API_KEY}
           />
         </div>
-
       </div>
     </Layout>
   );
