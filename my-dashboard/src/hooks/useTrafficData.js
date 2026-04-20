@@ -13,7 +13,7 @@ import {
 import { db } from "../firebase/config";
 
 const SNAPSHOT_COLLECTION = "trafficSnapshots";
-const SNAPSHOT_INTERVAL_MS = 15 * 60 * 1000;
+const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 const SNAPSHOT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 const DASHBOARD_HISTORY_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -308,7 +308,6 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
     history,
     cacheKey,
     maxSamplePoints,
-    skipWhenHidden,
   } = resolvedOptions;
 
   const [trafficSamples, setTrafficSamples] = useState([]);
@@ -666,15 +665,11 @@ export function useTrafficData(stops = [], apiKey, options = {}) {
     if (!enabled || !liveTraffic) return undefined;
 
     const intervalId = window.setInterval(() => {
-      if (skipWhenHidden && typeof document !== "undefined" && document.hidden) {
-        return;
-      }
-
       void refreshTraffic();
     }, SNAPSHOT_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [enabled, liveTraffic, refreshTraffic, skipWhenHidden]);
+  }, [enabled, liveTraffic, refreshTraffic]);
 
   return {
     trafficSamples,

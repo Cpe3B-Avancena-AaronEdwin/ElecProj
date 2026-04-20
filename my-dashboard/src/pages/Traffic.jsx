@@ -1,372 +1,225 @@
 import { useMemo, useState } from "react";
-import { useAuth } from "../context/AuthContext";
+import Layout from "../components/Layout";
 
-import { useFirestoreTransitData } from "../hooks/useFirestoreTransitData";
 import { useGtfsBundle } from "../hooks/useGtfsBundle";
 import { useTrafficData } from "../hooks/useTrafficData";
 import { useRouteLines } from "../hooks/useRouteLines";
+import { useFirestoreTransitData } from "../hooks/useFirestoreTransitData";
 
-import DashboardToolbar from "../components/dashboard/DashboardToolbar";
 import DashboardMap from "../components/dashboard/DashboardMap";
+import TripPlannerPanel from "../components/dashboard/TripPlannerPanel";
 import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
 import TrafficStatusPanel from "../components/dashboard/TrafficStatusPanel";
-import RoutingStatusPanel from "../components/dashboard/RoutingStatusPanel";
-import RouteSummaryPanel from "../components/dashboard/RouteSummaryPanel";
-
-import Layout from "../components/Layout";
-
-function normalizeStop(stop) {
-  return {
-    ...stop,
-    id: stop.id || stop.stop_id,
-    stop_id: stop.stop_id || stop.id,
-    stopName: stop.stopName || stop.stop_name,
-    stopCode: stop.stopCode || stop.stop_code,
-    stopLat:
-      stop.stopLat ?? stop.stop_lat ?? stop.latitude ?? stop.lat ?? null,
-    stopLon:
-      stop.stopLon ?? stop.stop_lon ?? stop.longitude ?? stop.lng ?? null,
-  };
-}
 
 export default function Traffic() {
-  useAuth();
-
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
 
-  const {
-    routes = [],
-    stops = [],
-    vehicles = [],
-    trips = [],
-    loadingMapData,
-  } = useFirestoreTransitData();
+  const [selectedPlan, setSelectedPlan] = useState(null);
 
   const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
 
-  const [selectedRouteId, setSelectedRouteId] = useState("all");
-  const [useFirestoreData, setUseFirestoreData] = useState(true);
-  const [showTrafficOverlay, setShowTrafficOverlay] = useState(true);
+  const gtfsStops = gtfsBundle?.stops || [];
+  const gtfsRoutes = gtfsBundle?.routes || [];
 
-  const hasFirestoreData =
-    routes.length > 0 ||
-    stops.length > 0 ||
-    vehicles.length > 0 ||
-    trips.length > 0;
+  const gtfsRouteMap = useMemo(() => {
+    return gtfsRoutes.reduce((acc, route) => {
+      const key = route.id || route.routeId || route.route_id;
+      if (key) acc[key] = route;
+      return acc;
+    }, {});
+  }, [gtfsRoutes]);
 
-  const sourceMode =
-    useFirestoreData && hasFirestoreData ? "firestore" : "gtfs";
-
-  const sourceRoutes =
-    sourceMode === "firestore" ? routes : gtfsBundle?.routes || [];
-
-  const sourceStops =
-    sourceMode === "firestore" ? stops : gtfsBundle?.stops || [];
-
-  const sourceTrips =
-    sourceMode === "firestore" ? trips : gtfsBundle?.trips || [];
-
-  const sourceVehicles =
-    sourceMode === "firestore" ? vehicles : [];
-
-  const rawGtfsStops = gtfsBundle?.rawStops || gtfsBundle?.stops || [];
-  const rawGtfsTrips = gtfsBundle?.rawTrips || gtfsBundle?.trips || [];
-  const rawGtfsStopTimes = gtfsBundle?.rawStopTimes || [];
-  const rawGtfsShapes = gtfsBundle?.rawShapes || [];
-
-  const sourceRouteMap = useMemo(() => {
-    const map = {};
-    sourceRoutes.forEach((route) => {
-      const routeId = route.id || route.route_id;
-      map[routeId] = {
-        ...route,
-        id: routeId,
-        routeCode: route.routeCode || route.route_short_name || "N/A",
-        routeName:
-          route.routeName ||
-          route.route_long_name ||
-          route.route_desc ||
-          "Unnamed Route",
-      };
-    });
-    return map;
-  }, [sourceRoutes]);
-
-  const activeRoutes = useMemo(() => {
-    return sourceRoutes.filter((route) => route.active !== false);
-  }, [sourceRoutes]);
-
-  const selectedRouteMeta = useMemo(() => {
-    if (selectedRouteId === "all") return null;
-    const route = sourceRouteMap[selectedRouteId];
-    if (!route) return null;
-
-    return {
-      id: route.id || route.route_id,
-      code: route.routeCode || route.route_short_name || "N/A",
-      name:
-        route.routeName ||
-        route.route_long_name ||
-        route.route_desc ||
-        "Unnamed Route",
-    };
-  }, [selectedRouteId, sourceRouteMap]);
-
-  const gtfsDerived = useMemo(() => {
-    if (sourceMode !== "gtfs") {
-      return {
-        filteredStops: [],
-        shapePoints: [],
-      };
-    }
-
-    if (selectedRouteId === "all") {
-      return {
-        filteredStops: [],
-        shapePoints: [],
-      };
-    }
-
-    const routeTrips = rawGtfsTrips.filter(
-      (trip) => (trip.route_id || trip.routeId) === selectedRouteId
-    );
-
-    if (!routeTrips.length) {
-      return {
-        filteredStops: [],
-        shapePoints: [],
-      };
-    }
-
-    const tripIds = new Set(
-      routeTrips.map((trip) => trip.trip_id || trip.tripId).filter(Boolean)
-    );
-
-    const selectedTrip = routeTrips[0] || null;
-    const selectedShapeId =
-      selectedTrip?.shape_id || selectedTrip?.shapeId || null;
-
-    const stopTimesForRoute = rawGtfsStopTimes
-      .filter((st) => tripIds.has(st.trip_id || st.tripId))
-      .sort((a, b) => {
-        const seqA = Number(a.stop_sequence ?? a.stopSequence ?? 0);
-        const seqB = Number(b.stop_sequence ?? b.stopSequence ?? 0);
-        return seqA - seqB;
-      });
-
-    const stopIdsInOrder = [];
-    const seenStopIds = new Set();
-
-    stopTimesForRoute.forEach((st) => {
-      const stopId = st.stop_id || st.stopId;
-      if (!stopId || seenStopIds.has(stopId)) return;
-      seenStopIds.add(stopId);
-      stopIdsInOrder.push(stopId);
-    });
-
-    const stopMap = new Map(
-      rawGtfsStops.map((stop) => [stop.stop_id || stop.id, stop])
-    );
-
-    const orderedStops = stopIdsInOrder
-      .map((stopId) => stopMap.get(stopId))
-      .filter(Boolean)
-      .map((stop) =>
-        normalizeStop({
-          ...stop,
-          routeId: selectedRouteId,
-          route_id: selectedRouteId,
-        })
-      );
-
-    const shapePoints = rawGtfsShapes
-      .filter((shape) => (shape.shape_id || shape.shapeId) === selectedShapeId)
-      .sort((a, b) => {
-        const seqA = Number(a.shape_pt_sequence ?? a.shapePtSequence ?? 0);
-        const seqB = Number(a.shape_pt_sequence ?? a.shapePtSequence ?? 0);
-        return seqA - seqB;
-      })
-      .map((shape) => [
-        parseFloat(shape.shape_pt_lat ?? shape.shapePtLat),
-        parseFloat(shape.shape_pt_lon ?? shape.shapePtLon),
-      ])
-      .filter(
-        (point) => !Number.isNaN(point[0]) && !Number.isNaN(point[1])
-      );
-
-    return {
-      filteredStops: orderedStops,
-      shapePoints,
-    };
-  }, [
-    sourceMode,
-    selectedRouteId,
-    rawGtfsTrips,
-    rawGtfsStopTimes,
-    rawGtfsStops,
-    rawGtfsShapes,
-  ]);
-
-  const filteredStops = useMemo(() => {
-    if (sourceMode === "gtfs") {
-      if (selectedRouteId === "all") return [];
-      return gtfsDerived.filteredStops;
-    }
-
-    if (selectedRouteId === "all") {
-      return sourceStops;
-    }
-
-    return sourceStops.filter(
-      (stop) => (stop.routeId || stop.route_id) === selectedRouteId
-    );
-  }, [sourceMode, selectedRouteId, gtfsDerived.filteredStops, sourceStops]);
-
-  const filteredVehicles = useMemo(() => {
-    if (selectedRouteId === "all") {
-      return sourceVehicles;
-    }
-
-    return sourceVehicles.filter(
-      (vehicle) => (vehicle.routeId || vehicle.route_id) === selectedRouteId
-    );
-  }, [sourceVehicles, selectedRouteId]);
-
-  const isAllGtfs = sourceMode === "gtfs" && selectedRouteId === "all";
-
-  const routingInputStops = useMemo(() => {
-    if (isAllGtfs) return [];
-    return filteredStops;
-  }, [filteredStops, isAllGtfs]);
-
-  const trafficEnabled = showTrafficOverlay && !isAllGtfs;
-
-  const {
-    trafficSamples = [],
-    trafficSummary,
-    trafficLoading,
-    refreshTraffic,
-    trafficError,
-    lastTrafficUpdated,
-  } = useTrafficData(filteredStops, TOMTOM_API_KEY, {
-    enabled: trafficEnabled,
-    liveTraffic: trafficEnabled,
-    history: false,
-    cacheKey: `traffic-page:${sourceMode}:${selectedRouteId}`,
-    maxSamplePoints: 15,
+  const { vehicles = [] } = useFirestoreTransitData({
+    routes: false,
+    stops: false,
+    vehicles: true,
+    trips: false,
+    predictions: false,
+    realtimeVehicles: false,
+    cacheMs: 5 * 60 * 1000,
   });
 
   const {
-    routePaths = [],
-    refreshRouteLines,
-    routingLoading,
-    routingError,
-    lastRoutingUpdated,
-  } = useRouteLines(
-    routingInputStops,
-    TOMTOM_API_KEY,
-    sourceMode,
-    sourceRouteMap,
-    gtfsDerived.shapePoints,
-    selectedRouteMeta,
-    {
-      enabled: !isAllGtfs && selectedRouteId !== "all",
-      cacheKey: `traffic-routes:${sourceMode}:${selectedRouteId}`,
-    }
-  );
+    trafficSamples = [],
+    trafficSummary = {},
+    trafficLoading,
+    trafficError,
+    lastTrafficUpdated,
+  } = useTrafficData(gtfsStops, TOMTOM_API_KEY, {
+    enabled: true,
+    liveTraffic: true,
+    history: true,
+    cacheKey: "traffic-page-network",
+    maxSamplePoints: 15,
+  });
 
-  const isLoading =
-    sourceMode === "gtfs" ? gtfsLoading : loadingMapData;
+  const { routePaths = [] } = useRouteLines(
+    gtfsStops,
+    TOMTOM_API_KEY,
+    "gtfs",
+    gtfsRouteMap,
+    [],
+    null,
+    {}
+  ) || {};
+
+  const plannerMapData = useMemo(() => {
+    if (!selectedPlan) return null;
+
+    const markers = [];
+    const polylines = [];
+    const fitBoundsPoints = [];
+
+    if (selectedPlan.fromStop) {
+      markers.push({
+        id: "planner-start",
+        kind: "start",
+        stop: selectedPlan.fromStop,
+        name: selectedPlan.fromStopName,
+        label: "Start",
+      });
+    }
+
+    (selectedPlan.transferStops || []).forEach((stop, index) => {
+      markers.push({
+        id: `planner-transfer-${index}`,
+        kind: "transfer",
+        stop,
+        name: selectedPlan.transferStopNames?.[index] || "Transfer",
+        label: `Transfer ${index + 1}`,
+      });
+    });
+
+    if (selectedPlan.toStop) {
+      markers.push({
+        id: "planner-end",
+        kind: "end",
+        stop: selectedPlan.toStop,
+        name: selectedPlan.toStopName,
+        label: "Destination",
+      });
+    }
+
+    (selectedPlan.legs || []).forEach((leg, index) => {
+      const colorPalette = ["#22c55e", "#f59e0b", "#ef4444", "#8b5cf6"];
+      const color = colorPalette[index % colorPalette.length];
+      const path = (leg.pathPoints || []).filter(
+        (p) => Array.isArray(p) && p.length >= 2 && !Number.isNaN(p[0]) && !Number.isNaN(p[1])
+      );
+
+      if (path.length >= 2) {
+        polylines.push({
+          id: `planner-leg-${index}`,
+          color,
+          weight: 7,
+          opacity: 1,
+          routeLabel: leg.routeLabel,
+          directionLabel: leg.directionLabel,
+          path,
+          fromStopName: leg.fromStopName,
+          toStopName: leg.toStopName,
+          stopCount: leg.stopCount,
+        });
+        fitBoundsPoints.push(...path);
+      }
+    });
+
+    markers.forEach((marker) => {
+      const lat = parseFloat(marker.stop?.stopLat ?? marker.stop?.stop_lat);
+      const lng = parseFloat(marker.stop?.stopLon ?? marker.stop?.stop_lon);
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        fitBoundsPoints.push([lat, lng]);
+      }
+    });
+
+    return {
+      markers,
+      polylines,
+      fitBoundsPoints,
+    };
+  }, [selectedPlan]);
+
+  const formatUpdatedAt = (isoString) => {
+    if (!isoString) return "No update yet";
+    const date = new Date(isoString);
+    return date.toLocaleString([], {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
 
   return (
     <Layout>
       <div className="dashboard-container">
-        <div className="page-header">
-          <h1>Live Traffic & Routes</h1>
-          <p>Real-time traffic conditions, route management, and transit analytics</p>
-        </div>
+        <TripPlannerPanel gtfsBundle={gtfsBundle} onPlanSelected={setSelectedPlan} />
 
-        <DashboardToolbar
-          routes={activeRoutes}
-          selectedRouteId={selectedRouteId}
-          onChangeRoute={setSelectedRouteId}
-          sourceMode={sourceMode}
-          onChangeSourceMode={(mode) =>
-            setUseFirestoreData(mode === "firestore")
-          }
-          showTrafficOverlay={showTrafficOverlay}
-          onChangeTrafficOverlay={(value) =>
-            setShowTrafficOverlay(value)
-          }
-          hasFirestoreData={hasFirestoreData}
-          trafficLoading={trafficLoading}
-          routingLoading={routingLoading}
-          predictionSaving={false}
-          onRefreshTraffic={() => refreshTraffic(true)}
-          onRefreshRouteLines={() => refreshRouteLines(true)}
-          onSavePrediction={() => {}}
-          tomtomEnabled={true}
-          stats={{
-            sourceMode,
-            routesLoaded: sourceRoutes.length,
-            stopsLoaded: sourceStops.length,
-            tripsLoaded: sourceTrips.length,
-            vehiclesLoaded: sourceVehicles.length,
-            gtfsStatus: gtfsLoading ? "Loading..." : gtfsError ? "Error" : "Ready",
-            trafficUpdated: lastTrafficUpdated
-              ? new Date(lastTrafficUpdated).toLocaleTimeString()
-              : "—",
-            routesUpdated: lastRoutingUpdated
-              ? new Date(lastRoutingUpdated).toLocaleTimeString()
-              : "—",
-            mapZoom: 13,
-          }}
+        <DashboardMap
+          stops={[]}
+          vehicles={vehicles}
+          routePaths={routePaths}
+          trafficSamples={trafficSamples}
+          showTrafficFlow={true}
+          tomtomApiKey={TOMTOM_API_KEY}
+          showStops={false}
+          showRoutes={true}
+          plannerMapData={plannerMapData}
         />
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: "1rem",
+            marginBottom: "1rem",
+          }}
+        >
+          <div className="card" style={{ padding: "1rem" }}>
+            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
+              Traffic Last Updated
+            </div>
+            <div
+              style={{
+                fontSize: "1.2rem",
+                fontWeight: 800,
+                color: "var(--text-on-dark)",
+              }}
+            >
+              {formatUpdatedAt(lastTrafficUpdated)}
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: "1rem" }}>
+            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
+              GTFS Loading
+            </div>
+            <div
+              style={{
+                fontSize: "1.2rem",
+                fontWeight: 800,
+                color: "var(--text-on-dark)",
+              }}
+            >
+              {gtfsLoading ? "Loading..." : "Ready"}
+            </div>
+            <div style={{ color: "var(--text-sub)", marginTop: "0.35rem" }}>
+              {gtfsError || `${gtfsStops.length} stops loaded`}
+            </div>
+          </div>
+        </div>
 
         <div className="grid">
           <TrafficSummaryPanel summary={trafficSummary} />
           <TrafficStatusPanel
             loading={trafficLoading}
             error={trafficError}
-            sourceMode={sourceMode}
-            showTrafficOverlay={showTrafficOverlay}
-            samplePoints={trafficEnabled ? trafficSamples.length : 0}
-            apiConfigured={true}
-          />
-          <RouteSummaryPanel
-            routes={activeRoutes}
-            sourceStops={sourceStops}
-            sourceTrips={sourceTrips}
-            sourceVehicles={sourceVehicles}
-          />
-          <RoutingStatusPanel
-            routes={routePaths}
-            error={routingError}
+            sourceMode="gtfs"
+            showTrafficOverlay={true}
+            samplePoints={trafficSamples.length}
+            apiConfigured={!!TOMTOM_API_KEY}
           />
         </div>
-
-        {!isLoading ? (
-          <div className="card">
-            {isAllGtfs ? (
-              <div style={{ marginBottom: "1rem", color: "#cbd5e1" }}>
-                Select a specific route to display stop markers and route lines.
-              </div>
-            ) : null}
-
-            <DashboardMap
-              stops={isAllGtfs ? [] : filteredStops}
-              vehicles={filteredVehicles}
-              routePaths={isAllGtfs ? [] : routePaths}
-              trafficSamples={showTrafficOverlay ? trafficSamples : []}
-              showTrafficFlow={showTrafficOverlay}
-              tomtomApiKey={TOMTOM_API_KEY}
-              showStops={!isAllGtfs}
-              showRoutes={!isAllGtfs}
-            />
-          </div>
-        ) : (
-          <div className="card">Loading traffic data...</div>
-        )}
       </div>
     </Layout>
   );
