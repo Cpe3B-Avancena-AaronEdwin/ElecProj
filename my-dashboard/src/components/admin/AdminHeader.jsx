@@ -8,6 +8,7 @@ const topButtonStyle = (background) => ({
   color: "#fff",
   cursor: "pointer",
   fontWeight: "bold",
+  minHeight: "44px",
 });
 
 export default function AdminHeader({ user, role, onBack }) {
@@ -22,9 +23,15 @@ export default function AdminHeader({ user, role, onBack }) {
         marginBottom: "1.5rem",
       }}
     >
-      <div>
-        <h1 style={{ margin: 0, fontSize: "2.2rem" }}>Admin Panel</h1>
-        <p style={{ margin: "0.5rem 0 0", color: "#cbd5e1" }}>
+      <div style={{ minWidth: 0, flex: "1 1 420px" }}>
+        <h1 style={{ margin: 0 }}>Admin Panel</h1>
+        <p
+          style={{
+            margin: "0.5rem 0 0",
+            color: "#cbd5e1",
+            wordBreak: "break-word",
+          }}
+        >
           Logged in as: <strong>{user?.email || "Unknown"}</strong>
         </p>
         <p style={{ margin: "0.25rem 0 0", color: "#cbd5e1" }}>
@@ -32,7 +39,14 @@ export default function AdminHeader({ user, role, onBack }) {
         </p>
       </div>
 
-      <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "0.75rem",
+          flexWrap: "wrap",
+          alignItems: "stretch",
+        }}
+      >
         <button onClick={onBack} style={topButtonStyle("#2563eb")}>
           Back to Dashboard
         </button>

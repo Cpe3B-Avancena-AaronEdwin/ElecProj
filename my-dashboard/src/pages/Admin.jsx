@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Outlet } from "react-router-dom"; // ✅ add Outlet
+import { useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../hooks/useAdminData";
 import { useAdminForms } from "../hooks/useAdminForms";
@@ -28,6 +28,7 @@ import {
   initialTripForm,
   initialVehicleForm,
 } from "../constants/adminInitialState";
+import "../styles/admin.css";
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -49,47 +50,213 @@ export default function Admin() {
 
   const forms = useAdminForms(vehicles);
 
-  // 🔹 Submit handlers (same as your original)
-  const submitRoute = async (e) => { /* ... keep your existing logic ... */ };
-  const submitStop = async (e) => { /* ... keep your existing logic ... */ };
-  const submitVehicle = async (e) => { /* ... keep your existing logic ... */ };
-  const submitTrip = async (e) => { /* ... keep your existing logic ... */ };
+  const submitRoute = async (e) => {
+    e.preventDefault();
 
-  // 🔹 Delete handlers (same as your original)
-  const handleDeleteRoute = async (id) => { /* ... */ };
-  const handleDeleteStop = async (id) => { /* ... */ };
-  const handleDeleteVehicle = async (id) => { /* ... */ };
-  const handleDeleteTrip = async (id) => { /* ... */ };
+    if (!forms.routeForm.routeCode.trim() || !forms.routeForm.routeName.trim()) {
+      showMessage("Please fill in route code and route name.");
+      return;
+    }
 
-  // 🔹 Edit handlers (same as your original)
-  const handleEditRoute = (route) => { setActiveTab("routes"); forms.editRoute(route); };
-  const handleEditStop = (stop) => { setActiveTab("stops"); forms.editStop(stop); };
-  const handleEditVehicle = (vehicle) => { setActiveTab("vehicles"); forms.editVehicle(vehicle); };
-  const handleEditTrip = (trip) => { setActiveTab("trips"); forms.editTrip(trip); };
+    try {
+      const result = await saveRoute({
+        form: forms.routeForm,
+        editingId: forms.editingRouteId,
+        userId: user?.uid,
+      });
+
+      showMessage(result);
+      forms.setRouteForm(initialRouteForm);
+      forms.setEditingRouteId(null);
+    } catch (error) {
+      console.error("Failed to save route:", error);
+      showMessage(error.message || "Failed to save route.");
+    }
+  };
+
+  const submitStop = async (e) => {
+    e.preventDefault();
+
+    if (
+      !forms.stopForm.stopName.trim() ||
+      forms.stopForm.latitude === "" ||
+      forms.stopForm.longitude === ""
+    ) {
+      showMessage("Please fill in stop name, latitude, and longitude.");
+      return;
+    }
+
+    try {
+      const result = await saveStop({
+        form: forms.stopForm,
+        editingId: forms.editingStopId,
+        userId: user?.uid,
+      });
+
+      showMessage(result);
+      forms.setStopForm(initialStopForm);
+      forms.setEditingStopId(null);
+    } catch (error) {
+      console.error("Failed to save stop:", error);
+      showMessage(error.message || "Failed to save stop.");
+    }
+  };
+
+  const submitVehicle = async (e) => {
+    e.preventDefault();
+
+    if (
+      !forms.vehicleForm.vehicleCode.trim() ||
+      !forms.vehicleForm.plateNumber.trim()
+    ) {
+      showMessage("Please fill in vehicle code and plate number.");
+      return;
+    }
+
+    try {
+      const result = await saveVehicle({
+        form: forms.vehicleForm,
+        editingId: forms.editingVehicleId,
+        userId: user?.uid,
+      });
+
+      showMessage(result);
+      forms.setVehicleForm(initialVehicleForm);
+      forms.setEditingVehicleId(null);
+    } catch (error) {
+      console.error("Failed to save vehicle:", error);
+      showMessage(error.message || "Failed to save vehicle.");
+    }
+  };
+
+  const submitTrip = async (e) => {
+    e.preventDefault();
+
+    if (
+      !forms.tripForm.tripCode.trim() ||
+      !forms.tripForm.routeId ||
+      !forms.tripForm.vehicleId ||
+      !forms.tripForm.departureTime ||
+      !forms.tripForm.expectedArrival
+    ) {
+      showMessage(
+        "Please fill in trip code, route, vehicle, departure time, and expected arrival."
+      );
+      return;
+    }
+
+    try {
+      const result = await saveTrip({
+        form: forms.tripForm,
+        editingId: forms.editingTripId,
+        userId: user?.uid,
+      });
+
+      showMessage(result);
+      forms.setTripForm(initialTripForm);
+      forms.setEditingTripId(null);
+    } catch (error) {
+      console.error("Failed to save trip:", error);
+      showMessage(error.message || "Failed to save trip.");
+    }
+  };
+
+  const handleDeleteRoute = async (id) => {
+    if (!window.confirm("Delete this route?")) return;
+
+    try {
+      const result = await removeRoute(id);
+      showMessage(result);
+    } catch (error) {
+      console.error("Failed to delete route:", error);
+      showMessage(error.message || "Failed to delete route.");
+    }
+  };
+
+  const handleDeleteStop = async (id) => {
+    if (!window.confirm("Delete this stop?")) return;
+
+    try {
+      const result = await removeStop(id);
+      showMessage(result);
+    } catch (error) {
+      console.error("Failed to delete stop:", error);
+      showMessage(error.message || "Failed to delete stop.");
+    }
+  };
+
+  const handleDeleteVehicle = async (id) => {
+    if (!window.confirm("Delete this vehicle?")) return;
+
+    try {
+      const result = await removeVehicle(id);
+      showMessage(result);
+    } catch (error) {
+      console.error("Failed to delete vehicle:", error);
+      showMessage(error.message || "Failed to delete vehicle.");
+    }
+  };
+
+  const handleDeleteTrip = async (id) => {
+    if (!window.confirm("Delete this trip?")) return;
+
+    try {
+      const result = await removeTrip(id);
+      showMessage(result);
+    } catch (error) {
+      console.error("Failed to delete trip:", error);
+      showMessage(error.message || "Failed to delete trip.");
+    }
+  };
+
+  const handleEditRoute = (route) => {
+    setActiveTab("routes");
+    forms.editRoute(route);
+  };
+
+  const handleEditStop = (stop) => {
+    setActiveTab("stops");
+    forms.editStop(stop);
+  };
+
+  const handleEditVehicle = (vehicle) => {
+    setActiveTab("vehicles");
+    forms.editVehicle(vehicle);
+  };
+
+  const handleEditTrip = (trip) => {
+    setActiveTab("trips");
+    forms.editTrip(trip);
+  };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", color: "#e5e7eb" }}>
-      <div style={{ maxWidth: "1450px", margin: "0 auto", padding: "1.5rem" }}>
-        <AdminHeader user={user} role={role} onBack={() => navigate("/dashboard")} />
+    <div className="admin-page-shell">
+      <div className="admin-page-container">
+        <AdminHeader
+          user={user}
+          role={role}
+          onBack={() => navigate("/dashboard")}
+        />
+
         <AdminMessage message={message} />
 
-        {/* 🔹 Nested routes will render here */}
         <Outlet />
 
-        {/* 🔹 Default Admin dashboard with tabs */}
-        <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: "1.25rem" }}>
-          <AdminSidebar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            routesCount={routes.length}
-            stopsCount={stops.length}
-            vehiclesCount={vehicles.length}
-            tripsCount={trips.length}
-          />
+        <div className="admin-layout">
+          <div className="admin-sidebar-wrap">
+            <AdminSidebar
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              routesCount={routes.length}
+              stopsCount={stops.length}
+              vehiclesCount={vehicles.length}
+              tripsCount={trips.length}
+            />
+          </div>
 
-          <div style={{ background: "#111827", borderRadius: "16px", padding: "1rem" }}>
+          <div className="admin-content-card">
             {loading ? (
-              <div style={{ padding: "1rem" }}>Loading data...</div>
+              <div className="admin-loading-state">Loading data...</div>
             ) : (
               <>
                 {activeTab === "routes" && (
@@ -155,6 +322,7 @@ export default function Admin() {
             )}
           </div>
         </div>
+
         <SiteFooter />
       </div>
     </div>

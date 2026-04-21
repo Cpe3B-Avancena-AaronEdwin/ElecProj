@@ -1,0 +1,157 @@
+.admin-page-shell {
+  min-height: 100vh;
+  background: #0f172a;
+  color: #e5e7eb;
+  overflow-x: hidden;
+}
+
+.admin-page-container {
+  max-width: 1450px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+.admin-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.admin-sidebar-wrap {
+  min-width: 0;
+}
+
+.admin-content-card {
+  min-width: 0;
+  background: #111827;
+  border-radius: 16px;
+  padding: 1rem;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.admin-loading-state {
+  padding: 1rem;
+}
+
+.admin-sidebar-card {
+  background: #111827;
+  border-radius: 16px;
+  padding: 1rem;
+  border: 1px solid #1f2937;
+  height: fit-content;
+  box-sizing: border-box;
+}
+
+.admin-sidebar-title {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.admin-sidebar-tabs {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-sidebar-stats {
+  margin-top: 1.2rem;
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+.admin-sidebar-stats-title {
+  margin-bottom: 0.5rem;
+}
+
+.admin-sidebar-stats p {
+  margin: 0.25rem 0;
+}
+
+.admin-table-shell {
+  margin-top: 1rem;
+  background: #0b1220;
+  border-radius: 14px;
+  border: 1px solid #1f2937;
+  overflow: hidden;
+}
+
+.admin-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.admin-table thead tr {
+  background: #1f2937;
+}
+
+.admin-table th,
+.admin-table td {
+  text-align: left;
+  padding: 0.95rem;
+  vertical-align: top;
+}
+
+.admin-table th {
+  color: #fff;
+  border-bottom: 1px solid #334155;
+}
+
+.admin-table td {
+  color: #e5e7eb;
+  border-bottom: 1px solid #1f2937;
+}
+
+.admin-table-empty {
+  color: #cbd5e1;
+}
+
+.admin-action-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* tablet */
+@media (max-width: 1024px) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* mobile */
+@media (max-width: 640px) {
+  .admin-page-container {
+    padding: 1rem;
+  }
+
+  .admin-layout {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .admin-sidebar-card,
+  .admin-content-card {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .admin-table {
+    min-width: 760px;
+  }
+
+  .admin-action-buttons {
+    flex-direction: column;
+  }
+
+  .admin-action-buttons button {
+    width: 100%;
+  }
+}
