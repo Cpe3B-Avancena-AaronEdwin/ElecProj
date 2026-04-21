@@ -1,14 +1,23 @@
 .admin-users-page {
+  width: 100%;
   min-height: 100vh;
-  background: #0f172a;
+  background: #031427 !important;
   color: #e5e7eb;
 }
 
 .admin-users-container {
-  padding: 24px;
+  width: 100%;
+  min-height: 100vh;
+  background: #031427;
+  padding: 24px 24px 40px;
+  box-sizing: border-box;
+  font-family: "Inter", sans-serif;
+}
+
+.admin-users-inner {
+  width: 100%;
   max-width: 1280px;
   margin: 0 auto;
-  font-family: "Inter", sans-serif;
 }
 
 .admin-users-header {
@@ -128,7 +137,7 @@
 .user-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .user-card {
@@ -296,7 +305,7 @@
 
 @media (max-width: 640px) {
   .admin-users-container {
-    padding: 16px;
+    padding: 16px 16px 32px;
   }
 
   .admin-users-header {

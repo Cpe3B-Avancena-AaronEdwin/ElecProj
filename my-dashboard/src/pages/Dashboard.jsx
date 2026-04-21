@@ -35,13 +35,9 @@ function formatShortTime(value, fallbackText = "Now") {
 
   let date = null;
 
-  if (typeof value === "number") {
-    date = new Date(value);
-  } else if (value?.toDate && typeof value.toDate === "function") {
-    date = value.toDate();
-  } else {
-    date = new Date(value);
-  }
+  if (typeof value === "number") date = new Date(value);
+  else if (value?.toDate && typeof value.toDate === "function") date = value.toDate();
+  else date = new Date(value);
 
   if (!date || Number.isNaN(date.getTime())) return fallbackText;
 
@@ -59,36 +55,17 @@ function buildChartDataFromHistory(trafficHistory = []) {
   const filtered = trafficHistory.filter((item) => {
     const ts =
       Number(item.timestampMs) ||
-      new Date(
-        item.timestampText ||
-          item.timestamp ||
-          item.createdAt ||
-          0
-      ).getTime();
+      new Date(item.timestampText || item.timestamp || item.createdAt || 0).getTime();
 
     return Number.isFinite(ts) && ts >= last24h;
   });
 
-  return filtered.map((item, index) => {
-    const score = Number(item.congestionScore || 0);
-
-    return {
-      index,
-      time: formatShortTime(
-        item.timestampMs ||
-          item.timestampText ||
-          item.timestamp,
-        "Now"
-      ),
-      score,
-      level: item.congestionLevel || "Unknown",
-      rawTimestamp:
-        item.timestampMs ||
-        item.timestampText ||
-        item.timestamp ||
-        null,
-    };
-  });
+  return filtered.map((item, index) => ({
+    index,
+    time: formatShortTime(item.timestampMs || item.timestampText || item.timestamp, "Now"),
+    score: Number(item.congestionScore || 0),
+    level: item.congestionLevel || "Unknown",
+  }));
 }
 
 function buildFallbackChartData(graphPoints) {
@@ -99,7 +76,6 @@ function buildFallbackChartData(graphPoints) {
     ],
     score: Math.round(value * 100),
     level: "Estimated",
-    rawTimestamp: null,
   }));
 }
 
@@ -108,21 +84,13 @@ function CustomTooltip({ active, payload, label }) {
 
   const point = payload[0]?.payload;
   const score = payload[0]?.value ?? 0;
-  const level = point?.level || "Unknown";
 
   return (
-    <div className="vehicle-flow-tooltip live-tooltip">
+    <div className="vehicle-flow-tooltip">
       <div className="vehicle-flow-tooltip-time">{label}</div>
       <div className="vehicle-flow-tooltip-value">score : {score}</div>
-      <div
-        style={{
-          color: "#cbd5e1",
-          fontSize: "0.9rem",
-          fontWeight: 700,
-          marginTop: "4px",
-        }}
-      >
-        level : {level}
+      <div style={{ color: "#cbd5e1", fontSize: "0.9rem", marginTop: 4 }}>
+        level : {point?.level || "Unknown"}
       </div>
     </div>
   );
@@ -180,35 +148,29 @@ export default function Dashboard() {
     trafficSummary,
   });
 
-  const { currentPrediction, predictionError, predictionMessage } = useCurrentPrediction({
-    routes: gtfsRoutes,
-    stops: gtfsStops,
-    trips: gtfsTrips,
-    trafficSummary,
-    trafficHistory,
-    historyAnalytics,
-    user,
-    selectedRouteId: "all",
-    sourceRouteMap: gtfsRouteMap,
-    sourceMode: "gtfs",
-  });
+  const { currentPrediction, predictionError, predictionMessage } =
+    useCurrentPrediction({
+      routes: gtfsRoutes,
+      stops: gtfsStops,
+      trips: gtfsTrips,
+      trafficSummary,
+      trafficHistory,
+      historyAnalytics,
+      user,
+      selectedRouteId: "all",
+      sourceRouteMap: gtfsRouteMap,
+      sourceMode: "gtfs",
+    });
 
   const quickAlert = useMemo(() => {
     if (trafficSummary.closed > 0) {
-      return { level: "critical", message: "⚠ Road closure detected on monitored corridor" };
+      return { level: "critical", message: "⚠ Road closure detected" };
     }
 
     if (currentPrediction.predictedDelayRisk === "High") {
       return {
         level: "heavy",
         message: `⚠ ${currentPrediction.routeCode} likely delayed by ${currentPrediction.etaImpactMinutes} mins`,
-      };
-    }
-
-    if (currentPrediction.trend === "Rising" || currentPrediction.trend === "Worsening") {
-      return {
-        level: "moderate",
-        message: "⚠ Congestion trend is rising across key corridors",
       };
     }
 
@@ -220,50 +182,28 @@ export default function Dashboard() {
       return trafficHistory.map((item) => scoreToRatio(item.congestionScore)).slice(-24);
     }
 
-    const sampleLevels =
-      trafficSamples.length > 0
-        ? trafficSamples
-            .map((sample) => scoreToRatio(sample?.congestionScore))
-            .filter((value) => Number.isFinite(value))
-        : [];
-
-    if (sampleLevels.length > 1) return sampleLevels.slice(0, 16);
-
-    const heavy = Number(trafficSummary.heavy || 0);
-    const moderate = Number(trafficSummary.moderate || 0);
-    const low = Number(trafficSummary.light || trafficSummary.low || 0);
-    const closed = Number(trafficSummary.closed || 0);
-
-    const generated = [];
-    for (let i = 0; i < heavy; i += 1) generated.push(0.85);
-    for (let i = 0; i < moderate; i += 1) generated.push(0.55);
-    for (let i = 0; i < low; i += 1) generated.push(0.25);
-    for (let i = 0; i < closed; i += 1) generated.push(1);
-
-    if (generated.length) return generated.slice(0, 8);
-
     return [0.2, 0.12, 0.35, 0.82, 0.58, 0.74, 0.95, 0.42];
-  }, [trafficHistory, trafficSamples, trafficSummary]);
+  }, [trafficHistory]);
 
   const chartData = useMemo(() => {
-    if (trafficHistory.length >= 2) {
-      return buildChartDataFromHistory(trafficHistory);
-    }
+    if (trafficHistory.length >= 2) return buildChartDataFromHistory(trafficHistory);
     return buildFallbackChartData(graphPoints);
   }, [trafficHistory, graphPoints]);
 
   const graphTitle =
-    trafficHistory.length >= 2 ? "LAST 24H CONGESTION TREND" : "CURRENT CONGESTION PROFILE";
+    trafficHistory.length >= 2
+      ? "LAST 24H CONGESTION TREND"
+      : "CURRENT CONGESTION PROFILE";
 
   const graphNote =
     trafficHistory.length >= 2
       ? `Based on ${chartData.length} stored snapshots from the last 24 hours.`
-      : `Based on ${trafficSamples.length || graphPoints.length} current monitored traffic sample points.`;
+      : `Based on ${trafficSamples.length || graphPoints.length} monitored points.`;
 
-  const formatUpdatedAt = (isoString) => {
-    if (!isoString) return "No update yet";
-    const date = new Date(isoString);
-    return date.toLocaleString([], {
+  const formatUpdatedAt = (value) => {
+    if (!value) return "No update yet";
+    const d = new Date(value);
+    return d.toLocaleString([], {
       month: "short",
       day: "numeric",
       hour: "numeric",
@@ -271,23 +211,19 @@ export default function Dashboard() {
     });
   };
 
-  const timeSince = (isoString) => {
-    if (!isoString) return "";
-    const ms = Date.now() - new Date(isoString).getTime();
-    if (ms < 0) return "";
-    const minutes = Math.floor(ms / 60000);
-    if (minutes < 1) return "less than a minute";
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ${minutes % 60}m`;
+  const timeSince = (value) => {
+    if (!value) return "";
+    const diff = Date.now() - new Date(value).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "less than a minute";
+    if (mins < 60) return `${mins} mins`;
+    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
   };
 
   const recommendationTone =
     currentPrediction.predictedDelayRisk === "High"
-      ? "rgba(239, 68, 68, 0.08)"
-      : currentPrediction.predictedDelayRisk === "Medium"
-      ? "rgba(245, 158, 11, 0.08)"
-      : "rgba(34, 197, 94, 0.08)";
+      ? "rgba(239,68,68,.08)"
+      : "rgba(34,197,94,.08)";
 
   return (
     <Layout>
@@ -295,78 +231,46 @@ export default function Dashboard() {
         <DashboardStats metrics={metrics} />
 
         <div className="dashboard-status-row">
-          <div className="status-card card">
-            <div className="status-card-title">Last Updated</div>
-            <div className="status-card-value">{formatUpdatedAt(lastTrafficUpdated)}</div>
-            <div className="status-card-note">
-              {lastTrafficUpdated
-                ? `Updated ${timeSince(lastTrafficUpdated)} ago`
-                : "Waiting for latest traffic refresh."}
+          <div className="dashboard-status-left">
+            <div className="status-card card">
+              <div className="status-card-title">Last Updated</div>
+              <div className="status-card-value">
+                {formatUpdatedAt(lastTrafficUpdated)}
+              </div>
+              <div className="status-card-note">
+                {lastTrafficUpdated
+                  ? `Updated ${timeSince(lastTrafficUpdated)} ago`
+                  : "Waiting for latest traffic refresh."}
+              </div>
             </div>
-          </div>
 
-          <div className="status-card card">
-            <div className="status-card-title">Quick Alerts</div>
-            <div className={`alert-pill alert-pill--${quickAlert.level}`}>
-              {quickAlert.message}
+            <div className="status-card card">
+              <div className="status-card-title">Quick Alerts</div>
+              <div className={`alert-pill alert-pill--${quickAlert.level}`}>
+                {quickAlert.message}
+              </div>
+              <div className="status-card-note">
+                {currentPrediction.congestionForecast}
+              </div>
             </div>
-            <div className="status-card-note">{currentPrediction.congestionForecast}</div>
           </div>
 
           <div className="status-card card vehicle-flow-card">
             <div className="vehicle-flow-title">{graphTitle}</div>
 
             <div className="vehicle-flow-chart-box">
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart
-                  data={chartData}
-                  margin={{ top: 12, right: 12, left: 8, bottom: 8 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="4 6"
-                    stroke="rgba(255,255,255,0.12)"
-                    vertical={true}
-                    horizontal={true}
-                  />
-
-                  <XAxis
-                    dataKey="time"
-                    tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
-                    axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
-                    tickLine={false}
-                    interval="preserveStartEnd"
-                  />
-
-                  <YAxis
-                    domain={[0, 100]}
-                    ticks={[0, 20, 40, 60, 80, 100]}
-                    tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
-                    axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
-                    tickLine={false}
-                    width={54}
-                  />
-
-                  <Tooltip
-                    content={<CustomTooltip />}
-                    cursor={{
-                      stroke: "rgba(255,255,255,0.95)",
-                      strokeWidth: 2,
-                    }}
-                  />
-
+              <ResponsiveContainer width="100%" height={390}>
+                <LineChart data={chartData}>
+                  <CartesianGrid strokeDasharray="4 6" />
+                  <XAxis dataKey="time" />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip content={<CustomTooltip />} />
                   <Line
                     type="monotone"
                     dataKey="score"
                     stroke="#45f4ff"
-                    strokeWidth={5}
+                    strokeWidth={4}
                     dot={false}
-                    activeDot={{
-                      r: 8,
-                      fill: "#ffffff",
-                      stroke: "#45f4ff",
-                      strokeWidth: 4,
-                    }}
-                    isAnimationActive={true}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -376,84 +280,51 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: "1rem",
-            marginBottom: "1rem",
-          }}
-        >
-          <div className="card" style={{ padding: "1rem" }}>
-            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
-              Prediction Confidence
-            </div>
-            <div
-              style={{
-                fontSize: "2rem",
-                fontWeight: 800,
-                color: "var(--text-on-dark)",
-              }}
-            >
+        <div className="dashboard-insights-grid">
+          <div className="card">
+            <div style={{ color: "var(--text-sub)" }}>Prediction Confidence</div>
+            <div style={{ fontSize: "2rem", fontWeight: 800 }}>
               {currentPrediction.confidence}%
             </div>
-            <div style={{ color: "var(--text-sub)", marginTop: "0.35rem" }}>
-              Based on {currentPrediction.basedOnTrafficSamples} live traffic samples,{" "}
-              {currentPrediction.historicalSnapshotCount24h} last-24h snapshots, and{" "}
-              {currentPrediction.historicalSnapshotCount7d} seven-day snapshots.
+            <div style={{ color: "var(--text-sub)" }}>
+              Based on {currentPrediction.basedOnTrafficSamples} live samples,
+              {` ${currentPrediction.historicalSnapshotCount24h}`} last-24h snapshots,
+              and {currentPrediction.historicalSnapshotCount7d} seven-day snapshots.
             </div>
           </div>
 
-          <div className="card" style={{ padding: "1rem", background: recommendationTone }}>
-            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
-              Recommended Action
-            </div>
-            <div
-              style={{
-                fontSize: "1.05rem",
-                fontWeight: 700,
-                color: "var(--text-on-dark)",
-              }}
-            >
+          <div className="card" style={{ background: recommendationTone }}>
+            <div style={{ color: "var(--text-sub)" }}>Recommended Action</div>
+            <div style={{ fontWeight: 700 }}>
               {currentPrediction.recommendation}
             </div>
-            <div style={{ color: "var(--text-sub)", marginTop: "0.45rem" }}>
+            <div style={{ color: "var(--text-sub)" }}>
               Estimated delay impact: +{currentPrediction.etaImpactMinutes} minutes.
             </div>
           </div>
 
-          <div className="card" style={{ padding: "1rem" }}>
-            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
-              Historical Peak Window
-            </div>
-            <div
-              style={{
-                color: "var(--text-on-dark)",
-                fontWeight: 700,
-                marginBottom: "0.35rem",
-              }}
-            >
-              {currentPrediction.predictedPeakWindow || "Building history"}
+          <div className="card">
+            <div style={{ color: "var(--text-sub)" }}>Historical Peak Window</div>
+            <div style={{ fontWeight: 700 }}>
+              {currentPrediction.predictedPeakWindow}
             </div>
             <div style={{ color: "var(--text-sub)" }}>
-              24h avg: {currentPrediction.historicalAverageScore24h ?? 0}/100 • 7d avg:{" "}
-              {currentPrediction.historicalAverageScore7d ?? 0}/100
+              24h avg: {currentPrediction.historicalAverageScore24h}/100 • 7d avg:{" "}
+              {currentPrediction.historicalAverageScore7d}/100
             </div>
           </div>
         </div>
 
+        {/* SWITCHED HERE */}
         <div className="grid">
-          <GtfsStatusPanel gtfsBundle={gtfsBundle} loading={gtfsLoading} error={gtfsError} />
-          <TrafficSummaryPanel summary={trafficSummary} />
-          <CurrentPredictionPanel prediction={currentPrediction} />
-        </div>
-
-        <div className="grid">
-          <PredictionStatusPanel
-            prediction={currentPrediction}
-            error={predictionError}
-            message={predictionMessage}
+          <GtfsStatusPanel
+            gtfsBundle={gtfsBundle}
+            loading={gtfsLoading}
+            error={gtfsError}
           />
+
+          <TrafficSummaryPanel summary={trafficSummary} />
+
           <TrafficStatusPanel
             loading={trafficLoading}
             error={trafficError}
@@ -461,6 +332,16 @@ export default function Dashboard() {
             showTrafficOverlay={true}
             samplePoints={trafficSamples.length}
             apiConfigured={!!TOMTOM_API_KEY}
+          />
+        </div>
+
+        <div className="grid two-col">
+          <CurrentPredictionPanel prediction={currentPrediction} />
+
+          <PredictionStatusPanel
+            prediction={currentPrediction}
+            error={predictionError}
+            message={predictionMessage}
           />
         </div>
       </div>

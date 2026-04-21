@@ -5,13 +5,8 @@ import { logoutUser } from "../firebase/auth";
 import SiteFooter from "./SiteFooter";
 
 function getFirstName(user) {
-  const rawName =
-    user?.displayName?.trim() ||
-    user?.email?.split("@")[0] ||
-    "User";
-
+  const rawName = user?.displayName?.trim() || user?.email?.split("@")[0] || "User";
   const firstToken = rawName.split(/\s+/)[0] || "User";
-
   return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
 }
 
@@ -19,28 +14,47 @@ export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, role } = useAuth();
+
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const buttonRef = useRef(null);
 
   const firstName = useMemo(() => getFirstName(user), [user]);
 
   useEffect(() => {
+    setDropdownOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
     function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (!dropdownRef.current) return;
+      if (!dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
     }
 
-    if (dropdownOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
+    function handleEscape(e) {
+      if (e.key === "Escape") {
+        setDropdownOpen(false);
+      }
     }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     };
-  }, [dropdownOpen]);
+  }, []);
 
   const closeDropdown = () => setDropdownOpen(false);
+
+  const toggleDropdown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropdownOpen((prev) => !prev);
+  };
 
   const handleLogout = async () => {
     closeDropdown();
@@ -49,18 +63,18 @@ export default function Layout({ children }) {
   };
 
   const handleProfile = () => {
-    navigate("/profile");
     closeDropdown();
+    navigate("/profile");
   };
 
   const handleAdminUsers = () => {
-    navigate("/admin/users");
     closeDropdown();
+    navigate("/admin/users");
   };
 
   const handleAdminPanel = () => {
-    navigate("/admin");
     closeDropdown();
+    navigate("/admin");
   };
 
   const navItems = [
@@ -77,68 +91,73 @@ export default function Layout({ children }) {
             <div className="header-icon">
               <img src="/logo.jpeg" alt="CityBloop Logo" />
             </div>
+
             <div className="header-content">
               <h1 className="header-title">CityBloop</h1>
               <p className="header-subtitle">Live Transit Analytics</p>
             </div>
           </div>
 
-          <div className="header-right" ref={dropdownRef}>
-            <span className="user-label">Hello, {firstName}</span>
+          <div className="header-right">
+            <div className="dropdown-wrapper" ref={dropdownRef}>
+              <span className="user-label">Hello, {firstName}</span>
 
-            <button
-              className="dropdown-trigger"
-              onClick={() => setDropdownOpen(!dropdownOpen)}
-            >
-              ☰
-            </button>
+              <button
+                ref={buttonRef}
+                type="button"
+                className="dropdown-trigger"
+                onClick={toggleDropdown}
+                aria-label="Open user menu"
+                aria-haspopup="menu"
+                aria-expanded={dropdownOpen}
+              >
+                ☰
+              </button>
 
-            {dropdownOpen && (
-              <div className="dropdown-menu">
-                <button className="dropdown-item" onClick={handleProfile}>
-                  Profile
-                </button>
+              {dropdownOpen && (
+                <div className="dropdown-menu" role="menu">
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={handleProfile}
+                    role="menuitem"
+                  >
+                    Profile
+                  </button>
 
-                {role === "viewer" && (
-                  <>
-                    <button
-                      className="dropdown-item dropdown-item--danger"
-                      onClick={handleLogout}
-                    >
-                      Log out
-                    </button>
-                  </>
-                )}
+                  {role === "admin" && (
+                    <>
+                      <button
+                        type="button"
+                        className="dropdown-item"
+                        onClick={handleAdminUsers}
+                        role="menuitem"
+                      >
+                        Users Information Settings
+                      </button>
 
-                {role === "operator" && (
-                  <>
-                    <button
-                      className="dropdown-item dropdown-item--danger"
-                      onClick={handleLogout}
-                    >
-                      Log out
-                    </button>
-                  </>
-                )}
+                      <button
+                        type="button"
+                        className="dropdown-item"
+                        onClick={handleAdminPanel}
+                        role="menuitem"
+                      >
+                        Manage Routes
+                      </button>
+                    </>
+                  )}
 
-                {role === "admin" && (
-                  <>
-                    <button className="dropdown-item" onClick={handleAdminUsers}>
-                      Users Information Settings
-                    </button>
-                    <button className="dropdown-item" onClick={handleAdminPanel}>
-                      Manage Routes
-                    </button>
-                    <button
-                      className="dropdown-item dropdown-item--danger"
-                      onClick={handleLogout}
-                    >
-                      Log out
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+                  <button
+                    type="button"
+                    className="dropdown-item dropdown-item--danger"
+                    onClick={handleLogout}
+                    role="menuitem"
+                  >
+                    Log out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
