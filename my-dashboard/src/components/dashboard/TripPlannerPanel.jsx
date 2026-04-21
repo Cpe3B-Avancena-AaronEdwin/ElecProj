@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { findBestTripPlan, searchStops } from "../../utils/gtfsUtils";
 
 function StopHintList({ title, items = [], onPick }) {
@@ -202,9 +202,232 @@ function PlanSummary({ plan }) {
   );
 }
 
+function StopPicker({
+  id,
+  label,
+  value,
+  onChange,
+  options = [],
+  placeholder,
+  open,
+  setOpen,
+  onClear,
+}) {
+  const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (!wrapperRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [setOpen]);
+
+  const filteredOptions = useMemo(() => {
+    const query = String(value || "").trim().toLowerCase();
+
+    if (!query) {
+      return options.slice(0, 50);
+    }
+
+    return options
+      .filter((stop) => {
+        const name = String(stop.stopName || "").toLowerCase();
+        const code = String(stop.stopCode || "").toLowerCase();
+        return name.includes(query) || code.includes(query);
+      })
+      .slice(0, 50);
+  }, [options, value]);
+
+  const handleArrowClick = () => {
+    const hasValue = String(value || "").trim().length > 0;
+
+    if (open && hasValue) {
+      onChange("");
+      onClear?.();
+      setOpen(true);
+
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
+
+      return;
+    }
+
+    setOpen((prev) => !prev);
+
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+  };
+
+  return (
+    <div style={{ minWidth: 0 }} ref={wrapperRef}>
+      <label
+        htmlFor={id}
+        style={{
+          display: "block",
+          marginBottom: "0.45rem",
+          color: "var(--text-sub)",
+          fontSize: "0.85rem",
+        }}
+      >
+        {label}
+      </label>
+
+      <div
+        style={{
+          position: "relative",
+        }}
+      >
+        <input
+          ref={inputRef}
+          id={id}
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          autoComplete="off"
+          style={{
+            width: "100%",
+            padding: "0.8rem 3rem 0.8rem 0.9rem",
+            borderRadius: "12px",
+            border: "1px solid var(--border)",
+            background: "rgba(255,255,255,0.04)",
+            color: "var(--text-on-dark)",
+            outline: "none",
+            boxSizing: "border-box",
+          }}
+        />
+
+        <button
+          type="button"
+          onClick={handleArrowClick}
+          aria-label={
+            open && String(value || "").trim()
+              ? `Clear ${label} and show all options`
+              : `Toggle ${label} options`
+          }
+          title={
+            open && String(value || "").trim()
+              ? "Clear and show all options"
+              : "Show options"
+          }
+          style={{
+            position: "absolute",
+            top: "50%",
+            right: "0.6rem",
+            transform: "translateY(-50%)",
+            width: "34px",
+            height: "34px",
+            border: "1px solid rgba(255,255,255,0.18)",
+            borderRadius: "10px",
+            background: "rgba(255,255,255,0.04)",
+            color: "var(--text-on-dark)",
+            cursor: "pointer",
+            fontSize: "0.95rem",
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {open && String(value || "").trim() ? "✕" : "▼"}
+        </button>
+
+        {open && (
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 0.45rem)",
+              left: 0,
+              right: 0,
+              maxHeight: "260px",
+              overflowY: "auto",
+              borderRadius: "14px",
+              border: "1px solid var(--border)",
+              background: "#0f172a",
+              boxShadow: "0 12px 28px rgba(0,0,0,0.28)",
+              zIndex: 2000,
+              padding: "0.4rem",
+            }}
+          >
+            {filteredOptions.length ? (
+              filteredOptions.map((stop) => (
+                <button
+                  key={stop.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(stop.stopName);
+                    setOpen(false);
+                  }}
+                  style={{
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "0.75rem 0.8rem",
+                    border: "none",
+                    borderRadius: "10px",
+                    background: "transparent",
+                    color: "var(--text-on-dark)",
+                    cursor: "pointer",
+                    display: "block",
+                  }}
+                >
+                  <div style={{ fontWeight: 700 }}>{stop.stopName}</div>
+                  {stop.stopCode ? (
+                    <div
+                      style={{
+                        fontSize: "0.8rem",
+                        color: "var(--text-sub)",
+                        marginTop: "0.2rem",
+                      }}
+                    >
+                      {stop.stopCode}
+                    </div>
+                  ) : null}
+                </button>
+              ))
+            ) : (
+              <div
+                style={{
+                  padding: "0.8rem",
+                  color: "var(--text-sub)",
+                  fontSize: "0.9rem",
+                }}
+              >
+                No matching stops found.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
   const [fromText, setFromText] = useState("");
   const [toText, setToText] = useState("");
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
   const [plannerResult, setPlannerResult] = useState(null);
   const [plannerMessage, setPlannerMessage] = useState(
     "Enter your FROM and TO stops, then click Find Route."
@@ -235,6 +458,12 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
       })
       .slice(0, 1200);
   }, [gtfsBundle]);
+
+  const clearPlannerResult = () => {
+    setPlannerResult(null);
+    setPlannerMessage("Selection cleared. All stops are shown again.");
+    onPlanSelected?.(null);
+  };
 
   useEffect(() => {
     if (!fromText.trim() && !toText.trim()) {
@@ -269,6 +498,8 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
   const handleSwap = () => {
     setFromText(toText);
     setToText(fromText);
+    setFromOpen(false);
+    setToOpen(false);
     setPlannerResult(null);
     setPlannerMessage("Stops swapped. Click Find Route to check the reverse trip.");
     onPlanSelected?.(null);
@@ -278,7 +509,7 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
   const alternatePlans = plannerResult?.plans?.slice(1, 4) || [];
 
   return (
-    <div className="card" style={{ padding: "1rem", marginBottom: "1rem" }}>
+    <div className="card" style={{ padding: "1rem", marginBottom: "1rem", overflow: "visible" }}>
       <div
         style={{
           display: "flex",
@@ -315,35 +546,17 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
           alignItems: "end",
         }}
       >
-        <div style={{ minWidth: 0 }}>
-          <label
-            htmlFor="trip-planner-from"
-            style={{
-              display: "block",
-              marginBottom: "0.45rem",
-              color: "var(--text-sub)",
-              fontSize: "0.85rem",
-            }}
-          >
-            FROM
-          </label>
-          <input
-            id="trip-planner-from"
-            list="trip-planner-stops"
-            value={fromText}
-            onChange={(e) => setFromText(e.target.value)}
-            placeholder="Type origin stop"
-            style={{
-              width: "100%",
-              padding: "0.8rem 0.9rem",
-              borderRadius: "12px",
-              border: "1px solid var(--border)",
-              background: "rgba(255,255,255,0.04)",
-              color: "var(--text-on-dark)",
-              outline: "none",
-            }}
-          />
-        </div>
+        <StopPicker
+          id="trip-planner-from"
+          label="FROM"
+          value={fromText}
+          onChange={setFromText}
+          options={uniqueStopOptions}
+          placeholder="Type origin stop"
+          open={fromOpen}
+          setOpen={setFromOpen}
+          onClear={clearPlannerResult}
+        />
 
         <button
           type="button"
@@ -362,35 +575,17 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
           ⇄
         </button>
 
-        <div style={{ minWidth: 0 }}>
-          <label
-            htmlFor="trip-planner-to"
-            style={{
-              display: "block",
-              marginBottom: "0.45rem",
-              color: "var(--text-sub)",
-              fontSize: "0.85rem",
-            }}
-          >
-            TO
-          </label>
-          <input
-            id="trip-planner-to"
-            list="trip-planner-stops"
-            value={toText}
-            onChange={(e) => setToText(e.target.value)}
-            placeholder="Type destination stop"
-            style={{
-              width: "100%",
-              padding: "0.8rem 0.9rem",
-              borderRadius: "12px",
-              border: "1px solid var(--border)",
-              background: "rgba(255,255,255,0.04)",
-              color: "var(--text-on-dark)",
-              outline: "none",
-            }}
-          />
-        </div>
+        <StopPicker
+          id="trip-planner-to"
+          label="TO"
+          value={toText}
+          onChange={setToText}
+          options={uniqueStopOptions}
+          placeholder="Type destination stop"
+          open={toOpen}
+          setOpen={setToOpen}
+          onClear={clearPlannerResult}
+        />
 
         <button
           type="button"
@@ -410,25 +605,28 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
         </button>
       </div>
 
-      <datalist id="trip-planner-stops">
-        {uniqueStopOptions.map((stop) => (
-          <option
-            key={stop.id}
-            value={stop.stopName}
-            label={stop.stopCode ? `${stop.stopName} (${stop.stopCode})` : stop.stopName}
-          />
-        ))}
-      </datalist>
-
       <StopHintList
         title="FROM matches"
         items={fromSuggestions}
-        onPick={(item) => setFromText(item.stopName)}
+        onPick={(item) => {
+          setFromText(item.stopName);
+          setFromOpen(false);
+          setPlannerResult(null);
+          setPlannerMessage("FROM stop selected. Choose TO stop or click Find Route.");
+          onPlanSelected?.(null);
+        }}
       />
+
       <StopHintList
         title="TO matches"
         items={toSuggestions}
-        onPick={(item) => setToText(item.stopName)}
+        onPick={(item) => {
+          setToText(item.stopName);
+          setToOpen(false);
+          setPlannerResult(null);
+          setPlannerMessage("TO stop selected. Click Find Route to calculate the trip.");
+          onPlanSelected?.(null);
+        }}
       />
 
       <div
