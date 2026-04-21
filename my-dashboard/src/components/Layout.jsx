@@ -66,7 +66,6 @@ export default function Layout({ children }) {
   const navItems = [
     { label: "Dashboard", path: "/dashboard" },
     { label: "Traffic & Routes", path: "/traffic" },
-    { label: "Reports", path: "/reports" },
     { label: "About Us", path: "/about" },
   ];
 
@@ -155,7 +154,6 @@ export default function Layout({ children }) {
               </Link>
             ))}
           </nav>
-          <input className="search-input" placeholder="Search location..." />
         </div>
 
         <div className="content">{children}</div>

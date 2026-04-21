@@ -657,6 +657,8 @@ html, body, #root {
   line-height: 1.5;
 }
 
+/* ===== DASHBOARD ALERTS ===== */
+
 .alert-pill {
   display: inline-flex;
   align-items: center;
@@ -674,47 +676,175 @@ html, body, #root {
 }
 
 .alert-pill--heavy {
-  color: #f97316;
-  background: rgba(251, 146, 60, 0.12);
-  border-color: rgba(251, 146, 60, 0.25);
+  color: #fdba74;
+  background: rgba(249, 115, 22, 0.12);
+  border-color: rgba(249, 115, 22, 0.25);
 }
 
 .alert-pill--moderate {
-  color: #facc15;
+  color: #fde047;
   background: rgba(250, 204, 21, 0.12);
   border-color: rgba(250, 204, 21, 0.25);
 }
 
 .alert-pill--normal {
-  color: #34d399;
-  background: rgba(52, 211, 153, 0.12);
-  border-color: rgba(52, 211, 153, 0.25);
+  color: #6ee7b7;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.25);
 }
 
-.sparkline-chart {
-  min-height: 90px;
+/* ===== INTERACTIVE CHART ===== */
+
+.vehicle-flow-card {
+  min-height: 430px;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
 }
 
-.sparkline {
+.vehicle-flow-title {
+  color: #ffffff;
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  margin-bottom: 14px;
+}
+
+.vehicle-flow-chart-box {
   width: 100%;
-  height: 90px;
+  height: 300px;
+  min-height: 300px;
+  border-radius: 18px;
+  padding: 8px 10px 0 0;
+  background: linear-gradient(
+    180deg,
+    rgba(59, 130, 246, 0.04),
+    rgba(15, 23, 42, 0.02)
+  );
+  overflow: hidden;
+  margin-bottom: 12px;
 }
 
-.sparkline path {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+/* force proper SVG rendering */
+.vehicle-flow-chart-box svg {
+  overflow: visible;
 }
 
-.sparkline circle {
-  fill: var(--accent);
-  stroke: rgba(255, 255, 255, 0.2);
-  stroke-width: 1;
+.vehicle-flow-chart-box .recharts-surface {
+  overflow: visible;
+}
+
+.vehicle-flow-chart-box .recharts-cartesian-grid line {
+  stroke: rgba(255, 255, 255, 0.08) !important;
+}
+
+.vehicle-flow-chart-box .recharts-xAxis line,
+.vehicle-flow-chart-box .recharts-yAxis line,
+.vehicle-flow-chart-box .recharts-xAxis path,
+.vehicle-flow-chart-box .recharts-yAxis path {
+  stroke: rgba(255, 255, 255, 0.9) !important;
+}
+
+.vehicle-flow-chart-box .recharts-text {
+  fill: rgba(255, 255, 255, 0.88) !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+.vehicle-flow-chart-box .recharts-line-curve {
+  stroke: #45f4ff !important;
+  stroke-width: 4px !important;
+  fill: none !important;
+}
+
+.vehicle-flow-chart-box .recharts-active-dot circle {
+  fill: #ffffff !important;
+  stroke: #45f4ff !important;
+  stroke-width: 4 !important;
+}
+
+.vehicle-flow-tooltip {
+  min-width: 150px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(39, 54, 120, 0.96);
+  border: 1px solid rgba(120, 153, 255, 0.3);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(10px);
+}
+
+.vehicle-flow-tooltip-time {
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+
+.vehicle-flow-tooltip-value {
+  color: #45f4ff;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+/* ===== CARDS ===== */
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid rgba(34, 211, 238, 0.1);
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  transition: all 0.15s ease;
+  min-height: auto;
+}
+
+.card:hover {
+  border-color: rgba(34, 211, 238, 0.2);
+  box-shadow: 0 8px 24px rgba(34, 211, 238, 0.08);
+}
+
+/* ===== RESPONSIVE ===== */
+
+@media (max-width: 1024px) {
+  .dashboard-status-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .vehicle-flow-card {
+    min-height: auto;
+  }
+
+  .vehicle-flow-chart-box {
+    height: 260px;
+    min-height: 260px;
+  }
+
+  .vehicle-flow-title {
+    font-size: 1rem;
+  }
+
+  .card {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-container {
+    padding: 8px;
+  }
+
+  .vehicle-flow-chart-box {
+    height: 230px;
+    min-height: 230px;
+  }
+
+  .vehicle-flow-tooltip {
+    min-width: 120px;
+    padding: 10px 12px;
+  }
 }
 
 @media (max-width: 1024px) {

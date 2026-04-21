@@ -1,5 +1,14 @@
 import { useMemo } from "react";
 import { useAuth } from "../context/AuthContext";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
 
 import { useFirestoreTransitData } from "../hooks/useFirestoreTransitData";
 import { useGtfsBundle } from "../hooks/useGtfsBundle";
@@ -19,6 +28,104 @@ import Layout from "../components/Layout";
 function scoreToRatio(score) {
   const value = Number(score || 0);
   return Math.max(0, Math.min(1, value / 100));
+}
+
+function formatShortTime(value, fallbackText = "Now") {
+  if (!value) return fallbackText;
+
+  let date = null;
+
+  if (typeof value === "number") {
+    date = new Date(value);
+  } else if (value?.toDate && typeof value.toDate === "function") {
+    date = value.toDate();
+  } else {
+    date = new Date(value);
+  }
+
+  if (!date || Number.isNaN(date.getTime())) return fallbackText;
+
+  return date.toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function buildChartDataFromHistory(trafficHistory = []) {
+  const now = Date.now();
+  const last24h = now - 24 * 60 * 60 * 1000;
+
+  const filtered = trafficHistory.filter((item) => {
+    const ts =
+      Number(item.timestampMs) ||
+      new Date(
+        item.timestampText ||
+          item.timestamp ||
+          item.createdAt ||
+          0
+      ).getTime();
+
+    return Number.isFinite(ts) && ts >= last24h;
+  });
+
+  return filtered.map((item, index) => {
+    const score = Number(item.congestionScore || 0);
+
+    return {
+      index,
+      time: formatShortTime(
+        item.timestampMs ||
+          item.timestampText ||
+          item.timestamp,
+        "Now"
+      ),
+      score,
+      level: item.congestionLevel || "Unknown",
+      rawTimestamp:
+        item.timestampMs ||
+        item.timestampText ||
+        item.timestamp ||
+        null,
+    };
+  });
+}
+
+function buildFallbackChartData(graphPoints) {
+  return graphPoints.map((value, index, arr) => ({
+    index,
+    time: ["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"][
+      Math.round((index / Math.max(arr.length - 1, 1)) * 7)
+    ],
+    score: Math.round(value * 100),
+    level: "Estimated",
+    rawTimestamp: null,
+  }));
+}
+
+function CustomTooltip({ active, payload, label }) {
+  if (!active || !payload || !payload.length) return null;
+
+  const point = payload[0]?.payload;
+  const score = payload[0]?.value ?? 0;
+  const level = point?.level || "Unknown";
+
+  return (
+    <div className="vehicle-flow-tooltip live-tooltip">
+      <div className="vehicle-flow-tooltip-time">{label}</div>
+      <div className="vehicle-flow-tooltip-value">score : {score}</div>
+      <div
+        style={{
+          color: "#cbd5e1",
+          fontSize: "0.9rem",
+          fontWeight: 700,
+          marginTop: "4px",
+        }}
+      >
+        level : {level}
+      </div>
+    </div>
+  );
 }
 
 export default function Dashboard() {
@@ -110,7 +217,7 @@ export default function Dashboard() {
 
   const graphPoints = useMemo(() => {
     if (trafficHistory.length >= 2) {
-      return trafficHistory.map((item) => scoreToRatio(item.congestionScore)).slice(-288);
+      return trafficHistory.map((item) => scoreToRatio(item.congestionScore)).slice(-24);
     }
 
     const sampleLevels =
@@ -133,17 +240,24 @@ export default function Dashboard() {
     for (let i = 0; i < low; i += 1) generated.push(0.25);
     for (let i = 0; i < closed; i += 1) generated.push(1);
 
-    if (generated.length) return generated.slice(0, 16);
+    if (generated.length) return generated.slice(0, 8);
 
-    return [0.25, 0.35, 0.3, 0.4];
+    return [0.2, 0.12, 0.35, 0.82, 0.58, 0.74, 0.95, 0.42];
   }, [trafficHistory, trafficSamples, trafficSummary]);
 
+  const chartData = useMemo(() => {
+    if (trafficHistory.length >= 2) {
+      return buildChartDataFromHistory(trafficHistory);
+    }
+    return buildFallbackChartData(graphPoints);
+  }, [trafficHistory, graphPoints]);
+
   const graphTitle =
-    trafficHistory.length >= 2 ? "Last 24H Congestion Trend" : "Current Congestion Profile";
+    trafficHistory.length >= 2 ? "LAST 24H CONGESTION TREND" : "CURRENT CONGESTION PROFILE";
 
   const graphNote =
     trafficHistory.length >= 2
-      ? `Based on ${trafficHistory.length} stored 5-minute snapshots from the last 24 hours.`
+      ? `Based on ${chartData.length} stored snapshots from the last 24 hours.`
       : `Based on ${trafficSamples.length || graphPoints.length} current monitored traffic sample points.`;
 
   const formatUpdatedAt = (isoString) => {
@@ -167,14 +281,6 @@ export default function Dashboard() {
     const hours = Math.floor(minutes / 60);
     return `${hours}h ${minutes % 60}m`;
   };
-
-  const sparklinePath = graphPoints
-    .map((value, index) => {
-      const x = (index / Math.max(graphPoints.length - 1, 1)) * 100;
-      const y = 100 - value * 100;
-      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
-    })
-    .join(" ");
 
   const recommendationTone =
     currentPrediction.predictedDelayRisk === "High"
@@ -207,18 +313,65 @@ export default function Dashboard() {
             <div className="status-card-note">{currentPrediction.congestionForecast}</div>
           </div>
 
-          <div className="status-card card">
-            <div className="status-card-title">{graphTitle}</div>
-            <div className="sparkline-chart">
-              <svg viewBox="0 0 100 100" className="sparkline">
-                <path d={sparklinePath} />
-                {graphPoints.map((value, index) => {
-                  const x = (index / Math.max(graphPoints.length - 1, 1)) * 100;
-                  const y = 100 - value * 100;
-                  return <circle key={index} cx={x} cy={y} r="2.5" />;
-                })}
-              </svg>
+          <div className="status-card card vehicle-flow-card">
+            <div className="vehicle-flow-title">{graphTitle}</div>
+
+            <div className="vehicle-flow-chart-box">
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 12, right: 12, left: 8, bottom: 8 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="4 6"
+                    stroke="rgba(255,255,255,0.12)"
+                    vertical={true}
+                    horizontal={true}
+                  />
+
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                  />
+
+                  <YAxis
+                    domain={[0, 100]}
+                    ticks={[0, 20, 40, 60, 80, 100]}
+                    tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
+                    tickLine={false}
+                    width={54}
+                  />
+
+                  <Tooltip
+                    content={<CustomTooltip />}
+                    cursor={{
+                      stroke: "rgba(255,255,255,0.95)",
+                      strokeWidth: 2,
+                    }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#45f4ff"
+                    strokeWidth={5}
+                    dot={false}
+                    activeDot={{
+                      r: 8,
+                      fill: "#ffffff",
+                      stroke: "#45f4ff",
+                      strokeWidth: 4,
+                    }}
+                    isAnimationActive={true}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
+
             <div className="status-card-note">{graphNote}</div>
           </div>
         </div>
