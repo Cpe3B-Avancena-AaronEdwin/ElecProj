@@ -53,15 +53,8 @@ export default function Traffic() {
     maxSamplePoints: 15,
   });
 
-  const { routePaths = [] } = useRouteLines(
-    gtfsStops,
-    TOMTOM_API_KEY,
-    "gtfs",
-    gtfsRouteMap,
-    [],
-    null,
-    {}
-  ) || {};
+  const { routePaths = [] } =
+    useRouteLines(gtfsStops, TOMTOM_API_KEY, "gtfs", gtfsRouteMap, [], null, {}) || {};
 
   const plannerMapData = useMemo(() => {
     if (!selectedPlan) return null;
@@ -150,6 +143,24 @@ export default function Traffic() {
     });
   };
 
+  const trafficLegend = [
+    {
+      label: "Light Traffic",
+      color: "#22c55e",
+      description: "Green",
+    },
+    {
+      label: "Moderate Traffic",
+      color: "#facc15",
+      description: "Yellow",
+    },
+    {
+      label: "Heavy Traffic",
+      color: "#ef4444",
+      description: "Red",
+    },
+  ];
+
   return (
     <Layout>
       <div className="dashboard-container">
@@ -166,6 +177,57 @@ export default function Traffic() {
           showRoutes={true}
           plannerMapData={plannerMapData}
         />
+
+        <div
+          className="card"
+          style={{
+            padding: "0.9rem 1rem",
+            marginBottom: "1rem",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            gap: "0.85rem 1.25rem",
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 700,
+              color: "var(--text-on-dark)",
+              marginRight: "0.25rem",
+            }}
+          >
+            Traffic Color Indicator:
+          </div>
+
+          {trafficLegend.map((item) => (
+            <div
+              key={item.label}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.55rem",
+                color: "var(--text-sub)",
+                fontSize: "0.95rem",
+              }}
+            >
+              <span
+                style={{
+                  width: "16px",
+                  height: "16px",
+                  borderRadius: "999px",
+                  background: item.color,
+                  display: "inline-block",
+                  boxShadow: `0 0 0 2px rgba(255,255,255,0.08), 0 0 10px ${item.color}33`,
+                  flexShrink: 0,
+                }}
+              />
+              <span style={{ color: "var(--text-on-dark)", fontWeight: 600 }}>
+                {item.description}
+              </span>
+              <span>— {item.label}</span>
+            </div>
+          ))}
+        </div>
 
         <div
           style={{
