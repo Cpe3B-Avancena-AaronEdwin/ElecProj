@@ -97,8 +97,23 @@ export async function linkPasswordToCurrentUser(email, password) {
 }
 
 export async function getCurrentUser() {
-  const data = await apiFetch("/api/auth/me", "Failed to load current user.");
-  return syncCurrentUser(data?.user || null);
+  try {
+    const data = await apiFetch(
+      "/api/auth/me",
+      "Failed to load current user."
+    );
+
+    return syncCurrentUser(data?.user || null);
+  } catch (error) {
+    if (
+      error.message?.toLowerCase().includes("unauthorized")
+    ) {
+      clearAuthCurrentUser();
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export async function getCurrentUserProviders() {
