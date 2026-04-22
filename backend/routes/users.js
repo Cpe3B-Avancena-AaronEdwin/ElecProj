@@ -1,25 +1,23 @@
 import express from "express";
-import { db } from "../firebaseAdmin.js";
+import { pool } from "../db.js";
 import { requireAuth } from "../middleware/authMiddleware.js";
 import { requireAdmin } from "../middleware/adminMiddleware.js";
 
 const router = express.Router();
 
-function normalizeValue(value) {
-  if (value && typeof value.toDate === "function") {
-    return value.toDate().toISOString();
-  }
-  return value;
-}
-
-function normalizeDoc(docSnap) {
-  const data = docSnap.data() || {};
-
+function mapUser(row) {
   return {
-    id: docSnap.id,
-    ...Object.fromEntries(
-      Object.entries(data).map(([key, value]) => [key, normalizeValue(value)])
-    ),
+    id: row.id,
+    uid: row.uid,
+    email: row.email || "",
+    username: row.username || "",
+    displayName: row.display_name || "",
+    fullName: row.full_name || "",
+    photoURL: row.photo_url || "",
+    role: row.role || "viewer",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    lastLoginAt: row.last_login_at,
   };
 }
 
@@ -27,67 +25,23 @@ function normalizeUsername(username = "") {
   return String(username).trim().toLowerCase();
 }
 
-function buildUserPayload(body = {}, existing = {}) {
-  const displayName =
-    body.displayName !== undefined
-      ? String(body.displayName).trim()
-      : existing.displayName || "";
-
-  const fullName =
-    body.fullName !== undefined
-      ? String(body.fullName).trim()
-      : existing.fullName || displayName || "";
-
-  const username =
-    body.username !== undefined
-      ? normalizeUsername(body.username)
-      : existing.username || "";
-
-  return {
-    uid: body.uid !== undefined ? String(body.uid).trim() : existing.uid || "",
-    email:
-      body.email !== undefined
-        ? String(body.email).trim()
-        : existing.email || "",
-    displayName,
-    fullName,
-    username,
-    photoURL:
-      body.photoURL !== undefined
-        ? String(body.photoURL).trim()
-        : existing.photoURL || "",
-    role:
-      body.role !== undefined
-        ? String(body.role).trim()
-        : existing.role || "viewer",
-    sessions: Array.isArray(body.sessions)
-      ? body.sessions
-      : Array.isArray(existing.sessions)
-      ? existing.sessions
-      : [],
-    lastLoginAt:
-      body.lastLoginAt !== undefined ? body.lastLoginAt : existing.lastLoginAt || null,
-    updatedAt: new Date(),
-    createdAt: existing.createdAt || new Date(),
-  };
-}
-
-// GET current logged-in user profile
 router.get("/me", requireAuth, async (req, res, next) => {
   try {
-    const docSnap = await db.collection("users").doc(req.user.uid).get();
+    const [rows] = await pool.query(
+      "SELECT * FROM users WHERE uid = ? LIMIT 1",
+      [req.user.uid]
+    );
 
-    if (!docSnap.exists) {
+    if (!rows.length) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json(normalizeDoc(docSnap));
+    res.json(mapUser(rows[0]));
   } catch (error) {
     next(error);
   }
 });
 
-// GET user by username
 router.get("/lookup/by-username/:username", async (req, res, next) => {
   try {
     const username = normalizeUsername(req.params.username);
@@ -96,206 +50,134 @@ router.get("/lookup/by-username/:username", async (req, res, next) => {
       return res.status(400).json({ error: "Username is required" });
     }
 
-    const snapshot = await db
-      .collection("users")
-      .where("username", "==", username)
-      .limit(1)
-      .get();
+    const [rows] = await pool.query(
+      "SELECT * FROM users WHERE username = ? LIMIT 1",
+      [username]
+    );
 
-    if (snapshot.empty) {
+    if (!rows.length) {
       return res.status(404).json({ error: "Username not found" });
     }
 
-    res.json(normalizeDoc(snapshot.docs[0]));
+    res.json(mapUser(rows[0]));
   } catch (error) {
     next(error);
   }
 });
 
-// GET all users - admin only
 router.get("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const snapshot = await db.collection("users").orderBy("displayName", "asc").get();
-    const users = snapshot.docs.map(normalizeDoc);
-    res.json(users);
+    const [rows] = await pool.query(
+      "SELECT * FROM users ORDER BY display_name ASC"
+    );
+    res.json(rows.map(mapUser));
   } catch (error) {
     next(error);
   }
 });
 
-// GET user by uid/doc id
 router.get("/:id", requireAuth, async (req, res, next) => {
   try {
     const requestedId = req.params.id;
     const isSelf = req.user.uid === requestedId;
 
-    if (!isSelf) {
-      const requesterDoc = await db.collection("users").doc(req.user.uid).get();
-      const requesterRole = requesterDoc.exists ? requesterDoc.data()?.role : null;
-
-      if (requesterRole !== "admin") {
-        return res.status(403).json({ error: "Forbidden." });
-      }
+    if (!isSelf && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Forbidden." });
     }
 
-    const docSnap = await db.collection("users").doc(requestedId).get();
+    const [rows] = await pool.query(
+      "SELECT * FROM users WHERE uid = ? LIMIT 1",
+      [requestedId]
+    );
 
-    if (!docSnap.exists) {
+    if (!rows.length) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json(normalizeDoc(docSnap));
+    res.json(mapUser(rows[0]));
   } catch (error) {
     next(error);
   }
 });
 
-// CREATE manual user doc - admin only
-router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
-  try {
-    const { email, displayName, role, fullName, username, photoURL, uid } = req.body;
-
-    if (!email || !displayName) {
-      return res.status(400).json({
-        error: "email and displayName are required",
-      });
-    }
-
-    const normalizedUsername = normalizeUsername(username || "");
-    if (normalizedUsername) {
-      const usernameSnapshot = await db
-        .collection("users")
-        .where("username", "==", normalizedUsername)
-        .limit(1)
-        .get();
-
-      if (!usernameSnapshot.empty) {
-        return res.status(409).json({ error: "Username is already taken." });
-      }
-    }
-
-    const payload = {
-      uid: uid ? String(uid).trim() : "",
-      email: String(email).trim(),
-      displayName: String(displayName).trim(),
-      fullName: fullName ? String(fullName).trim() : String(displayName).trim(),
-      username: normalizedUsername,
-      photoURL: photoURL ? String(photoURL).trim() : "",
-      role: role ? String(role).trim() : "viewer",
-      sessions: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastLoginAt: null,
-    };
-
-    const docRef = await db.collection("users").add(payload);
-
-    res.status(201).json({
-      message: "User created successfully",
-      id: docRef.id,
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// UPSERT by uid - used after auth login/register
-router.post("/upsert/:uid", async (req, res, next) => {
-  try {
-    const uid = String(req.params.uid).trim();
-
-    if (!uid) {
-      return res.status(400).json({ error: "uid is required" });
-    }
-
-    const ref = db.collection("users").doc(uid);
-    const existingSnap = await ref.get();
-    const existing = existingSnap.exists ? existingSnap.data() : {};
-
-    const payload = buildUserPayload(
-      {
-        ...req.body,
-        uid,
-        lastLoginAt: new Date(),
-      },
-      existing
-    );
-
-    if (payload.username) {
-      const usernameSnapshot = await db
-        .collection("users")
-        .where("username", "==", payload.username)
-        .limit(5)
-        .get();
-
-      const conflict = usernameSnapshot.docs.find((doc) => doc.id !== uid);
-      if (conflict) {
-        return res.status(409).json({ error: "Username is already taken." });
-      }
-    }
-
-    await ref.set(payload, { merge: true });
-
-    res.json({
-      message: existingSnap.exists
-        ? "User updated successfully"
-        : "User created successfully",
-      user: {
-        id: uid,
-        ...Object.fromEntries(
-          Object.entries(payload).map(([key, value]) => [key, normalizeValue(value)])
-        ),
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
-// UPDATE user by id - self or admin
 router.put("/:id", requireAuth, async (req, res, next) => {
   try {
     const requestedId = req.params.id;
     const isSelf = req.user.uid === requestedId;
 
-    let requesterRole = null;
-    if (!isSelf) {
-      const requesterDoc = await db.collection("users").doc(req.user.uid).get();
-      requesterRole = requesterDoc.exists ? requesterDoc.data()?.role : null;
-
-      if (requesterRole !== "admin") {
-        return res.status(403).json({ error: "Forbidden." });
-      }
+    if (!isSelf && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Forbidden." });
     }
 
-    const ref = db.collection("users").doc(requestedId);
-    const existingSnap = await ref.get();
+    const [existingRows] = await pool.query(
+      "SELECT * FROM users WHERE uid = ? LIMIT 1",
+      [requestedId]
+    );
 
-    if (!existingSnap.exists) {
+    if (!existingRows.length) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const existing = existingSnap.data();
-    const payload = buildUserPayload(req.body, existing);
+    const existing = existingRows[0];
 
-    if (isSelf && requesterRole !== "admin") {
-      payload.role = existing.role || "viewer";
+    const displayName =
+      req.body.displayName !== undefined
+        ? String(req.body.displayName).trim()
+        : existing.display_name;
+
+    const fullName =
+      req.body.fullName !== undefined
+        ? String(req.body.fullName).trim()
+        : existing.full_name;
+
+    const username =
+      req.body.username !== undefined
+        ? normalizeUsername(req.body.username)
+        : existing.username;
+
+    const photoURL =
+      req.body.photoURL !== undefined
+        ? String(req.body.photoURL).trim()
+        : existing.photo_url;
+
+    const email =
+      req.body.email !== undefined
+        ? String(req.body.email).trim().toLowerCase()
+        : existing.email;
+
+    let role = existing.role;
+    if (!isSelf && req.user.role === "admin" && req.body.role !== undefined) {
+      role = String(req.body.role).trim();
     }
 
-    if (payload.username) {
-      const usernameSnapshot = await db
-        .collection("users")
-        .where("username", "==", payload.username)
-        .limit(5)
-        .get();
+    if (username) {
+      const [conflictRows] = await pool.query(
+        "SELECT uid FROM users WHERE username = ? AND uid <> ? LIMIT 1",
+        [username, requestedId]
+      );
 
-      const conflict = usernameSnapshot.docs.find((doc) => doc.id !== requestedId);
-      if (conflict) {
+      if (conflictRows.length) {
         return res.status(409).json({ error: "Username is already taken." });
       }
     }
 
-    await ref.update(payload);
+    if (email) {
+      const [emailConflictRows] = await pool.query(
+        "SELECT uid FROM users WHERE email = ? AND uid <> ? LIMIT 1",
+        [email, requestedId]
+      );
+
+      if (emailConflictRows.length) {
+        return res.status(409).json({ error: "Email is already in use." });
+      }
+    }
+
+    await pool.query(
+      `UPDATE users
+       SET email = ?, username = ?, display_name = ?, full_name = ?, photo_url = ?, role = ?, updated_at = ?
+       WHERE uid = ?`,
+      [email, username, displayName, fullName, photoURL, role, new Date(), requestedId]
+    );
 
     res.json({
       message: "User updated successfully",
@@ -305,29 +187,25 @@ router.put("/:id", requireAuth, async (req, res, next) => {
   }
 });
 
-// DELETE user doc - self or admin
 router.delete("/:id", requireAuth, async (req, res, next) => {
   try {
     const requestedId = req.params.id;
     const isSelf = req.user.uid === requestedId;
 
-    if (!isSelf) {
-      const requesterDoc = await db.collection("users").doc(req.user.uid).get();
-      const requesterRole = requesterDoc.exists ? requesterDoc.data()?.role : null;
-
-      if (requesterRole !== "admin") {
-        return res.status(403).json({ error: "Forbidden." });
-      }
+    if (!isSelf && req.user.role !== "admin") {
+      return res.status(403).json({ error: "Forbidden." });
     }
 
-    const ref = db.collection("users").doc(requestedId);
-    const existingSnap = await ref.get();
+    const [rows] = await pool.query(
+      "SELECT uid FROM users WHERE uid = ? LIMIT 1",
+      [requestedId]
+    );
 
-    if (!existingSnap.exists) {
+    if (!rows.length) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    await ref.delete();
+    await pool.query("DELETE FROM users WHERE uid = ?", [requestedId]);
 
     res.json({
       message: "User deleted successfully",

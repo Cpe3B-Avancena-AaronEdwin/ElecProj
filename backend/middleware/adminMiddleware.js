@@ -1,4 +1,4 @@
-import { db } from "../firebaseAdmin.js";
+import { pool } from "../db.js";
 
 export async function requireAdmin(req, res, next) {
   try {
@@ -10,27 +10,26 @@ export async function requireAdmin(req, res, next) {
       });
     }
 
-    const userDoc = await db.collection("users").doc(uid).get();
+    const [rows] = await pool.query(
+      "SELECT id, uid, email, username, display_name, full_name, photo_url, role, created_at, updated_at, last_login_at FROM users WHERE uid = ? LIMIT 1",
+      [uid]
+    );
 
-    if (!userDoc.exists) {
+    if (!rows.length) {
       return res.status(403).json({
         error: "Forbidden. User profile not found.",
       });
     }
 
-    const userData = userDoc.data() || {};
+    const user = rows[0];
 
-    if (userData.role !== "admin") {
+    if (user.role !== "admin") {
       return res.status(403).json({
         error: "Forbidden. Admin access required.",
       });
     }
 
-    req.userProfile = {
-      id: userDoc.id,
-      ...userData,
-    };
-
+    req.userProfile = user;
     next();
   } catch (error) {
     next(error);

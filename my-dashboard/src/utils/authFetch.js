@@ -1,18 +1,5 @@
-import { auth } from "../firebase/config";
-
 export async function getAuthHeaders(extraHeaders = {}) {
-  const currentUser = auth.currentUser;
-
-  if (!currentUser) {
-    return {
-      ...extraHeaders,
-    };
-  }
-
-  const token = await currentUser.getIdToken();
-
   return {
-    Authorization: `Bearer ${token}`,
     ...extraHeaders,
   };
 }
@@ -22,6 +9,7 @@ export async function authFetch(url, options = {}) {
 
   return fetch(url, {
     ...options,
+    credentials: "include",
     headers,
   });
 }
