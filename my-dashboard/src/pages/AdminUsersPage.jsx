@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import SiteFooter from "../components/SiteFooter";
+import Layout from "../components/Layout";
 import {
   updateUserProfile,
   deleteUserAccount,
@@ -152,9 +152,13 @@ export default function AdminUsersPage() {
 
   if (role !== "admin") {
     return (
-      <p style={{ color: "#f87171", padding: "1.5rem" }}>
-        Access denied. Admins only.
-      </p>
+      <Layout>
+        <div className="dashboard-container" style={{ paddingTop: "24px" }}>
+          <p style={{ color: "#f87171", padding: "1.5rem" }}>
+            Access denied. Admins only.
+          </p>
+        </div>
+      </Layout>
     );
   }
 
@@ -165,9 +169,10 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <div className="admin-users-page">
-      <div className="admin-users-container">
-        <div className="admin-users-header">
+    <Layout>
+      <div className="admin-users-page">
+        <div className="admin-users-container">
+          <div className="admin-users-header">
           <div className="admin-users-header-copy">
             <h2>User Management</h2>
             <p>Manage system access and permissions</p>
@@ -321,8 +326,8 @@ export default function AdminUsersPage() {
           ))}
         </div>
 
-        <SiteFooter />
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }

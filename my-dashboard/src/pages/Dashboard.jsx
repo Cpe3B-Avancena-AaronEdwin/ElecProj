@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   ResponsiveContainer,
@@ -16,12 +17,7 @@ import { useTrafficData } from "../hooks/useTrafficData";
 import { useDashboardMetrics } from "../hooks/useDashboardMetrics";
 import { useCurrentPrediction } from "../hooks/useCurrentPrediction";
 
-import DashboardStats from "../components/dashboard/DashboardStats";
-import GtfsStatusPanel from "../components/dashboard/GtfsStatusPanel";
-import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
-import CurrentPredictionPanel from "../components/dashboard/CurrentPredictionPanel";
-import TrafficStatusPanel from "../components/dashboard/TrafficStatusPanel";
-import PredictionStatusPanel from "../components/dashboard/PredictionStatusPanel";
+import DashboardMap from "../components/dashboard/DashboardMap";
 
 import Layout from "../components/Layout";
 
@@ -278,7 +274,25 @@ export default function Dashboard() {
   return (
     <Layout>
       <div className="dashboard-container">
-        <DashboardStats metrics={metrics} />
+        <div className="dashboard-status-bottom-row">
+          <div className="status-card card">
+            <div className="status-card-title">Last Updated</div>
+            <div className="status-card-value">{formatUpdatedAt(lastTrafficUpdated)}</div>
+            <div className="status-card-note">
+              {lastTrafficUpdated
+                ? `Updated ${timeSince(lastTrafficUpdated)} ago`
+                : "Waiting for latest traffic refresh."}
+            </div>
+          </div>
+
+          <div className="status-card card">
+            <div className="status-card-title">On-Time Rate</div>
+            <div className="status-card-value">{metrics.onTimeRate}%</div>
+            <div className="status-card-note">
+              Percentage of trips meeting the planned schedule.
+            </div>
+          </div>
+        </div>
 
         <div className="dashboard-chart-row">
           <div className="status-card card vehicle-flow-card vehicle-flow-card--full">
@@ -344,48 +358,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="dashboard-status-bottom-row">
-          <div className="status-card card">
-            <div className="status-card-title">Last Updated</div>
-            <div className="status-card-value">{formatUpdatedAt(lastTrafficUpdated)}</div>
-            <div className="status-card-note">
-              {lastTrafficUpdated
-                ? `Updated ${timeSince(lastTrafficUpdated)} ago`
-                : "Waiting for latest traffic refresh."}
-            </div>
-          </div>
-
-          <div className="status-card card">
-            <div className="status-card-title">Quick Alerts</div>
-            <div className={`alert-pill alert-pill--${quickAlert.level}`}>
-              {quickAlert.message}
-            </div>
-            <div className="status-card-note">{currentPrediction.congestionForecast}</div>
-          </div>
-        </div>
-
         <div className="dashboard-insights-grid">
           <div className="card dashboard-small-card">
-            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
-              Prediction Confidence
-            </div>
-            <div
-              style={{
-                fontSize: "2rem",
-                fontWeight: 800,
-                color: "var(--text-on-dark)",
-              }}
-            >
-              {currentPrediction.confidence}%
-            </div>
-            <div style={{ color: "var(--text-sub)", marginTop: "0.35rem" }}>
-              Based on {currentPrediction.basedOnTrafficSamples} live samples,{" "}
-              {currentPrediction.historicalSnapshotCount24h} last-24h snapshots, and{" "}
-              {currentPrediction.historicalSnapshotCount7d} seven-day snapshots.
-            </div>
-          </div>
-
-          <div className="card dashboard-small-card" style={{ background: recommendationTone }}>
             <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
               Recommended Action
             </div>
@@ -396,65 +370,61 @@ export default function Dashboard() {
                 color: "var(--text-on-dark)",
               }}
             >
-              {currentPrediction.recommendation}
+              {currentPrediction.recommendation || "Monitor the route and allow extra time when congestion increases."}
             </div>
             <div style={{ color: "var(--text-sub)", marginTop: "0.45rem" }}>
-              Estimated delay impact: +{currentPrediction.etaImpactMinutes} minutes.
+              {currentPrediction.etaImpactMinutes != null
+                ? `Expected delay impact: +${currentPrediction.etaImpactMinutes} minutes.`
+                : "No delay impact detected currently."}
             </div>
           </div>
 
-          <div className="card dashboard-small-card">
+          <div className="card dashboard-small-card" style={{ background: recommendationTone }}>
             <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
-              Historical Peak Window
+              Smart Prediction
             </div>
             <div
               style={{
-                color: "var(--text-on-dark)",
+                fontSize: "1.05rem",
                 fontWeight: 700,
-                marginBottom: "0.35rem",
+                color: "var(--text-on-dark)",
               }}
             >
-              {currentPrediction.predictedPeakWindow || "Building history"}
+              {currentPrediction.predictedDelayRisk || "Stable"}
             </div>
-            <div style={{ color: "var(--text-sub)" }}>
-              24h avg: {currentPrediction.historicalAverageScore24h ?? 0}/100 • 7d avg:{" "}
-              {currentPrediction.historicalAverageScore7d ?? 0}/100
+            <div style={{ color: "var(--text-sub)", marginTop: "0.45rem" }}>
+              {predictionMessage ||
+                "The system compares current traffic and route conditions to give a simple on-time prediction."}
             </div>
           </div>
         </div>
 
         <div className="dashboard-panels-grid">
           <div className="dashboard-panel-item">
-            <GtfsStatusPanel gtfsBundle={gtfsBundle} loading={gtfsLoading} error={gtfsError} />
-          </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <h3 style={{ margin: 0 }}>Live Map</h3>
+                  <div style={{ color: "var(--text-sub)", marginTop: "6px" }}>
+                    Visual transit and congestion data across the network.
+                  </div>
+                </div>
+                <Link to="/data" className="primary-button">
+                  Plan Your Trip
+                </Link>
+              </div>
 
-          <div className="dashboard-panel-item">
-            <TrafficSummaryPanel summary={trafficSummary} />
-          </div>
-
-          <div className="dashboard-panel-item">
-            <TrafficStatusPanel
-              loading={trafficLoading}
-              error={trafficError}
-              sourceMode="gtfs"
-              showTrafficOverlay={true}
-              samplePoints={trafficSamples.length}
-              apiConfigured={!!TOMTOM_API_KEY}
-            />
-          </div>
-        </div>
-
-        <div className="dashboard-bottom-grid">
-          <div className="dashboard-panel-item">
-            <CurrentPredictionPanel prediction={currentPrediction} />
-          </div>
-
-          <div className="dashboard-panel-item">
-            <PredictionStatusPanel
-              prediction={currentPrediction}
-              error={predictionError}
-              message={predictionMessage}
-            />
+              <DashboardMap
+                stops={gtfsStops}
+                vehicles={vehicles}
+                routePaths={[]}
+                trafficSamples={trafficSamples}
+                showTrafficFlow={true}
+                tomtomApiKey={TOMTOM_API_KEY}
+                showStops={true}
+                showRoutes={true}
+              />
+            </div>
           </div>
         </div>
       </div>
