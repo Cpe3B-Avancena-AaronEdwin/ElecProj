@@ -1,21 +1,15 @@
 import React, { useEffect, useState } from "react";
-import {
-  collection,
-  getDocs,
-  addDoc,
-  serverTimestamp,
-  query,
-  orderBy,
-} from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { db } from "../firebase/config";
 import { useAuth } from "../context/AuthContext";
 import Layout from "../components/Layout";
 import {
   updateUserProfile,
   deleteUserAccount,
 } from "../components/user/UserService";
+import { authJsonFetch, authFetch } from "../utils/authFetch";
 import "../styles/adminusers.css";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 export default function AdminUsersPage() {
   const { role, user } = useAuth();
@@ -35,13 +29,11 @@ export default function AdminUsersPage() {
   const fetchUsers = async () => {
     try {
       setError("");
-      const usersQuery = query(collection(db, "users"), orderBy("displayName"));
-      const snapshot = await getDocs(usersQuery);
-      const data = snapshot.docs.map((docItem) => ({
-        id: docItem.id,
-        ...docItem.data(),
-      }));
-      setUsers(data);
+      const data = await authJsonFetch(
+        `${API_BASE}/api/users`,
+        "Failed to load users."
+      );
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch users:", err);
       setError(err.message || "Failed to load users.");
@@ -70,13 +62,29 @@ export default function AdminUsersPage() {
     }
 
     try {
-      await addDoc(collection(db, "users"), {
-        email: newUser.email.trim(),
-        displayName: newUser.displayName.trim(),
-        role: newUser.role,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const response = await authFetch(`${API_BASE}/api/users`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: newUser.email.trim(),
+          displayName: newUser.displayName.trim(),
+          fullName: newUser.displayName.trim(),
+          role: newUser.role,
+        }),
       });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to create user.");
+      }
 
       setNewUser({
         email: "",
@@ -85,7 +93,7 @@ export default function AdminUsersPage() {
       });
 
       showTempMessage("User added successfully.");
-      fetchUsers();
+      await fetchUsers();
     } catch (err) {
       console.error("Failed to create user:", err);
       showTempMessage(err.message || "Failed to create user.", true);
@@ -101,8 +109,11 @@ export default function AdminUsersPage() {
       await updateUserProfile({
         userId: editingUser.id,
         displayName: editingUser.displayName,
+        fullName: editingUser.displayName,
         email: editingUser.email,
         role: editingUser.role,
+        username: editingUser.username || "",
+        photoURL: editingUser.photoURL || "",
       });
 
       setEditingUser(null);

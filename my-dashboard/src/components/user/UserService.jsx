@@ -1,5 +1,4 @@
-// src/components/user/UserService.jsx
-import { auth, db } from "../../firebase/config";
+import { auth } from "../../firebase/config";
 import {
   EmailAuthProvider,
   reauthenticateWithCredential,
@@ -7,30 +6,34 @@ import {
   updateProfile as firebaseUpdateProfile,
   deleteUser,
 } from "firebase/auth";
-import {
-  deleteDoc,
-  doc,
-  getDoc,
-  serverTimestamp,
-  updateDoc,
-} from "firebase/firestore";
+import { authFetch } from "../../utils/authFetch";
 
-/**
- * Update a user's profile in Firestore.
- *
- * Usage:
- * 1) Current logged-in user editing own profile:
- *    updateUserProfile({ displayName, photoURL })
- *
- * 2) Admin editing another user, including role:
- *    updateUserProfile({ userId, displayName, email, role, photoURL })
- */
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+async function handleResponse(response, fallbackMessage) {
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || fallbackMessage);
+  }
+
+  return data;
+}
+
 export const updateUserProfile = async ({
   userId,
   displayName,
   email,
   role,
   photoURL,
+  username,
+  fullName,
 }) => {
   const currentUser = auth.currentUser;
   const targetUserId = userId || currentUser?.uid;
@@ -39,28 +42,23 @@ export const updateUserProfile = async ({
     throw new Error("No user ID available for profile update.");
   }
 
-  const userRef = doc(db, "users", targetUserId);
-  const existingSnap = await getDoc(userRef);
+  const response = await authFetch(`${API_BASE}/api/users/${targetUserId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      displayName,
+      email,
+      role,
+      photoURL,
+      username,
+      fullName,
+    }),
+  });
 
-  if (!existingSnap.exists()) {
-    throw new Error("User document not found.");
-  }
+  await handleResponse(response, "Failed to update user profile.");
 
-  const existingData = existingSnap.data();
-
-  const payload = {
-    ...existingData,
-    updatedAt: serverTimestamp(),
-  };
-
-  if (displayName !== undefined) payload.displayName = displayName;
-  if (photoURL !== undefined) payload.photoURL = photoURL;
-  if (email !== undefined) payload.email = email;
-  if (role !== undefined) payload.role = role;
-
-  await updateDoc(userRef, payload);
-
-  // Only update Firebase Auth profile if the logged-in user is updating self
   if (currentUser && targetUserId === currentUser.uid) {
     const authProfileUpdates = {};
     if (displayName !== undefined) authProfileUpdates.displayName = displayName;
@@ -71,16 +69,9 @@ export const updateUserProfile = async ({
     }
   }
 
-  return {
-    success: true,
-    data: payload,
-  };
+  return { success: true };
 };
 
-/**
- * Change current logged-in user's password.
- * If currentPassword is provided, it will re-authenticate first.
- */
 export const updatePassword = async (newPassword, currentPassword = "") => {
   const currentUser = auth.currentUser;
 
@@ -104,10 +95,6 @@ export const updatePassword = async (newPassword, currentPassword = "") => {
   return { success: true };
 };
 
-/**
- * Mock-ish session info placeholder.
- * Keep this until you build real session tracking.
- */
 export const getUserSessions = async (userId) => {
   return {
     Device: "Chrome on Windows",
@@ -118,26 +105,27 @@ export const getUserSessions = async (userId) => {
   };
 };
 
-/**
- * Delete account behavior:
- * - If userId is passed and it is NOT the current logged-in user:
- *   only delete the Firestore user document (admin use case).
- * - If no userId is passed, or it matches current user:
- *   delete Firestore doc + Firebase Auth account for the current user.
- */
 export const deleteUserAccount = async (userId) => {
   const currentUser = auth.currentUser;
 
   if (userId && currentUser && userId !== currentUser.uid) {
-    await deleteDoc(doc(db, "users", userId));
-    return { success: true, mode: "firestore-only" };
+    const response = await authFetch(`${API_BASE}/api/users/${userId}`, {
+      method: "DELETE",
+    });
+
+    await handleResponse(response, "Failed to delete user.");
+    return { success: true, mode: "backend-delete" };
   }
 
   if (!currentUser) {
     throw new Error("No authenticated user.");
   }
 
-  await deleteDoc(doc(db, "users", currentUser.uid));
+  const response = await authFetch(`${API_BASE}/api/users/${currentUser.uid}`, {
+    method: "DELETE",
+  });
+
+  await handleResponse(response, "Failed to delete user profile.");
   await deleteUser(currentUser);
 
   return { success: true, mode: "self-delete" };

@@ -1,14 +1,15 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase/config";
 import { observeAuthState } from "../firebase/auth";
 
 import {
   updateUserProfile,
   updatePassword,
   getUserSessions,
-  deleteUserAccount
+  deleteUserAccount,
 } from "../components/user/UserService";
+import { authJsonFetch } from "../utils/authFetch";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 const AuthContext = createContext();
 
@@ -21,40 +22,40 @@ export function AuthProvider({ children }) {
     const unsubscribe = observeAuthState(async (firebaseUser) => {
       try {
         if (firebaseUser) {
-          const userRef = doc(db, "users", firebaseUser.uid);
-          const userSnap = await getDoc(userRef);
+          const userData = await authJsonFetch(
+            `${API_BASE}/api/users/${firebaseUser.uid}`,
+            "Failed to load user profile."
+          );
 
-          if (userSnap.exists()) {
-            const userData = userSnap.data();
+          setUser({
+            ...firebaseUser,
+            displayName:
+              userData.displayName || firebaseUser.displayName || "",
+            fullName:
+              userData.fullName ||
+              userData.displayName ||
+              firebaseUser.displayName ||
+              "",
+            username: userData.username || "",
+            photoURL: userData.photoURL || firebaseUser.photoURL || "",
+            email: userData.email || firebaseUser.email || "",
+          });
 
-            setUser({
-              ...firebaseUser,
-              displayName:
-                userData.displayName ||
-                firebaseUser.displayName ||
-                "",
-              fullName:
-                userData.displayName ||
-                firebaseUser.displayName ||
-                "",
-              username: userData.username || "",
-              photoURL: userData.photoURL || firebaseUser.photoURL || "",
-              email: userData.email || firebaseUser.email || "",
-            });
-
-            setRole(userData.role || "viewer");
-          } else {
-            setUser(firebaseUser);
-            setRole("viewer");
-          }
+          setRole(userData.role || "viewer");
         } else {
           setUser(null);
           setRole(null);
         }
       } catch (error) {
         console.error("Auth context error:", error);
-        setUser(firebaseUser || null);
-        setRole(null);
+
+        if (firebaseUser) {
+          setUser(firebaseUser);
+          setRole("viewer");
+        } else {
+          setUser(null);
+          setRole(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -68,14 +69,33 @@ export function AuthProvider({ children }) {
 
     setUser((prev) => ({
       ...prev,
-      displayName: data.displayName || prev?.displayName || "",
-      fullName: data.displayName || prev?.fullName || "",
-      photoURL: data.photoURL || prev?.photoURL || "",
+      displayName:
+        data.displayName !== undefined
+          ? data.displayName
+          : prev?.displayName || "",
+      fullName:
+        data.fullName !== undefined
+          ? data.fullName
+          : data.displayName !== undefined
+          ? data.displayName
+          : prev?.fullName || "",
+      username:
+        data.username !== undefined
+          ? data.username
+          : prev?.username || "",
+      photoURL:
+        data.photoURL !== undefined
+          ? data.photoURL
+          : prev?.photoURL || "",
+      email:
+        data.email !== undefined
+          ? data.email
+          : prev?.email || "",
     }));
   };
 
-  const changePassword = async (newPassword) => {
-    await updatePassword(newPassword);
+  const changePassword = async (newPassword, currentPassword = "") => {
+    await updatePassword(newPassword, currentPassword);
   };
 
   const fetchSessions = async () => {
@@ -97,7 +117,7 @@ export function AuthProvider({ children }) {
         updateProfileInfo,
         changePassword,
         fetchSessions,
-        removeAccount
+        removeAccount,
       }}
     >
       {children}
