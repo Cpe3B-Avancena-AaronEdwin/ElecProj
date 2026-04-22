@@ -113,29 +113,41 @@ body,
 ========================= */
 
 .user-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  padding: 8px 14px;
+  height: 40px;
+
+  border-radius: 10px;
+  border: 1px solid #475569;
   background: #1e293b;
   color: #f8fafc;
-  padding: 8px 14px;
-  border-radius: 10px;
+
   font-weight: 600;
   font-size: 0.95rem;
-  border: 1px solid #475569;
+
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.user-label:hover {
+  background: #334155;
+  border-color: #60a5fa;
+  transform: scale(1.05);
+}
+
+.user-label:active {
+  transform: scale(0.95);
 }
 
 .dropdown-wrapper {
   position: relative;
-}
-
-.dropdown-trigger {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  border: 1px solid #475569;
-  background: #1e293b;
-  color: #ffffff;
-  font-size: 1.3rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
 }
 
 .dropdown-trigger:hover {
