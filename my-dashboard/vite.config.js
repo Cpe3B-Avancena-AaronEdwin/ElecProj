@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: "http://192.168.2.1:5000",
+        target: "http://192.168.2.102:5000",
         changeOrigin: true,
         secure: false,
       },
