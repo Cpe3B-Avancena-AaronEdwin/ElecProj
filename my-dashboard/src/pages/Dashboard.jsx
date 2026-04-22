@@ -18,7 +18,6 @@ import { useDashboardMetrics } from "../hooks/useDashboardMetrics";
 import { useCurrentPrediction } from "../hooks/useCurrentPrediction";
 
 import DashboardMap from "../components/dashboard/DashboardMap";
-
 import Layout from "../components/Layout";
 
 function scoreToRatio(score) {
@@ -124,7 +123,7 @@ export default function Dashboard() {
     cacheMs: 5 * 60 * 1000,
   });
 
-  const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
+  const { gtfsBundle } = useGtfsBundle();
 
   const gtfsRoutes = gtfsBundle?.routes || [];
   const gtfsStops = gtfsBundle?.stops || [];
@@ -143,8 +142,6 @@ export default function Dashboard() {
     trafficSummary = {},
     trafficHistory = [],
     historyAnalytics = {},
-    trafficLoading,
-    trafficError,
     lastTrafficUpdated,
   } = useTrafficData(gtfsStops, TOMTOM_API_KEY, {
     enabled: true,
@@ -162,7 +159,7 @@ export default function Dashboard() {
     trafficSummary,
   });
 
-  const { currentPrediction, predictionError, predictionMessage } = useCurrentPrediction({
+  const { currentPrediction, predictionMessage } = useCurrentPrediction({
     routes: gtfsRoutes,
     stops: gtfsStops,
     trips: gtfsTrips,
@@ -174,28 +171,6 @@ export default function Dashboard() {
     sourceRouteMap: gtfsRouteMap,
     sourceMode: "gtfs",
   });
-
-  const quickAlert = useMemo(() => {
-    if (trafficSummary.closed > 0) {
-      return { level: "critical", message: "⚠ Road closure detected on monitored corridor" };
-    }
-
-    if (currentPrediction.predictedDelayRisk === "High") {
-      return {
-        level: "heavy",
-        message: `⚠ ${currentPrediction.routeCode} likely delayed by ${currentPrediction.etaImpactMinutes} mins`,
-      };
-    }
-
-    if (currentPrediction.trend === "Rising" || currentPrediction.trend === "Worsening") {
-      return {
-        level: "moderate",
-        message: "⚠ Congestion trend is rising across key corridors",
-      };
-    }
-
-    return { level: "normal", message: "✅ Traffic is flowing smoothly" };
-  }, [currentPrediction, trafficSummary.closed]);
 
   const graphPoints = useMemo(() => {
     if (trafficHistory.length >= 2) {
@@ -296,6 +271,73 @@ export default function Dashboard() {
 
         <div className="dashboard-chart-row">
           <div className="status-card card vehicle-flow-card vehicle-flow-card--full">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+                gap: "1rem",
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <div className="vehicle-flow-title">LIVE MAP</div>
+                <div className="status-card-note" style={{ marginTop: "0.35rem" }}>
+                  Visual transit and congestion data across the network.
+                </div>
+              </div>
+
+              <Link to="/trip-planner" className="primary-button">
+                Plan Your Trip
+              </Link>
+            </div>
+
+            <div
+              className="vehicle-flow-chart-box vehicle-flow-chart-box--full"
+              style={{
+                position: "relative",
+                height: "420px",
+                borderBottomLeftRadius: "18px",
+                borderBottomRightRadius: "18px",
+                overflow: "hidden",
+              }}
+            >
+              <DashboardMap
+                stops={gtfsStops}
+                vehicles={vehicles}
+                routePaths={[]}
+                trafficSamples={trafficSamples}
+                showTrafficFlow={true}
+                tomtomApiKey={TOMTOM_API_KEY}
+                showStops={false}
+                showRoutes={true}
+              />
+
+              <div className="map-legend">
+                <div className="legend-title">Traffic Legend</div>
+
+                <div className="legend-item">
+                  <span className="legend-color red"></span>
+                  Heavy Traffic
+                </div>
+
+                <div className="legend-item">
+                  <span className="legend-color yellow"></span>
+                  Moderate Traffic
+                </div>
+
+                <div className="legend-item">
+                  <span className="legend-color green"></span>
+                  Light Traffic
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="dashboard-chart-row">
+          <div className="status-card card vehicle-flow-card vehicle-flow-card--full">
             <div className="vehicle-flow-title">{graphTitle}</div>
 
             <div className="vehicle-flow-chart-box vehicle-flow-chart-box--full">
@@ -370,7 +412,8 @@ export default function Dashboard() {
                 color: "var(--text-on-dark)",
               }}
             >
-              {currentPrediction.recommendation || "Monitor the route and allow extra time when congestion increases."}
+              {currentPrediction.recommendation ||
+                "Monitor the route and allow extra time when congestion increases."}
             </div>
             <div style={{ color: "var(--text-sub)", marginTop: "0.45rem" }}>
               {currentPrediction.etaImpactMinutes != null
@@ -395,35 +438,6 @@ export default function Dashboard() {
             <div style={{ color: "var(--text-sub)", marginTop: "0.45rem" }}>
               {predictionMessage ||
                 "The system compares current traffic and route conditions to give a simple on-time prediction."}
-            </div>
-          </div>
-        </div>
-
-        <div className="dashboard-panels-grid">
-          <div className="dashboard-panel-item">
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div>
-                  <h3 style={{ margin: 0 }}>Live Map</h3>
-                  <div style={{ color: "var(--text-sub)", marginTop: "6px" }}>
-                    Visual transit and congestion data across the network.
-                  </div>
-                </div>
-                <Link to="/data" className="primary-button">
-                  Plan Your Trip
-                </Link>
-              </div>
-
-              <DashboardMap
-                stops={gtfsStops}
-                vehicles={vehicles}
-                routePaths={[]}
-                trafficSamples={trafficSamples}
-                showTrafficFlow={true}
-                tomtomApiKey={TOMTOM_API_KEY}
-                showStops={true}
-                showRoutes={true}
-              />
             </div>
           </div>
         </div>

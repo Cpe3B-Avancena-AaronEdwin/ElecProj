@@ -8,7 +8,6 @@ import { useTrafficData } from "../hooks/useTrafficData";
 import Layout from "../components/Layout";
 import DashboardToolbar from "../components/dashboard/DashboardToolbar";
 import DashboardMap from "../components/dashboard/DashboardMap";
-import TripPlannerPanel from "../components/dashboard/TripPlannerPanel";
 import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
 import TrafficStatusPanel from "../components/dashboard/TrafficStatusPanel";
 import RouteSummaryPanel from "../components/dashboard/RouteSummaryPanel";
@@ -73,9 +72,17 @@ export default function Data() {
   }, [selectedRouteId, sourceRouteMap]);
 
   const { routePaths, routingLoading, routingError, lastRoutingUpdated, refreshRouteLines } =
-    useRouteLines(filteredStops, TOMTOM_API_KEY, actualSourceMode, sourceRouteMap, [], selectedRouteMeta, {
-      cacheKey: `data-page:${actualSourceMode}:${selectedRouteId}`,
-    });
+    useRouteLines(
+      filteredStops,
+      TOMTOM_API_KEY,
+      actualSourceMode,
+      sourceRouteMap,
+      [],
+      selectedRouteMeta,
+      {
+        cacheKey: `data-page:${actualSourceMode}:${selectedRouteId}`,
+      }
+    );
 
   const {
     trafficSamples = [],
@@ -123,16 +130,45 @@ export default function Data() {
 
         <div className="dashboard-chart-row">
           <div className="dashboard-panel-item">
-            <DashboardMap
-              stops={sourceStops}
-              vehicles={sourceVehicles}
-              routePaths={routePaths}
-              trafficSamples={trafficSamples}
-              showTrafficFlow={showTrafficOverlay}
-              tomtomApiKey={TOMTOM_API_KEY}
-              showStops={true}
-              showRoutes={true}
-            />
+            <div
+              className="vehicle-flow-chart-box vehicle-flow-chart-box--full"
+              style={{
+                position: "relative",
+                height: "420px",
+                borderRadius: "18px",
+                overflow: "hidden",
+              }}
+            >
+              <DashboardMap
+                stops={sourceStops}
+                vehicles={sourceVehicles}
+                routePaths={routePaths}
+                trafficSamples={trafficSamples}
+                showTrafficFlow={showTrafficOverlay}
+                tomtomApiKey={TOMTOM_API_KEY}
+                showStops={false}
+                showRoutes={true}
+              />
+
+              <div className="map-legend">
+                <div className="legend-title">Traffic Legend</div>
+
+                <div className="legend-item">
+                  <span className="legend-color red"></span>
+                  Heavy Traffic
+                </div>
+
+                <div className="legend-item">
+                  <span className="legend-color yellow"></span>
+                  Moderate Traffic
+                </div>
+
+                <div className="legend-item">
+                  <span className="legend-color green"></span>
+                  Light Traffic
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -149,7 +185,11 @@ export default function Data() {
 
           <div className="status-card card">
             <div className="status-card-title">Latest Traffic Update</div>
-            <div className="status-card-value">{lastTrafficUpdated ? new Date(lastTrafficUpdated).toLocaleString() : "No recent update"}</div>
+            <div className="status-card-value">
+              {lastTrafficUpdated
+                ? new Date(lastTrafficUpdated).toLocaleString()
+                : "No recent update"}
+            </div>
             <div className="status-card-note">
               {trafficError || "Traffic status data is loaded here."}
             </div>
@@ -185,10 +225,6 @@ export default function Data() {
         <div className="dashboard-bottom-grid">
           <div className="dashboard-panel-item">
             <RoutingStatusPanel routes={routePaths} error={routingError} />
-          </div>
-
-          <div className="dashboard-panel-item">
-            <TripPlannerPanel gtfsBundle={gtfsBundle} onPlanSelected={() => {}} />
           </div>
         </div>
       </div>

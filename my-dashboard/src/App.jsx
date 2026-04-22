@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import Data from "./pages/Data";
+import TripPlanner from "./pages/TripPlanner";
 import Admin from "./pages/Admin";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import Login from "./pages/Login";
@@ -49,6 +50,15 @@ export default function App() {
             element={
               <ProtectedRoute allowedRoles={["admin", "operator", "viewer"]}>
                 <Data />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/trip-planner"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "operator", "viewer"]}>
+                <TripPlanner />
               </ProtectedRoute>
             }
           />
