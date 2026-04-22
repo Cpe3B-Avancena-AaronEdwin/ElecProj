@@ -75,15 +75,14 @@ export default function Layout({ children }) {
   // ✅ FIXED NAV ITEMS (ADMIN WORKS RELIABLY)
   const navItems = useMemo(() => {
     const items = [
-      { label: "Dashboard", path: "/dashboard" },
-      { label: "Traffic & Routes", path: "/traffic" },
-      { label: "About Us", path: "/about" },
+      { label: "Dashboard", path: "/dashboard", icon: "🏠" },
+      { label: "Data", path: "/data", icon: "📊" },
     ];
 
     if (role === "admin") {
       items.push(
-        { label: "Users Information Settings", path: "/admin/users" },
-        { label: "Manage Routes", path: "/admin" }
+        { label: "User Management", path: "/admin/users", icon: "👤" },
+        { label: "Route Management", path: "/admin", icon: "🛣️" }
       );
     }
 
@@ -145,25 +144,32 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        {/* NAVIGATION */}
-        <div className="nav-bar">
-          <nav className="horizontal-nav">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`nav-item ${
-                  location.pathname === item.path ? "active" : ""
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
+        <div className="layout-body">
+          <aside className="nav-sidebar" aria-label="Primary navigation">
+            <nav className="sidebar-menu">
+              {navItems.map((item) => {
+                const isActive =
+                  location.pathname === item.path ||
+                  (item.path === "/data" && location.pathname.startsWith("/data"));
 
-        {/* CONTENT */}
-        <div className="content">{children}</div>
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`nav-item ${isActive ? "active" : ""}`}
+                  >
+                    <span className="nav-icon" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                    <span className="nav-label">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </aside>
+
+          <div className="content">{children}</div>
+        </div>
 
         <SiteFooter />
       </div>

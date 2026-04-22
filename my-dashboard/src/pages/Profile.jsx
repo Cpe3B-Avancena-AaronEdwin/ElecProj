@@ -10,7 +10,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import Input from "../components/input";
 import Button from "../components/button";
-import SiteFooter from "../components/SiteFooter";
+import Layout from "../components/Layout";
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -246,9 +246,13 @@ export default function Profile() {
 
   if (!user) {
     return (
-      <div style={{ padding: "24px", color: "#fff" }}>
-        No user is currently signed in.
-      </div>
+      <Layout>
+        <div className="dashboard-container" style={{ paddingTop: "24px" }}>
+          <div style={{ color: "#fff" }}>
+            No user is currently signed in.
+          </div>
+        </div>
+      </Layout>
     );
   }
 
@@ -259,24 +263,19 @@ export default function Profile() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#0f172a",
-        padding: "24px",
-        boxSizing: "border-box",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "720px",
-          margin: "0 auto",
-          background: "#ffffff",
-          borderRadius: "24px",
-          padding: "24px",
-          boxShadow: "0 24px 80px rgba(15, 23, 42, 0.18)",
-        }}
-      >
+    <Layout>
+      <div className="dashboard-container">
+        <div
+          style={{
+            maxWidth: "720px",
+            width: "100%",
+            margin: "0 auto",
+            background: "var(--bg-card)",
+            borderRadius: "24px",
+            padding: "24px",
+            boxShadow: "0 24px 80px rgba(15, 23, 42, 0.18)",
+          }}
+        >
         <div
           style={{
             display: "flex",
@@ -583,7 +582,7 @@ export default function Profile() {
         </div>
       </div>
 
-      <SiteFooter />
-    </div>
+      </div>
+    </Layout>
   );
 }
