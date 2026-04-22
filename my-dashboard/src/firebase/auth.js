@@ -98,16 +98,10 @@ export async function linkPasswordToCurrentUser(email, password) {
 
 export async function getCurrentUser() {
   try {
-    const data = await apiFetch(
-      "/api/auth/me",
-      "Failed to load current user."
-    );
-
+    const data = await apiFetch("/api/auth/me", "Failed to load current user.");
     return syncCurrentUser(data?.user || null);
   } catch (error) {
-    if (
-      error.message?.toLowerCase().includes("unauthorized")
-    ) {
+    if (String(error?.message || "").toLowerCase().includes("unauthorized")) {
       clearAuthCurrentUser();
       return null;
     }
