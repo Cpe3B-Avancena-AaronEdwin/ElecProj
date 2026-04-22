@@ -3,7 +3,7 @@ function labelStyle() {
     display: "block",
     marginBottom: "0.6rem",
     fontWeight: "700",
-    color: "var(--text-on-dark)",
+    color: "#e6fcff",
     fontSize: "1rem",
   };
 }
@@ -12,41 +12,57 @@ function selectStyle() {
   return {
     padding: "0.95rem 1rem",
     borderRadius: "14px",
-    border: "1px solid var(--border)",
-    background: "var(--bg-main)",
-    color: "var(--text-on-dark)",
+    border: "1px solid rgba(34, 211, 238, 0.45)",
+    background: "rgba(34, 211, 238, 0.14)",
+    color: "#e6fcff",
     minWidth: "250px",
     width: "100%",
     fontSize: "1rem",
+    outline: "none",
+    boxShadow: "0 0 12px rgba(34, 211, 238, 0.10)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
   };
 }
 
-function buttonStyle(background) {
+function actionButtonStyle() {
   return {
     padding: "0.95rem 1.2rem",
-    border: "none",
     borderRadius: "14px",
-    background,
-    color: "var(--text-on-dark)",
+    border: "1px solid rgba(34, 211, 238, 0.45)",
+    background: "rgba(34, 211, 238, 0.16)",
+    color: "#e6fcff",
     cursor: "pointer",
-    fontWeight: "bold",
+    fontWeight: "700",
     minHeight: "48px",
     minWidth: "170px",
+    boxShadow: "0 0 12px rgba(34, 211, 238, 0.12)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
   };
 }
 
-function overlayToggleButtonStyle(active) {
+function toggleButtonStyle(active) {
   return {
     flex: 1,
     padding: "0.95rem 1rem",
     borderRadius: "14px",
-    border: `1px solid ${active ? "rgba(56, 189, 248, 0.9)" : "var(--border)"}`,
-    background: active ? "rgba(56, 189, 248, 0.18)" : "var(--bg-main)",
-    color: "var(--text-on-dark)",
+    border: active
+      ? "1px solid rgba(34, 211, 238, 0.75)"
+      : "1px solid rgba(34, 211, 238, 0.35)",
+    background: active
+      ? "rgba(34, 211, 238, 0.22)"
+      : "rgba(34, 211, 238, 0.10)",
+    color: "#e6fcff",
     fontSize: "1rem",
     fontWeight: "700",
     cursor: "pointer",
     transition: "all 0.2s ease",
+    boxShadow: active
+      ? "0 0 14px rgba(34, 211, 238, 0.22)"
+      : "0 0 8px rgba(34, 211, 238, 0.08)",
+    backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
   };
 }
 
@@ -71,8 +87,8 @@ export default function DashboardToolbar({
   return (
     <div
       style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
+        background: "rgba(34, 211, 238, 0.12)",
+        border: "1px solid rgba(34, 211, 238, 0.38)",
         borderRadius: "18px",
         padding: "1.5rem",
         marginBottom: "1.5rem",
@@ -80,6 +96,9 @@ export default function DashboardToolbar({
         gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
         gap: "1.25rem",
         alignItems: "end",
+        boxShadow: "0 0 16px rgba(34, 211, 238, 0.12)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
       }}
     >
       <div>
@@ -93,7 +112,10 @@ export default function DashboardToolbar({
           {routes.map((r) => (
             <option key={r.route_id || r.id} value={r.route_id || r.id}>
               {(r.routeCode || r.route_short_name || "N/A")} -{" "}
-              {r.routeName || r.route_long_name || r.route_desc || "Unnamed Route"}
+              {r.routeName ||
+                r.route_long_name ||
+                r.route_desc ||
+                "Unnamed Route"}
             </option>
           ))}
         </select>
@@ -127,7 +149,7 @@ export default function DashboardToolbar({
             onClick={() => onChangeTrafficOverlay?.(true)}
             disabled={!tomtomEnabled}
             style={{
-              ...overlayToggleButtonStyle(showTrafficOverlay),
+              ...toggleButtonStyle(showTrafficOverlay),
               opacity: tomtomEnabled ? 1 : 0.6,
               cursor: tomtomEnabled ? "pointer" : "not-allowed",
             }}
@@ -140,7 +162,7 @@ export default function DashboardToolbar({
             onClick={() => onChangeTrafficOverlay?.(false)}
             disabled={!tomtomEnabled}
             style={{
-              ...overlayToggleButtonStyle(!showTrafficOverlay),
+              ...toggleButtonStyle(!showTrafficOverlay),
               opacity: tomtomEnabled ? 1 : 0.6,
               cursor: tomtomEnabled ? "pointer" : "not-allowed",
             }}
@@ -154,7 +176,7 @@ export default function DashboardToolbar({
             style={{
               marginTop: "0.5rem",
               fontSize: "0.9rem",
-              color: "var(--text-sub)",
+              color: "rgba(230, 252, 255, 0.72)",
             }}
           >
             TomTom API key not configured.
@@ -173,9 +195,12 @@ export default function DashboardToolbar({
         <button
           onClick={onRefreshTraffic}
           disabled={trafficLoading || !tomtomEnabled}
-          style={buttonStyle(
-            trafficLoading || !tomtomEnabled ? "#475569" : "#10b981"
-          )}
+          style={{
+            ...actionButtonStyle(),
+            opacity: trafficLoading || !tomtomEnabled ? 0.6 : 1,
+            cursor:
+              trafficLoading || !tomtomEnabled ? "not-allowed" : "pointer",
+          }}
         >
           {trafficLoading ? "Refreshing Traffic..." : "Refresh Traffic"}
         </button>
@@ -183,11 +208,17 @@ export default function DashboardToolbar({
         <button
           onClick={onRefreshRouteLines}
           disabled={routingLoading || (!tomtomEnabled && sourceMode === "firestore")}
-          style={buttonStyle(
-            routingLoading || (!tomtomEnabled && sourceMode === "firestore")
-              ? "#475569"
-              : "var(--accent)"
-          )}
+          style={{
+            ...actionButtonStyle(),
+            opacity:
+              routingLoading || (!tomtomEnabled && sourceMode === "firestore")
+                ? 0.6
+                : 1,
+            cursor:
+              routingLoading || (!tomtomEnabled && sourceMode === "firestore")
+                ? "not-allowed"
+                : "pointer",
+          }}
         >
           {routingLoading ? "Building Routes..." : "Refresh Route Lines"}
         </button>
@@ -195,7 +226,11 @@ export default function DashboardToolbar({
         <button
           onClick={onSavePrediction}
           disabled={predictionSaving}
-          style={buttonStyle(predictionSaving ? "#475569" : "#7c3aed")}
+          style={{
+            ...actionButtonStyle(),
+            opacity: predictionSaving ? 0.6 : 1,
+            cursor: predictionSaving ? "not-allowed" : "pointer",
+          }}
         >
           {predictionSaving ? "Saving Prediction..." : "Save Prediction"}
         </button>
@@ -203,7 +238,7 @@ export default function DashboardToolbar({
 
       <div
         style={{
-          color: "#e2e8f0",
+          color: "#e6fcff",
           fontSize: "1rem",
           lineHeight: 1.6,
         }}
