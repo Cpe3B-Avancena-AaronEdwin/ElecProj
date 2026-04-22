@@ -96,8 +96,13 @@ export default function Traffic() {
     (selectedPlan.legs || []).forEach((leg, index) => {
       const colorPalette = ["#22c55e", "#f59e0b", "#ef4444", "#8b5cf6"];
       const color = colorPalette[index % colorPalette.length];
+
       const path = (leg.pathPoints || []).filter(
-        (p) => Array.isArray(p) && p.length >= 2 && !Number.isNaN(p[0]) && !Number.isNaN(p[1])
+        (p) =>
+          Array.isArray(p) &&
+          p.length >= 2 &&
+          !Number.isNaN(p[0]) &&
+          !Number.isNaN(p[1])
       );
 
       if (path.length >= 2) {
@@ -113,6 +118,7 @@ export default function Traffic() {
           toStopName: leg.toStopName,
           stopCount: leg.stopCount,
         });
+
         fitBoundsPoints.push(...path);
       }
     });
@@ -120,6 +126,7 @@ export default function Traffic() {
     markers.forEach((marker) => {
       const lat = parseFloat(marker.stop?.stopLat ?? marker.stop?.stop_lat);
       const lng = parseFloat(marker.stop?.stopLon ?? marker.stop?.stop_lon);
+
       if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
         fitBoundsPoints.push([lat, lng]);
       }
@@ -134,7 +141,9 @@ export default function Traffic() {
 
   const formatUpdatedAt = (isoString) => {
     if (!isoString) return "No update yet";
+
     const date = new Date(isoString);
+
     return date.toLocaleString([], {
       month: "short",
       day: "numeric",
@@ -164,7 +173,10 @@ export default function Traffic() {
   return (
     <Layout>
       <div className="dashboard-container">
-        <TripPlannerPanel gtfsBundle={gtfsBundle} onPlanSelected={setSelectedPlan} />
+        <TripPlannerPanel
+          gtfsBundle={gtfsBundle}
+          onPlanSelected={setSelectedPlan}
+        />
 
         <DashboardMap
           stops={[]}
@@ -221,7 +233,12 @@ export default function Traffic() {
                   flexShrink: 0,
                 }}
               />
-              <span style={{ color: "var(--text-on-dark)", fontWeight: 600 }}>
+              <span
+                style={{
+                  color: "var(--text-on-dark)",
+                  fontWeight: 600,
+                }}
+              >
                 {item.description}
               </span>
               <span>— {item.label}</span>
@@ -238,9 +255,15 @@ export default function Traffic() {
           }}
         >
           <div className="card" style={{ padding: "1rem" }}>
-            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
+            <div
+              style={{
+                color: "var(--text-sub)",
+                marginBottom: "0.5rem",
+              }}
+            >
               Traffic Last Updated
             </div>
+
             <div
               style={{
                 fontSize: "1.2rem",
@@ -253,9 +276,15 @@ export default function Traffic() {
           </div>
 
           <div className="card" style={{ padding: "1rem" }}>
-            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
+            <div
+              style={{
+                color: "var(--text-sub)",
+                marginBottom: "0.5rem",
+              }}
+            >
               GTFS Loading
             </div>
+
             <div
               style={{
                 fontSize: "1.2rem",
@@ -265,14 +294,21 @@ export default function Traffic() {
             >
               {gtfsLoading ? "Loading..." : "Ready"}
             </div>
-            <div style={{ color: "var(--text-sub)", marginTop: "0.35rem" }}>
+
+            <div
+              style={{
+                color: "var(--text-sub)",
+                marginTop: "0.35rem",
+              }}
+            >
               {gtfsError || `${gtfsStops.length} stops loaded`}
             </div>
           </div>
         </div>
 
-        <div className="grid">
+        <div className="traffic-bottom-grid">
           <TrafficSummaryPanel summary={trafficSummary} />
+
           <TrafficStatusPanel
             loading={trafficLoading}
             error={trafficError}
