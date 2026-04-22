@@ -3,7 +3,7 @@ import {
   clearAuthCurrentUser,
 } from "./config";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 
 async function parseResponse(response, fallbackMessage) {
   let data = null;
@@ -22,7 +22,7 @@ async function parseResponse(response, fallbackMessage) {
 }
 
 async function apiFetch(path, fallbackMessage, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
+const response = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     ...options,
     headers: {
@@ -72,11 +72,11 @@ export async function registerUser(fullName, username, email, password) {
 }
 
 export function signInWithGoogle() {
-  window.location.assign(`${API_BASE}/api/auth/google`);
+window.location.assign(`${API_BASE}/api/auth/google`);
 }
 
 export function linkGoogleToCurrentUser() {
-  window.location.assign(`${API_BASE}/api/auth/google?mode=link`);
+window.location.assign(`${API_BASE}/api/auth/google?mode=link`);
 }
 
 export async function linkPasswordToCurrentUser(email, password) {
