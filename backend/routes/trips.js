@@ -1,174 +1,307 @@
 import express from "express";
-import { db } from "../firebaseAdmin.js";
+import crypto from "crypto";
+import { pool } from "../db.js";
+import { requireAuth } from "../middleware/authMiddleware.js";
+import { requireAdmin } from "../middleware/adminMiddleware.js";
 
 const router = express.Router();
 
-// GET all trips
+function randomTripId() {
+  return `trip_${crypto.randomUUID().replace(/-/g, "")}`;
+}
+
+function mapTrip(row) {
+  return {
+    id: row.trip_id,
+    docId: row.id,
+    tripId: row.trip_id,
+    routeId: row.route_id || "",
+    vehicleId: row.vehicle_id || "",
+    tripName: row.trip_name || "",
+    direction: row.direction || "",
+    departureTime: row.departure_time || "",
+    arrivalTime: row.arrival_time || "",
+    status: row.status || "scheduled",
+    delayMinutes: row.delay_minutes !== null ? Number(row.delay_minutes) : 0,
+    passengerCount:
+      row.passenger_count !== null ? Number(row.passenger_count) : 0,
+    notes: row.notes || "",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
 router.get("/", async (req, res, next) => {
   try {
-    const snapshot = await db.collection("trips").orderBy("createdAt", "desc").get();
+    const routeId = String(req.query.routeId || "").trim();
+    const vehicleId = String(req.query.vehicleId || "").trim();
 
-    const trips = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
+    let sql = "SELECT * FROM trips";
+    const params = [];
+    const conditions = [];
 
-    res.json(trips);
+    if (routeId) {
+      conditions.push("route_id = ?");
+      params.push(routeId);
+    }
+
+    if (vehicleId) {
+      conditions.push("vehicle_id = ?");
+      params.push(vehicleId);
+    }
+
+    if (conditions.length) {
+      sql += ` WHERE ${conditions.join(" AND ")}`;
+    }
+
+    sql += ` ORDER BY
+      CASE WHEN departure_time IS NULL THEN 1 ELSE 0 END,
+      departure_time ASC,
+      created_at DESC`;
+
+    const [rows] = await pool.query(sql, params);
+    res.json(rows.map(mapTrip));
   } catch (error) {
     next(error);
   }
 });
 
-// GET one trip
 router.get("/:id", async (req, res, next) => {
   try {
-    const doc = await db.collection("trips").doc(req.params.id).get();
+    const identifier = String(req.params.id).trim();
 
-    if (!doc.exists) {
+    const [rows] = await pool.query(
+      "SELECT * FROM trips WHERE trip_id = ? OR id = ? LIMIT 1",
+      [identifier, Number(identifier) || 0]
+    );
+
+    if (!rows.length) {
       return res.status(404).json({ error: "Trip not found" });
     }
 
-    res.json({
-      id: doc.id,
-      ...doc.data(),
-    });
+    res.json(mapTrip(rows[0]));
   } catch (error) {
     next(error);
   }
 });
 
-// CREATE trip
-router.post("/", async (req, res, next) => {
+router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const {
-      tripCode,
-      routeId,
-      vehicleId,
-      driverName,
-      origin,
-      destination,
-      departureTime,
-      arrivalTime,
-      status,
-      passengerCount,
-      delayMinutes,
-      active,
-    } = req.body;
+    const tripId = String(req.body.tripId || "").trim() || randomTripId();
+    const routeId = String(req.body.routeId || "").trim();
+    const vehicleId = String(req.body.vehicleId || "").trim();
+    const tripName = String(req.body.tripName || "").trim();
+    const direction = String(req.body.direction || "").trim();
+    const departureTime = String(req.body.departureTime || "").trim();
+    const arrivalTime = String(req.body.arrivalTime || "").trim();
+    const status = String(req.body.status || "scheduled").trim();
+    const delayMinutes = Number(req.body.delayMinutes || 0);
+    const passengerCount = Number(req.body.passengerCount || 0);
+    const notes = String(req.body.notes || "").trim();
 
-    if (!tripCode || !routeId) {
-      return res.status(400).json({
-        error: "tripCode and routeId are required",
-      });
+    const [existing] = await pool.query(
+      "SELECT trip_id FROM trips WHERE trip_id = ? LIMIT 1",
+      [tripId]
+    );
+
+    if (existing.length) {
+      return res.status(409).json({ error: "tripId already exists" });
     }
 
-    const payload = {
-      tripCode: String(tripCode).trim(),
-      routeId: String(routeId).trim(),
-      vehicleId: vehicleId ? String(vehicleId).trim() : "",
-      driverName: driverName ? String(driverName).trim() : "",
-      origin: origin ? String(origin).trim() : "",
-      destination: destination ? String(destination).trim() : "",
-      departureTime: departureTime ? String(departureTime).trim() : "",
-      arrivalTime: arrivalTime ? String(arrivalTime).trim() : "",
-      status: status ? String(status).trim() : "scheduled",
-      passengerCount: passengerCount !== undefined ? Number(passengerCount) : 0,
-      delayMinutes: delayMinutes !== undefined ? Number(delayMinutes) : 0,
-      active: active !== undefined ? Boolean(active) : true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    if (routeId) {
+      const [routeRows] = await pool.query(
+        "SELECT route_id FROM routes WHERE route_id = ? LIMIT 1",
+        [routeId]
+      );
 
-    const docRef = await db.collection("trips").add(payload);
+      if (!routeRows.length) {
+        return res.status(400).json({ error: "routeId does not exist" });
+      }
+    }
+
+    if (vehicleId) {
+      const [vehicleRows] = await pool.query(
+        "SELECT vehicle_id FROM vehicles WHERE vehicle_id = ? LIMIT 1",
+        [vehicleId]
+      );
+
+      if (!vehicleRows.length) {
+        return res.status(400).json({ error: "vehicleId does not exist" });
+      }
+    }
+
+    await pool.query(
+      `INSERT INTO trips
+      (trip_id, route_id, vehicle_id, trip_name, direction, departure_time, arrival_time, status, delay_minutes, passenger_count, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        tripId,
+        routeId || null,
+        vehicleId || null,
+        tripName || null,
+        direction || null,
+        departureTime || null,
+        arrivalTime || null,
+        status,
+        delayMinutes,
+        passengerCount,
+        notes || null,
+      ]
+    );
+
+    const [rows] = await pool.query(
+      "SELECT * FROM trips WHERE trip_id = ? LIMIT 1",
+      [tripId]
+    );
 
     res.status(201).json({
       message: "Trip created successfully",
-      id: docRef.id,
+      trip: mapTrip(rows[0]),
     });
   } catch (error) {
     next(error);
   }
 });
 
-// UPDATE trip
-router.put("/:id", async (req, res, next) => {
+router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const ref = db.collection("trips").doc(req.params.id);
-    const existing = await ref.get();
+    const identifier = String(req.params.id).trim();
 
-    if (!existing.exists) {
+    const [existingRows] = await pool.query(
+      "SELECT * FROM trips WHERE trip_id = ? OR id = ? LIMIT 1",
+      [identifier, Number(identifier) || 0]
+    );
+
+    if (!existingRows.length) {
       return res.status(404).json({ error: "Trip not found" });
     }
 
-    const current = existing.data();
+    const existing = existingRows[0];
 
-    const {
-      tripCode,
-      routeId,
-      vehicleId,
-      driverName,
-      origin,
-      destination,
-      departureTime,
-      arrivalTime,
-      status,
-      passengerCount,
-      delayMinutes,
-      active,
-    } = req.body;
+    const routeId =
+      req.body.routeId !== undefined
+        ? String(req.body.routeId).trim()
+        : existing.route_id || "";
 
-    const payload = {
-      tripCode: tripCode !== undefined ? String(tripCode).trim() : current.tripCode,
-      routeId: routeId !== undefined ? String(routeId).trim() : current.routeId,
-      vehicleId: vehicleId !== undefined ? String(vehicleId).trim() : current.vehicleId || "",
-      driverName:
-        driverName !== undefined ? String(driverName).trim() : current.driverName || "",
-      origin: origin !== undefined ? String(origin).trim() : current.origin || "",
-      destination:
-        destination !== undefined ? String(destination).trim() : current.destination || "",
-      departureTime:
-        departureTime !== undefined
-          ? String(departureTime).trim()
-          : current.departureTime || "",
-      arrivalTime:
-        arrivalTime !== undefined ? String(arrivalTime).trim() : current.arrivalTime || "",
-      status: status !== undefined ? String(status).trim() : current.status || "scheduled",
-      passengerCount:
-        passengerCount !== undefined
-          ? Number(passengerCount)
-          : Number(current.passengerCount || 0),
-      delayMinutes:
-        delayMinutes !== undefined
-          ? Number(delayMinutes)
-          : Number(current.delayMinutes || 0),
-      active: active !== undefined ? Boolean(active) : current.active,
-      updatedAt: new Date(),
-    };
+    const vehicleId =
+      req.body.vehicleId !== undefined
+        ? String(req.body.vehicleId).trim()
+        : existing.vehicle_id || "";
 
-    await ref.update(payload);
+    if (routeId) {
+      const [routeRows] = await pool.query(
+        "SELECT route_id FROM routes WHERE route_id = ? LIMIT 1",
+        [routeId]
+      );
+
+      if (!routeRows.length) {
+        return res.status(400).json({ error: "routeId does not exist" });
+      }
+    }
+
+    if (vehicleId) {
+      const [vehicleRows] = await pool.query(
+        "SELECT vehicle_id FROM vehicles WHERE vehicle_id = ? LIMIT 1",
+        [vehicleId]
+      );
+
+      if (!vehicleRows.length) {
+        return res.status(400).json({ error: "vehicleId does not exist" });
+      }
+    }
+
+    const tripName =
+      req.body.tripName !== undefined
+        ? String(req.body.tripName).trim()
+        : existing.trip_name || "";
+
+    const direction =
+      req.body.direction !== undefined
+        ? String(req.body.direction).trim()
+        : existing.direction || "";
+
+    const departureTime =
+      req.body.departureTime !== undefined
+        ? String(req.body.departureTime).trim()
+        : existing.departure_time || "";
+
+    const arrivalTime =
+      req.body.arrivalTime !== undefined
+        ? String(req.body.arrivalTime).trim()
+        : existing.arrival_time || "";
+
+    const status =
+      req.body.status !== undefined
+        ? String(req.body.status).trim()
+        : existing.status;
+
+    const delayMinutes =
+      req.body.delayMinutes !== undefined
+        ? Number(req.body.delayMinutes)
+        : Number(existing.delay_minutes || 0);
+
+    const passengerCount =
+      req.body.passengerCount !== undefined
+        ? Number(req.body.passengerCount)
+        : Number(existing.passenger_count || 0);
+
+    const notes =
+      req.body.notes !== undefined
+        ? String(req.body.notes).trim()
+        : existing.notes || "";
+
+    await pool.query(
+      `UPDATE trips
+       SET route_id = ?, vehicle_id = ?, trip_name = ?, direction = ?, departure_time = ?, arrival_time = ?, status = ?, delay_minutes = ?, passenger_count = ?, notes = ?, updated_at = ?
+       WHERE trip_id = ?`,
+      [
+        routeId || null,
+        vehicleId || null,
+        tripName || null,
+        direction || null,
+        departureTime || null,
+        arrivalTime || null,
+        status,
+        delayMinutes,
+        passengerCount,
+        notes || null,
+        new Date(),
+        existing.trip_id,
+      ]
+    );
+
+    const [rows] = await pool.query(
+      "SELECT * FROM trips WHERE trip_id = ? LIMIT 1",
+      [existing.trip_id]
+    );
 
     res.json({
       message: "Trip updated successfully",
+      trip: mapTrip(rows[0]),
     });
   } catch (error) {
     next(error);
   }
 });
 
-// DELETE trip
-router.delete("/:id", async (req, res, next) => {
+router.delete("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const ref = db.collection("trips").doc(req.params.id);
-    const existing = await ref.get();
+    const identifier = String(req.params.id).trim();
 
-    if (!existing.exists) {
+    const [existingRows] = await pool.query(
+      "SELECT * FROM trips WHERE trip_id = ? OR id = ? LIMIT 1",
+      [identifier, Number(identifier) || 0]
+    );
+
+    if (!existingRows.length) {
       return res.status(404).json({ error: "Trip not found" });
     }
 
-    await ref.delete();
+    await pool.query("DELETE FROM trips WHERE trip_id = ?", [
+      existingRows[0].trip_id,
+    ]);
 
-    res.json({
-      message: "Trip deleted successfully",
-    });
+    res.json({ message: "Trip deleted successfully" });
   } catch (error) {
     next(error);
   }

@@ -1,11 +1,4 @@
 import { auth } from "../../firebase/config";
-import {
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-  updatePassword as firebaseUpdatePassword,
-  updateProfile as firebaseUpdateProfile,
-  deleteUser,
-} from "firebase/auth";
 import { authFetch } from "../../utils/authFetch";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
@@ -58,48 +51,34 @@ export const updateUserProfile = async ({
   });
 
   await handleResponse(response, "Failed to update user profile.");
-
-  if (currentUser && targetUserId === currentUser.uid) {
-    const authProfileUpdates = {};
-    if (displayName !== undefined) authProfileUpdates.displayName = displayName;
-    if (photoURL !== undefined) authProfileUpdates.photoURL = photoURL;
-
-    if (Object.keys(authProfileUpdates).length > 0) {
-      await firebaseUpdateProfile(currentUser, authProfileUpdates);
-    }
-  }
-
   return { success: true };
 };
 
 export const updatePassword = async (newPassword, currentPassword = "") => {
-  const currentUser = auth.currentUser;
-
-  if (!currentUser) {
-    throw new Error("No authenticated user.");
-  }
-
   if (!newPassword || newPassword.length < 6) {
     throw new Error("Password must be at least 6 characters.");
   }
 
-  if (currentPassword && currentUser.email) {
-    const credential = EmailAuthProvider.credential(
-      currentUser.email,
-      currentPassword
-    );
-    await reauthenticateWithCredential(currentUser, credential);
-  }
+  const response = await authFetch(`${API_BASE}/api/auth/password`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      currentPassword,
+      newPassword,
+    }),
+  });
 
-  await firebaseUpdatePassword(currentUser, newPassword);
+  await handleResponse(response, "Failed to update password.");
   return { success: true };
 };
 
 export const getUserSessions = async (userId) => {
   return {
-    Device: "Chrome on Windows",
-    Location: "Philippines",
-    "IP Address": "192.168.1.1",
+    Device: "Current browser session",
+    Location: "Tracked by backend auth cookie",
+    "IP Address": "Hidden",
     "Last Active": "Just now",
     userId: userId || auth.currentUser?.uid || "",
   };
@@ -107,26 +86,16 @@ export const getUserSessions = async (userId) => {
 
 export const deleteUserAccount = async (userId) => {
   const currentUser = auth.currentUser;
+  const targetUserId = userId || currentUser?.uid;
 
-  if (userId && currentUser && userId !== currentUser.uid) {
-    const response = await authFetch(`${API_BASE}/api/users/${userId}`, {
-      method: "DELETE",
-    });
-
-    await handleResponse(response, "Failed to delete user.");
-    return { success: true, mode: "backend-delete" };
-  }
-
-  if (!currentUser) {
+  if (!targetUserId) {
     throw new Error("No authenticated user.");
   }
 
-  const response = await authFetch(`${API_BASE}/api/users/${currentUser.uid}`, {
+  const response = await authFetch(`${API_BASE}/api/users/${targetUserId}`, {
     method: "DELETE",
   });
 
-  await handleResponse(response, "Failed to delete user profile.");
-  await deleteUser(currentUser);
-
-  return { success: true, mode: "self-delete" };
+  await handleResponse(response, "Failed to delete user.");
+  return { success: true };
 };

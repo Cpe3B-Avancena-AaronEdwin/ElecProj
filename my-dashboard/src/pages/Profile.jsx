@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth } from "../firebase/config";
 import {
+  getCurrentUserProviders,
   linkGoogleToCurrentUser,
   linkPasswordToCurrentUser,
 } from "../firebase/auth";
@@ -12,6 +13,7 @@ import SiteFooter from "../components/SiteFooter";
 
 export default function Profile() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const {
     user,
     updateProfileInfo,
@@ -58,23 +60,34 @@ export default function Profile() {
 
   const refreshProviders = async () => {
     try {
-      if (auth.currentUser) {
-        await auth.currentUser.reload();
-        const refreshed = auth.currentUser.providerData.map(
-          (provider) => provider.providerId
-        );
-        setProviders(refreshed);
-      } else {
-        setProviders([]);
-      }
+      const refreshed = await getCurrentUserProviders();
+      setProviders(refreshed);
     } catch (err) {
       console.error("Failed to refresh providers:", err);
+      setProviders(
+        Array.isArray(auth.currentUser?.providerData)
+          ? auth.currentUser.providerData.map((provider) => provider.providerId)
+          : []
+      );
     }
   };
 
   useEffect(() => {
     refreshProviders();
   }, [user]);
+
+  useEffect(() => {
+    const success = searchParams.get("success");
+    const error = searchParams.get("error");
+
+    if (success) {
+      setLoginMessage(success);
+    }
+
+    if (error) {
+      setLoginError(error);
+    }
+  }, [searchParams]);
 
   const hasPasswordProvider = useMemo(
     () => providers.includes("password"),
@@ -121,31 +134,7 @@ export default function Profile() {
   const handleLinkGoogle = async () => {
     clearAllMessages();
     setLinkingGoogle(true);
-
-    try {
-      await linkGoogleToCurrentUser();
-      await refreshProviders();
-      setLoginMessage("Google account linked successfully.");
-    } catch (err) {
-      console.error("Link Google error:", err);
-
-      let errorMessage = "Failed to link Google account.";
-
-      if (err.code === "auth/credential-already-in-use") {
-        errorMessage = "This Google account is already linked to another user.";
-      } else if (err.code === "auth/popup-closed-by-user") {
-        errorMessage = "Google sign-in was cancelled.";
-      } else if (err.code === "auth/popup-blocked") {
-        errorMessage =
-          "Pop-up was blocked by your browser. Please allow pop-ups and try again.";
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setLoginError(errorMessage);
-    } finally {
-      setLinkingGoogle(false);
-    }
+    linkGoogleToCurrentUser();
   };
 
   const handleAddPassword = async (e) => {
@@ -177,19 +166,7 @@ export default function Profile() {
       setLoginMessage("Password login added successfully.");
     } catch (err) {
       console.error("Add password error:", err);
-
-      let errorMessage = "Failed to add password login.";
-
-      if (err.code === "auth/weak-password") {
-        errorMessage =
-          "Password is too weak. Please choose a stronger password.";
-      } else if (err.code === "auth/email-already-in-use") {
-        errorMessage = "This email is already associated with another account.";
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setLoginError(errorMessage);
+      setLoginError(err.message || "Failed to add password login.");
     } finally {
       setLinkingPassword(false);
     }
@@ -224,150 +201,48 @@ export default function Profile() {
       setPasswordMessage("Password changed successfully.");
     } catch (err) {
       console.error("Change password error:", err);
-
-      let errorMessage = "Failed to change password.";
-
-      if (err.code === "auth/wrong-password") {
-        errorMessage =
-          "Current password is incorrect. Please enter your correct current password.";
-      } else if (err.code === "auth/invalid-credential") {
-        errorMessage =
-          "Current password is incorrect. Please enter your correct current password.";
-      } else if (err.code === "auth/weak-password") {
-        errorMessage =
-          "New password is too weak. Please choose a stronger password.";
-      } else if (err.code === "auth/requires-recent-login") {
-        errorMessage =
-          "For security reasons, please log out and log back in before changing your password.";
-      } else if (err.message) {
-        errorMessage = err.message;
-      }
-
-      setPasswordError(errorMessage);
+      setPasswordError(err.message || "Failed to change password.");
     } finally {
       setChangingPassword(false);
     }
   };
 
   if (authLoading) {
-    return (
-      <div style={{ padding: "24px", color: "#fff" }}>
-        Loading profile...
-      </div>
-    );
+    return <div style={{ padding: "2rem" }}>Loading profile...</div>;
   }
 
   if (!user) {
     return (
-      <div style={{ padding: "24px", color: "#fff" }}>
-        No user is currently signed in.
+      <div style={{ padding: "2rem" }}>
+        <p>You are not logged in.</p>
+        <Button onClick={() => navigate("/login")}>Go to Login</Button>
       </div>
     );
   }
 
-  const infoBoxStyle = {
-    marginBottom: "20px",
-    padding: "12px 14px",
-    borderRadius: "12px",
-  };
-
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#0f172a",
-        padding: "24px",
-        boxSizing: "border-box",
-      }}
-    >
-      <div
-        style={{
-          maxWidth: "720px",
-          margin: "0 auto",
-          background: "#ffffff",
-          borderRadius: "24px",
-          padding: "24px",
-          boxShadow: "0 24px 80px rgba(15, 23, 42, 0.18)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: "12px",
-            marginBottom: "16px",
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            <h1 style={{ marginTop: 0, marginBottom: "6px", color: "#0f172a" }}>
-              Profile
-            </h1>
-            <p style={{ color: "#64748b", margin: 0 }}>
-              Manage your profile and linked sign-in methods.
+    <div className="auth-wrapper">
+      <div className="auth-card" style={{ maxWidth: 720 }}>
+        <div className="login-brand">
+          <div className="brand-mark" aria-hidden="true">
+            <img src="/logo.jpeg" alt="CityBloop Logo" />
+          </div>
+          <div className="brand-copy">
+            <h1 className="brand-name">Profile</h1>
+            <p className="brand-subtitle">
+              Manage your profile and login methods.
             </p>
           </div>
-
-          <Button
-            type="button"
-            className="btn--secondary"
-            onClick={() => navigate("/dashboard")}
-          >
-            Back to Dashboard
-          </Button>
         </div>
 
-        <div
-          style={{
-            background: "#f8fafc",
-            border: "1px solid #e2e8f0",
-            borderRadius: "16px",
-            padding: "16px",
-            marginBottom: "24px",
-          }}
-        >
-          <div style={{ marginBottom: "8px", color: "#334155" }}>
-            <strong>Email:</strong> {user.email || "No email"}
-          </div>
-          <div style={{ marginBottom: "8px", color: "#334155" }}>
-            <strong>Current providers:</strong>{" "}
-            {providers.length ? providers.join(", ") : "None"}
-          </div>
-          <div style={{ color: "#334155" }}>
-            <strong>UID:</strong> {user.uid}
-          </div>
-        </div>
-
-        {(profileError || profileMessage) && (
-          <div
-            style={{
-              ...infoBoxStyle,
-              background: profileError ? "#fef2f2" : "#f0fdf4",
-              color: profileError ? "#dc2626" : "#166534",
-              border: profileError
-                ? "1px solid #fecaca"
-                : "1px solid #bbf7d0",
-            }}
-          >
-            {profileError || profileMessage}
-          </div>
-        )}
-
-        <form
-          onSubmit={handleSaveProfile}
-          style={{
-            display: "grid",
-            gap: "16px",
-            marginBottom: "32px",
-          }}
-        >
+        <form className="auth-form" onSubmit={handleSaveProfile} noValidate>
           <Input
             id="fullName"
             label="Full Name"
             type="text"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
+            required
           />
 
           <Input
@@ -376,6 +251,7 @@ export default function Profile() {
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            required
           />
 
           <Input
@@ -386,82 +262,52 @@ export default function Profile() {
             onChange={(e) => setPhotoURL(e.target.value)}
           />
 
-          <Button
-            type="submit"
-            className="btn--primary"
-            disabled={savingProfile}
-          >
+          {profileError && <div className="form-error">{profileError}</div>}
+          {profileMessage && <div className="form-success">{profileMessage}</div>}
+
+          <Button type="submit" className="btn--primary" disabled={savingProfile}>
             {savingProfile ? "Saving..." : "Save Profile"}
           </Button>
         </form>
 
-        <div
-          style={{
-            borderTop: "1px solid #e2e8f0",
-            paddingTop: "24px",
-          }}
-        >
-          <h2 style={{ marginTop: 0, color: "#0f172a" }}>Login Methods</h2>
+        <div className="auth-divider">
+          <span>Login Methods</span>
+        </div>
 
-          {(loginError || loginMessage) && (
-            <div
-              style={{
-                ...infoBoxStyle,
-                background: loginError ? "#fef2f2" : "#f0fdf4",
-                color: loginError ? "#dc2626" : "#166534",
-                border: loginError
-                  ? "1px solid #fecaca"
-                  : "1px solid #bbf7d0",
-              }}
-            >
-              {loginError || loginMessage}
-            </div>
-          )}
+        <div className="auth-form">
+          <p className="login-hint">
+            Connected methods:
+            {" "}
+            <strong>
+              {providers.length ? providers.join(", ") : "none"}
+            </strong>
+          </p>
 
-          {hasPasswordProvider && !hasGoogleProvider && (
-            <div
-              style={{
-                display: "grid",
-                gap: "12px",
-                marginBottom: "20px",
-              }}
-            >
-              <p style={{ margin: 0, color: "#475569" }}>
-                Your account currently uses password login. Link Google so you
-                can sign in with either password or Google on the same account.
-              </p>
+          {loginError && <div className="form-error">{loginError}</div>}
+          {loginMessage && <div className="form-success">{loginMessage}</div>}
 
-              <Button
-                type="button"
-                className="btn--secondary"
-                onClick={handleLinkGoogle}
-                disabled={linkingGoogle}
-              >
-                {linkingGoogle ? "Linking Google..." : "Link Google"}
-              </Button>
-            </div>
-          )}
+          <Button
+            type="button"
+            className="btn--google"
+            onClick={handleLinkGoogle}
+            disabled={linkingGoogle || hasGoogleProvider}
+          >
+            {hasGoogleProvider
+              ? "Google Already Linked"
+              : linkingGoogle
+              ? "Redirecting..."
+              : "Link Google Account"}
+          </Button>
 
           {!hasPasswordProvider && (
-            <form
-              onSubmit={handleAddPassword}
-              style={{
-                display: "grid",
-                gap: "16px",
-                marginBottom: "20px",
-              }}
-            >
-              <p style={{ margin: 0, color: "#475569" }}>
-                Your account does not have password login yet. Add an email and
-                password so you can log in using email/username and password too.
-              </p>
-
+            <form className="auth-form" onSubmit={handleAddPassword} noValidate>
               <Input
                 id="linkEmail"
-                label="Email"
+                label="Email for Password Login"
                 type="email"
                 value={linkEmail}
                 onChange={(e) => setLinkEmail(e.target.value)}
+                required
               />
 
               <Input
@@ -470,6 +316,7 @@ export default function Profile() {
                 type="password"
                 value={linkPassword}
                 onChange={(e) => setLinkPassword(e.target.value)}
+                required
               />
 
               <Input
@@ -478,51 +325,34 @@ export default function Profile() {
                 type="password"
                 value={confirmLinkPassword}
                 onChange={(e) => setConfirmLinkPassword(e.target.value)}
+                required
               />
 
               <Button
                 type="submit"
-                className="btn--primary"
+                className="btn--secondary"
                 disabled={linkingPassword}
               >
-                {linkingPassword ? "Adding Password..." : "Add Password Login"}
+                {linkingPassword ? "Saving..." : "Add Password Login"}
               </Button>
             </form>
           )}
+        </div>
 
-          {hasPasswordProvider && (
-            <form
-              onSubmit={handleChangePassword}
-              style={{
-                display: "grid",
-                gap: "16px",
-                marginTop: "20px",
-              }}
-            >
-              <h3 style={{ margin: 0, color: "#0f172a" }}>Change Password</h3>
+        {hasPasswordProvider && (
+          <>
+            <div className="auth-divider">
+              <span>Change Password</span>
+            </div>
 
-              {(passwordError || passwordMessage) && (
-                <div
-                  style={{
-                    ...infoBoxStyle,
-                    marginBottom: 0,
-                    background: passwordError ? "#fef2f2" : "#f0fdf4",
-                    color: passwordError ? "#dc2626" : "#166534",
-                    border: passwordError
-                      ? "1px solid #fecaca"
-                      : "1px solid #bbf7d0",
-                  }}
-                >
-                  {passwordError || passwordMessage}
-                </div>
-              )}
-
+            <form className="auth-form" onSubmit={handleChangePassword} noValidate>
               <Input
                 id="currentPassword"
                 label="Current Password"
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
+                required
               />
 
               <Input
@@ -531,6 +361,7 @@ export default function Profile() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                required
               />
 
               <Input
@@ -539,23 +370,36 @@ export default function Profile() {
                 type="password"
                 value={confirmNewPassword}
                 onChange={(e) => setConfirmNewPassword(e.target.value)}
+                required
               />
+
+              {passwordError && <div className="form-error">{passwordError}</div>}
+              {passwordMessage && (
+                <div className="form-success">{passwordMessage}</div>
+              )}
 
               <Button
                 type="submit"
                 className="btn--primary"
                 disabled={changingPassword}
               >
-                {changingPassword ? "Changing Password..." : "Change Password"}
+                {changingPassword ? "Updating..." : "Change Password"}
               </Button>
             </form>
-          )}
-        </div>
+          </>
+        )}
 
-        <div style={{ marginTop: "28px" }}>
-          <SiteFooter />
+        <div style={{ marginTop: "1rem" }}>
+          <Button
+            type="button"
+            className="btn--secondary"
+            onClick={() => navigate("/dashboard")}
+          >
+            Back to Dashboard
+          </Button>
         </div>
       </div>
+      <SiteFooter />
     </div>
   );
 }
