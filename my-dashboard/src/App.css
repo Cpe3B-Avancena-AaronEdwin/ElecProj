@@ -259,7 +259,7 @@ body,
 }
 
 .nav-sidebar:hover {
-  width: 200px;
+  width: 330px;
 }
 
 .sidebar-brand {
@@ -308,7 +308,7 @@ body,
   color: var(--text-sub);
   text-decoration: none;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 1.5rem;
   border: 1px solid transparent;
   transition: all 0.15s ease;
   border-radius: 10px;
@@ -435,13 +435,19 @@ body,
   height: 390px;
   min-height: 390px;
   border-radius: 18px;
-  padding: 8px;
+  padding: 0px;
   background: linear-gradient(
     180deg,
     rgba(59, 130, 246, 0.04),
     rgba(15, 23, 42, 0.02)
   );
   overflow: hidden;
+}
+
+/* 🔥 FIX: make Leaflet map follow rounded corners */
+.vehicle-flow-chart-box .leaflet-container {
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
 }
 
 .vehicle-flow-chart-box--full {
@@ -671,8 +677,11 @@ body,
   text-decoration: none;
   border: none;
   border-radius: 14px;
-  padding: 0.95rem 1.2rem;
+
+  padding: 1.2rem 1.8rem;   /* ⬅️ bigger */
+  font-size: 1.15rem;       /* ⬅️ larger text */
   font-weight: 700;
+
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -893,3 +902,47 @@ body,
     min-height: 250px;
   }
 }
+
+/* =========================
+   MAP LEGEND (ADD THIS AT THE VERY BOTTOM)
+========================= */
+
+.map-legend {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+
+  padding: 12px 14px;
+  color: #fff;
+  font-size: 0.9rem;
+  z-index: 500;
+
+  backdrop-filter: blur(6px);
+}
+
+.legend-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.legend-color.red { background: #ef4444; }
+.legend-color.yellow { background: #facc15; }
+.legend-color.green { background: #22c55e; }

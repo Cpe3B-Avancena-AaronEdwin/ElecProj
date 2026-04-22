@@ -26,12 +26,10 @@ export default function Layout({ children }) {
 
   const firstName = useMemo(() => getFirstName(user), [user]);
 
-  // close dropdown on route change
   useEffect(() => {
     setDropdownOpen(false);
   }, [location.pathname]);
 
-  // click outside / ESC close
   useEffect(() => {
     function handleClickOutside(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -72,11 +70,11 @@ export default function Layout({ children }) {
     navigate("/profile");
   };
 
-  // ✅ FIXED NAV ITEMS (ADMIN WORKS RELIABLY)
   const navItems = useMemo(() => {
     const items = [
       { label: "Dashboard", path: "/dashboard", icon: "🏠" },
       { label: "Data", path: "/data", icon: "📊" },
+      { label: "Trip Planner", path: "/trip-planner", icon: "🧭" },
     ];
 
     if (role === "admin") {
@@ -109,30 +107,22 @@ export default function Layout({ children }) {
           {/* USER DROPDOWN */}
           <div className="header-right">
             <div className="dropdown-wrapper" ref={dropdownRef}>
-
               <button
                 ref={buttonRef}
                 type="button"
                 className="user-label"
                 onClick={toggleDropdown}
-                aria-haspopup="menu"
-                aria-expanded={dropdownOpen}
               >
                 Hello, {firstName}
               </button>
 
               {dropdownOpen && (
-                <div className="dropdown-menu" role="menu">
-                  <button
-                    type="button"
-                    className="dropdown-item"
-                    onClick={handleProfile}
-                  >
+                <div className="dropdown-menu">
+                  <button className="dropdown-item" onClick={handleProfile}>
                     Profile
                   </button>
 
                   <button
-                    type="button"
                     className="dropdown-item dropdown-item--danger"
                     onClick={handleLogout}
                   >
@@ -145,12 +135,10 @@ export default function Layout({ children }) {
         </div>
 
         <div className="layout-body">
-          <aside className="nav-sidebar" aria-label="Primary navigation">
+          <aside className="nav-sidebar">
             <nav className="sidebar-menu">
               {navItems.map((item) => {
-                const isActive =
-                  location.pathname === item.path ||
-                  (item.path === "/data" && location.pathname.startsWith("/data"));
+                const isActive = location.pathname.startsWith(item.path);
 
                 return (
                   <Link
@@ -158,9 +146,7 @@ export default function Layout({ children }) {
                     to={item.path}
                     className={`nav-item ${isActive ? "active" : ""}`}
                   >
-                    <span className="nav-icon" aria-hidden="true">
-                      {item.icon}
-                    </span>
+                    <span className="nav-icon">{item.icon}</span>
                     <span className="nav-label">{item.label}</span>
                   </Link>
                 );
