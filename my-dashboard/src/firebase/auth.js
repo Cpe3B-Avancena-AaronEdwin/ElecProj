@@ -15,21 +15,9 @@ import {
   reauthenticateWithCredential,
 } from "firebase/auth";
 
-import {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-  collection,
-  query,
-  where,
-  getDocs,
-  limit,
-} from "firebase/firestore";
+import { auth } from "./config";
 
-import { auth, db } from "./config";
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
@@ -48,27 +36,36 @@ const isEmailInput = (value = "") => {
   return value.includes("@");
 };
 
+async function apiFetch(url, fallbackMessage, options) {
+  const response = await fetch(url, options);
+
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || fallbackMessage);
+  }
+
+  return data;
+}
+
 const getUserByUsername = async (username) => {
   const normalized = normalizeUsername(username);
 
   if (!normalized) return null;
 
-  const usersRef = collection(db, "users");
-  const q = query(
-    usersRef,
-    where("username", "==", normalized),
-    limit(1)
-  );
-
-  const snapshot = await getDocs(q);
-
-  if (snapshot.empty) return null;
-
-  const docSnap = snapshot.docs[0];
-  return {
-    id: docSnap.id,
-    ...docSnap.data(),
-  };
+  try {
+    return await apiFetch(
+      `${API_BASE}/api/users/lookup/by-username/${encodeURIComponent(normalized)}`,
+      "Username not found."
+    );
+  } catch {
+    return null;
+  }
 };
 
 const resolveEmailForLogin = async (identifier) => {
@@ -114,50 +111,29 @@ const buildUserDoc = (user, overrides = {}) => {
     username: overrides.username || "",
     photoURL: overrides.photoURL ?? user.photoURL ?? "",
     role: overrides.role || "viewer",
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    lastLoginAt: serverTimestamp(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    lastLoginAt: new Date().toISOString(),
     sessions: overrides.sessions || [],
   };
 };
 
 const ensureUserDocument = async (user, overrides = {}) => {
-  const userRef = doc(db, "users", user.uid);
-  const userSnap = await getDoc(userRef);
+  const payload = buildUserDoc(user, overrides);
 
-  if (!userSnap.exists()) {
-    await setDoc(userRef, buildUserDoc(user, overrides));
-  } else {
-    const existing = userSnap.data();
+  const result = await apiFetch(
+    `${API_BASE}/api/users/upsert/${user.uid}`,
+    "Failed to sync user profile.",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }
+  );
 
-    await updateDoc(userRef, {
-      email: user.email || existing.email || "",
-      displayName:
-        overrides.displayName ||
-        overrides.fullName ||
-        existing.displayName ||
-        user.displayName ||
-        getSafeNameFromEmail(user.email),
-      fullName:
-        overrides.fullName ||
-        overrides.displayName ||
-        existing.fullName ||
-        user.displayName ||
-        getSafeNameFromEmail(user.email),
-      username:
-        overrides.username !== undefined
-          ? normalizeUsername(overrides.username)
-          : (existing.username || ""),
-      photoURL:
-        overrides.photoURL !== undefined
-          ? overrides.photoURL
-          : (user.photoURL || existing.photoURL || ""),
-      updatedAt: serverTimestamp(),
-      lastLoginAt: serverTimestamp(),
-    });
-  }
-
-  return userRef;
+  return result.user;
 };
 
 // Email/Password Login using email OR username
@@ -354,7 +330,7 @@ export const updateUserProfile = async (data) => {
 
   if (normalizedUsername) {
     const existing = await getUserByUsername(normalizedUsername);
-    if (existing && existing.uid !== user.uid) {
+    if (existing && existing.uid !== user.uid && existing.id !== user.uid) {
       throw new Error("Username is already taken.");
     }
   }
@@ -364,14 +340,22 @@ export const updateUserProfile = async (data) => {
     photoURL: data.photoURL || "",
   });
 
-  const userRef = doc(db, "users", user.uid);
-  await updateDoc(userRef, {
-    displayName: resolvedName,
-    fullName: resolvedName,
-    username: normalizedUsername,
-    photoURL: data.photoURL || "",
-    updatedAt: serverTimestamp(),
-  });
+  await apiFetch(
+    `${API_BASE}/api/users/${user.uid}`,
+    "Failed to update profile.",
+    {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        displayName: resolvedName,
+        fullName: resolvedName,
+        username: normalizedUsername,
+        photoURL: data.photoURL || "",
+      }),
+    }
+  );
 };
 
 // Update Password with reauthentication
@@ -379,11 +363,8 @@ export const updateUserPassword = async (currentPassword, newPassword) => {
   const user = auth.currentUser;
   if (!user) throw new Error("No user is signed in.");
 
-  // Reauthenticate with current password
   const credential = EmailAuthProvider.credential(user.email, currentPassword);
   await reauthenticateWithCredential(user, credential);
-
-  // Update to new password
   await fbUpdatePassword(user, newPassword);
 };
 
@@ -392,14 +373,12 @@ export const getUserSessions = async () => {
   const user = auth.currentUser;
   if (!user) return [];
 
-  const userRef = doc(db, "users", user.uid);
-  const snapshot = await getDoc(userRef);
+  const profile = await apiFetch(
+    `${API_BASE}/api/users/${user.uid}`,
+    "Failed to load sessions."
+  );
 
-  if (snapshot.exists()) {
-    return snapshot.data().sessions || [];
-  }
-
-  return [];
+  return profile.sessions || [];
 };
 
 // Delete Account + History
@@ -407,6 +386,9 @@ export const deleteUserAccount = async () => {
   const user = auth.currentUser;
   if (!user) return;
 
-  await deleteDoc(doc(db, "users", user.uid));
+  await apiFetch(`${API_BASE}/api/users/${user.uid}`, "Failed to delete user.", {
+    method: "DELETE",
+  });
+
   await deleteUser(user);
 };

@@ -4,8 +4,6 @@ import { auth } from "../firebase/config";
 import {
   linkGoogleToCurrentUser,
   linkPasswordToCurrentUser,
-  updateUserProfile,
-  updateUserPassword,
 } from "../firebase/auth";
 import { useAuth } from "../context/AuthContext";
 import Input from "../components/input";
@@ -14,7 +12,12 @@ import SiteFooter from "../components/SiteFooter";
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const {
+    user,
+    updateProfileInfo,
+    changePassword,
+    loading: authLoading,
+  } = useAuth();
 
   const [fullName, setFullName] = useState("");
   const [username, setUsername] = useState("");
@@ -98,10 +101,12 @@ export default function Profile() {
     setSavingProfile(true);
 
     try {
-      await updateUserProfile({
+      await updateProfileInfo({
         fullName,
+        displayName: fullName,
         username,
         photoURL,
+        email: user?.email || "",
       });
 
       setProfileMessage("Profile updated successfully.");
@@ -212,7 +217,7 @@ export default function Profile() {
     setChangingPassword(true);
 
     try {
-      await updateUserPassword(currentPassword, newPassword);
+      await changePassword(newPassword, currentPassword);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmNewPassword("");
@@ -243,6 +248,14 @@ export default function Profile() {
       setChangingPassword(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div style={{ padding: "24px", color: "#fff" }}>
+        Loading profile...
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -420,7 +433,7 @@ export default function Profile() {
 
               <Button
                 type="button"
-                className="btn--google"
+                className="btn--secondary"
                 onClick={handleLinkGoogle}
                 disabled={linkingGoogle}
               >
@@ -429,7 +442,7 @@ export default function Profile() {
             </div>
           )}
 
-          {!hasPasswordProvider && hasGoogleProvider && (
+          {!hasPasswordProvider && (
             <form
               onSubmit={handleAddPassword}
               style={{
@@ -439,8 +452,8 @@ export default function Profile() {
               }}
             >
               <p style={{ margin: 0, color: "#475569" }}>
-                Your account currently uses Google only. Add a password so you
-                can also log in using email and password.
+                Your account does not have password login yet. Add an email and
+                password so you can log in using email/username and password too.
               </p>
 
               <Input
@@ -449,7 +462,6 @@ export default function Profile() {
                 type="email"
                 value={linkEmail}
                 onChange={(e) => setLinkEmail(e.target.value)}
-                required
               />
 
               <Input
@@ -458,7 +470,6 @@ export default function Profile() {
                 type="password"
                 value={linkPassword}
                 onChange={(e) => setLinkPassword(e.target.value)}
-                required
               />
 
               <Input
@@ -467,7 +478,6 @@ export default function Profile() {
                 type="password"
                 value={confirmLinkPassword}
                 onChange={(e) => setConfirmLinkPassword(e.target.value)}
-                required
               />
 
               <Button
@@ -475,25 +485,9 @@ export default function Profile() {
                 className="btn--primary"
                 disabled={linkingPassword}
               >
-                {linkingPassword ? "Adding Password..." : "Add Password"}
+                {linkingPassword ? "Adding Password..." : "Add Password Login"}
               </Button>
             </form>
-          )}
-
-          {hasPasswordProvider && hasGoogleProvider && (
-            <div
-              style={{
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                color: "#166534",
-                padding: "14px",
-                borderRadius: "12px",
-                marginBottom: "20px",
-              }}
-            >
-              This account already has both Password and Google linked. You can
-              use either login method.
-            </div>
           )}
 
           {hasPasswordProvider && (
@@ -502,17 +496,10 @@ export default function Profile() {
               style={{
                 display: "grid",
                 gap: "16px",
-                marginBottom: "20px",
-                padding: "16px",
-                background: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                borderRadius: "12px",
+                marginTop: "20px",
               }}
             >
               <h3 style={{ margin: 0, color: "#0f172a" }}>Change Password</h3>
-              <p style={{ margin: 0, color: "#475569" }}>
-                Enter your current password and choose a new one.
-              </p>
 
               {(passwordError || passwordMessage) && (
                 <div
@@ -536,7 +523,6 @@ export default function Profile() {
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                required
               />
 
               <Input
@@ -545,7 +531,6 @@ export default function Profile() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                required
               />
 
               <Input
@@ -554,7 +539,6 @@ export default function Profile() {
                 type="password"
                 value={confirmNewPassword}
                 onChange={(e) => setConfirmNewPassword(e.target.value)}
-                required
               />
 
               <Button
@@ -566,24 +550,12 @@ export default function Profile() {
               </Button>
             </form>
           )}
+        </div>
 
-          {!hasPasswordProvider && !hasGoogleProvider && (
-            <div
-              style={{
-                background: "#fff7ed",
-                border: "1px solid #fed7aa",
-                color: "#9a3412",
-                padding: "14px",
-                borderRadius: "12px",
-              }}
-            >
-              No supported login methods were detected on this account.
-            </div>
-          )}
+        <div style={{ marginTop: "28px" }}>
+          <SiteFooter />
         </div>
       </div>
-
-      <SiteFooter />
     </div>
   );
 }

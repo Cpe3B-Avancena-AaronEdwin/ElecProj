@@ -1,7 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { db } from "../firebase/config";
 import { createRouteMap, createVehicleMap } from "../utils/adminHelpers";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+async function fetchJson(url, fallbackMessage) {
+  const response = await fetch(url);
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || fallbackMessage);
+  }
+
+  return Array.isArray(data) ? data : [];
+}
 
 export function useAdminData() {
   const [routes, setRoutes] = useState([]);
@@ -12,58 +29,36 @@ export function useAdminData() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const routesQuery = query(collection(db, "routes"), orderBy("createdAt", "desc"));
-    const stopsQuery = query(collection(db, "stops"), orderBy("createdAt", "desc"));
-    const vehiclesQuery = query(collection(db, "vehicles"), orderBy("createdAt", "desc"));
-    const tripsQuery = query(collection(db, "trips"), orderBy("createdAt", "desc"));
+    let cancelled = false;
 
-    const unsubRoutes = onSnapshot(
-      routesQuery,
-      (snapshot) => {
-        setRoutes(snapshot.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
-        setLoading(false);
-      },
-      (error) => {
-        console.error("Routes fetch error:", error);
-        setLoading(false);
-      }
-    );
+    async function loadAdminData() {
+      setLoading(true);
 
-    const unsubStops = onSnapshot(
-      stopsQuery,
-      (snapshot) => {
-        setStops(snapshot.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
-      },
-      (error) => {
-        console.error("Stops fetch error:", error);
-      }
-    );
+      try {
+        const [routesData, stopsData, vehiclesData, tripsData] = await Promise.all([
+          fetchJson(`${API_BASE}/api/routes`, "Failed to fetch routes."),
+          fetchJson(`${API_BASE}/api/stops`, "Failed to fetch stops."),
+          fetchJson(`${API_BASE}/api/vehicles`, "Failed to fetch vehicles."),
+          fetchJson(`${API_BASE}/api/trips`, "Failed to fetch trips."),
+        ]);
 
-    const unsubVehicles = onSnapshot(
-      vehiclesQuery,
-      (snapshot) => {
-        setVehicles(snapshot.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
-      },
-      (error) => {
-        console.error("Vehicles fetch error:", error);
-      }
-    );
+        if (cancelled) return;
 
-    const unsubTrips = onSnapshot(
-      tripsQuery,
-      (snapshot) => {
-        setTrips(snapshot.docs.map((docItem) => ({ id: docItem.id, ...docItem.data() })));
-      },
-      (error) => {
-        console.error("Trips fetch error:", error);
+        setRoutes(routesData);
+        setStops(stopsData);
+        setVehicles(vehiclesData);
+        setTrips(tripsData);
+      } catch (error) {
+        console.error("Admin data fetch error:", error);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    );
+    }
+
+    loadAdminData();
 
     return () => {
-      unsubRoutes();
-      unsubStops();
-      unsubVehicles();
-      unsubTrips();
+      cancelled = true;
     };
   }, []);
 
