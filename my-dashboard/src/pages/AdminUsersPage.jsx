@@ -9,7 +9,14 @@ import {
 import { authJsonFetch, authFetch } from "../utils/authFetch";
 import "../styles/adminusers.css";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const API_BASE = import.meta.env.DEV
+  ? import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"
+  : "";
+
+function buildApiUrl(path) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE}${normalizedPath}`;
+}
 
 export default function AdminUsersPage() {
   const { role, user } = useAuth();
@@ -30,13 +37,14 @@ export default function AdminUsersPage() {
     try {
       setError("");
       const data = await authJsonFetch(
-        `${API_BASE}/api/users`,
+        buildApiUrl("/api/users"),
         "Failed to load users."
       );
       setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to fetch users:", err);
       setError(err.message || "Failed to load users.");
+      setUsers([]);
     }
   };
 
@@ -64,7 +72,7 @@ export default function AdminUsersPage() {
     }
 
     try {
-      const response = await authFetch(`${API_BASE}/api/users`, {
+      const response = await authFetch(buildApiUrl("/api/users"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -245,13 +253,29 @@ export default function AdminUsersPage() {
           </div>
 
           <div className="user-list">
+            {users.length === 0 && !error && (
+              <div className="user-card">
+                <div className="user-main">
+                  <div className="user-details">
+                    <div className="user-name-row">
+                      <span className="user-name">No users found</span>
+                    </div>
+                    <div className="user-email">
+                      No user records were returned from the API.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {users.map((u) => {
               const displayLabel =
                 u.displayName || u.fullName || u.username || u.email || "Unnamed User";
 
               const avatarLetter = displayLabel.charAt(0)?.toUpperCase() || "U";
 
-              const isEditing = editingUser?.id === u.id;
+              const isEditing =
+                editingUser?.id === u.id || editingUser?.uid === u.uid;
               const isCurrentUser =
                 u.uid === user?.uid || Number(u.id) === Number(user?.id);
 
