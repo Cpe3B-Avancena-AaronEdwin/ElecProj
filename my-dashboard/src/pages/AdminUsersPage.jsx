@@ -47,10 +47,12 @@ export default function AdminUsersPage() {
   const showTempMessage = (text, isError = false) => {
     if (isError) {
       setError(text);
+      setMessage("");
       setTimeout(() => setError(""), 3000);
       return;
     }
 
+    setError("");
     setMessage(text);
     setTimeout(() => setMessage(""), 2500);
   };
@@ -101,17 +103,17 @@ export default function AdminUsersPage() {
   };
 
   const handleSaveEdit = async () => {
-    if (!editingUser?.id) return;
+    if (!editingUser?.id && !editingUser?.uid) return;
 
     try {
-      setSavingId(editingUser.id);
+      setSavingId(editingUser.id || editingUser.uid);
 
       await updateUserProfile({
-        userId: editingUser.id,
-        displayName: editingUser.displayName,
-        fullName: editingUser.displayName,
-        email: editingUser.email,
-        role: editingUser.role,
+        userId: editingUser.id || editingUser.uid,
+        displayName: editingUser.displayName || editingUser.fullName || "",
+        fullName: editingUser.fullName || editingUser.displayName || "",
+        email: editingUser.email || "",
+        role: editingUser.role || "viewer",
         username: editingUser.username || "",
         photoURL: editingUser.photoURL || "",
       });
@@ -128,20 +130,28 @@ export default function AdminUsersPage() {
   };
 
   const handleDelete = async (targetUser) => {
-    if (!targetUser?.id) return;
+    if (!targetUser?.id && !targetUser?.uid) return;
 
-    if (targetUser.id === user?.uid) {
+    const isSelf =
+      targetUser?.uid === user?.uid || Number(targetUser?.id) === Number(user?.id);
+
+    if (isSelf) {
       showTempMessage("You cannot delete your own admin account here.", true);
       return;
     }
 
     const confirmed = window.confirm(
-      `Delete ${targetUser.displayName || targetUser.email}?`
+      `Delete ${
+        targetUser.displayName ||
+        targetUser.fullName ||
+        targetUser.username ||
+        targetUser.email
+      }?`
     );
     if (!confirmed) return;
 
     try {
-      await deleteUserAccount(targetUser.id);
+      await deleteUserAccount(targetUser.id || targetUser.uid);
       showTempMessage("User deleted successfully.");
       await fetchUsers();
     } catch (err) {
@@ -173,159 +183,165 @@ export default function AdminUsersPage() {
       <div className="admin-users-page">
         <div className="admin-users-container">
           <div className="admin-users-header">
-          <div className="admin-users-header-copy">
-            <h2>User Management</h2>
-            <p>Manage system access and permissions</p>
-          </div>
+            <div className="admin-users-header-copy">
+              <h2>User Management</h2>
+              <p>Manage system access and permissions</p>
+            </div>
 
-          <button className="back-btn" onClick={() => navigate("/dashboard")}>
-            ← Back
-          </button>
-        </div>
-
-        {(message || error) && (
-          <div className={`admin-users-alert ${error ? "error" : "success"}`}>
-            {error || message}
-          </div>
-        )}
-
-        <div className="create-user-card">
-          <h3>Create Firestore User Entry</h3>
-
-          <div className="create-user-grid">
-            <input
-              type="email"
-              placeholder="Email"
-              value={newUser.email}
-              onChange={(e) =>
-                setNewUser((prev) => ({ ...prev, email: e.target.value }))
-              }
-              className="create-user-input"
-            />
-
-            <input
-              type="text"
-              placeholder="Display Name"
-              value={newUser.displayName}
-              onChange={(e) =>
-                setNewUser((prev) => ({
-                  ...prev,
-                  displayName: e.target.value,
-                }))
-              }
-              className="create-user-input"
-            />
-
-            <select
-              value={newUser.role}
-              onChange={(e) =>
-                setNewUser((prev) => ({ ...prev, role: e.target.value }))
-              }
-              className="create-user-input"
-            >
-              <option value="viewer">Viewer</option>
-              <option value="operator">Operator</option>
-              <option value="admin">Admin</option>
-            </select>
-
-            <button onClick={handleCreate} className="create-user-button">
-              Add User
+            <button className="back-btn" onClick={() => navigate("/dashboard")}>
+              ← Back
             </button>
           </div>
-        </div>
 
-        <div className="user-list">
-          {users.map((u) => (
-            <div key={u.id} className="user-card">
-              <div className="user-main">
-                <div className="avatar">
-                  {u.displayName?.charAt(0)?.toUpperCase() || "U"}
-                </div>
+          {(message || error) && (
+            <div className={`admin-users-alert ${error ? "error" : "success"}`}>
+              {error || message}
+            </div>
+          )}
 
-                <div className="user-details">
-                  <div className="user-name-row">
-                    <span className="user-name">
-                      {u.displayName || "Unnamed User"}
-                    </span>
-                    <span className="status">active</span>
+          <div className="create-user-card">
+            <h3>Create MySQL User Entry</h3>
+
+            <div className="create-user-grid">
+              <input
+                type="email"
+                placeholder="Email"
+                value={newUser.email}
+                onChange={(e) =>
+                  setNewUser((prev) => ({ ...prev, email: e.target.value }))
+                }
+                className="create-user-input"
+              />
+
+              <input
+                type="text"
+                placeholder="Display Name"
+                value={newUser.displayName}
+                onChange={(e) =>
+                  setNewUser((prev) => ({
+                    ...prev,
+                    displayName: e.target.value,
+                  }))
+                }
+                className="create-user-input"
+              />
+
+              <select
+                value={newUser.role}
+                onChange={(e) =>
+                  setNewUser((prev) => ({ ...prev, role: e.target.value }))
+                }
+                className="create-user-input"
+              >
+                <option value="viewer">Viewer</option>
+                <option value="operator">Operator</option>
+                <option value="admin">Admin</option>
+              </select>
+
+              <button onClick={handleCreate} className="create-user-button">
+                Add User
+              </button>
+            </div>
+          </div>
+
+          <div className="user-list">
+            {users.map((u) => {
+              const displayLabel =
+                u.displayName || u.fullName || u.username || u.email || "Unnamed User";
+
+              const avatarLetter = displayLabel.charAt(0)?.toUpperCase() || "U";
+
+              const isEditing = editingUser?.id === u.id;
+              const isCurrentUser =
+                u.uid === user?.uid || Number(u.id) === Number(user?.id);
+
+              return (
+                <div key={u.id || u.uid} className="user-card">
+                  <div className="user-main">
+                    <div className="avatar">{avatarLetter}</div>
+
+                    <div className="user-details">
+                      <div className="user-name-row">
+                        <span className="user-name">{displayLabel}</span>
+                        <span className="status">active</span>
+                      </div>
+
+                      <div className="user-email">{u.email || "No email"}</div>
+
+                      <div className="user-role-row">
+                        {isEditing ? (
+                          <select
+                            value={editingUser.role || "viewer"}
+                            onChange={(e) =>
+                              setEditingUser({
+                                ...editingUser,
+                                role: e.target.value,
+                              })
+                            }
+                            className="role-select"
+                          >
+                            <option value="viewer">Viewer</option>
+                            <option value="operator">Operator</option>
+                            <option value="admin">Admin</option>
+                          </select>
+                        ) : (
+                          <span className="role-text">{u.role || "viewer"}</span>
+                        )}
+                      </div>
+
+                      <div className="tags">
+                        <span className="tag">{roleTagLabel(u.role)}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="user-email">{u.email || "No email"}</div>
+                  <div className="user-actions">
+                    {isEditing ? (
+                      <>
+                        <button
+                          className="action-btn save-btn"
+                          onClick={handleSaveEdit}
+                          disabled={savingId === (u.id || u.uid)}
+                        >
+                          {savingId === (u.id || u.uid) ? "Saving..." : "Save"}
+                        </button>
 
-                  <div className="user-role-row">
-                    {editingUser?.id === u.id ? (
-                      <select
-                        value={editingUser.role || "viewer"}
-                        onChange={(e) =>
-                          setEditingUser({
-                            ...editingUser,
-                            role: e.target.value,
-                          })
-                        }
-                        className="role-select"
-                      >
-                        <option value="viewer">Viewer</option>
-                        <option value="operator">Operator</option>
-                        <option value="admin">Admin</option>
-                      </select>
+                        <button
+                          className="action-btn cancel-btn"
+                          onClick={() => setEditingUser(null)}
+                          disabled={savingId === (u.id || u.uid)}
+                        >
+                          Cancel
+                        </button>
+                      </>
                     ) : (
-                      <span className="role-text">{u.role || "viewer"}</span>
+                      <>
+                        <button
+                          className="action-btn"
+                          onClick={() => setEditingUser({ ...u })}
+                        >
+                          Change Role
+                        </button>
+
+                        <button
+                          className="action-btn cancel-btn"
+                          onClick={() => handleDelete(u)}
+                          disabled={isCurrentUser}
+                          title={
+                            isCurrentUser
+                              ? "You cannot delete your own account here."
+                              : "Delete user"
+                          }
+                        >
+                          Delete
+                        </button>
+                      </>
                     )}
                   </div>
-
-                  <div className="tags">
-                    <span className="tag">{roleTagLabel(u.role)}</span>
-                  </div>
                 </div>
-              </div>
-
-              <div className="user-actions">
-                {editingUser?.id === u.id ? (
-                  <>
-                    <button
-                      className="action-btn save-btn"
-                      onClick={handleSaveEdit}
-                      disabled={savingId === u.id}
-                    >
-                      {savingId === u.id ? "Saving..." : "Save"}
-                    </button>
-
-                    <button
-                      className="action-btn cancel-btn"
-                      onClick={() => setEditingUser(null)}
-                      disabled={savingId === u.id}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      className="action-btn"
-                      onClick={() => setEditingUser({ ...u })}
-                    >
-                      Change Role
-                    </button>
-
-                    <button
-                      className="action-btn cancel-btn"
-                      onClick={() => handleDelete(u)}
-                      disabled={u.id === user?.uid}
-                      title={
-                        u.id === user?.uid
-                          ? "You cannot delete your own account here."
-                          : "Delete user"
-                      }
-                    >
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
+              );
+            })}
+          </div>
         </div>
       </div>
     </Layout>

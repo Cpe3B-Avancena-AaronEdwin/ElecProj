@@ -110,7 +110,10 @@ function estimateTripDelay(trip, avgStopDelayValue, fallbackTripDelay) {
 }
 
 function estimateActiveTrips(trips = [], vehicles = []) {
-  const explicitActiveTrips = trips.filter((t) => String(t.status || "").toLowerCase() === "active").length;
+  const explicitActiveTrips = trips.filter(
+    (t) => String(t.status || "").toLowerCase() === "active"
+  ).length;
+
   if (explicitActiveTrips > 0) return explicitActiveTrips;
 
   if (trips.length > 0) {
@@ -118,20 +121,43 @@ function estimateActiveTrips(trips = [], vehicles = []) {
   }
 
   if (vehicles.length > 0) {
-    return vehicles.filter((v) => String(v.status || "").toLowerCase() === "active").length || vehicles.length;
+    return (
+      vehicles.filter((v) => String(v.status || "").toLowerCase() === "active").length ||
+      vehicles.length
+    );
   }
 
   return 0;
+}
+
+function deriveRateFromTrafficSummary(trafficSummary = {}, fallbackValue = 0) {
+  const congestionScore = toNumber(trafficSummary?.congestionScore, 0);
+  const delayMinutes = toNumber(trafficSummary?.delayMinutes, 0);
+  const level = String(trafficSummary?.level || "").toLowerCase();
+
+  if (delayMinutes > 0) {
+    return clamp(100 - delayMinutes * 8, 0, 100);
+  }
+
+  if (congestionScore > 0) {
+    return clamp(100 - congestionScore * 0.6, 0, 100);
+  }
+
+  if (level.includes("high")) return 55;
+  if (level.includes("medium")) return 75;
+  if (level.includes("low")) return 92;
+
+  return fallbackValue;
 }
 
 export function useDashboardMetrics({
   stops = [],
   vehicles = [],
   trips = [],
+  trafficSummary = {},
 }) {
   return useMemo(() => {
     const totalStops = stops.length;
-
     const totalPassengers = estimatePassengersFromStops(stops);
 
     const stopDelayValues = stops.map((stop) => estimateStopDelay(stop, totalStops));
@@ -189,12 +215,23 @@ export function useDashboardMetrics({
     const totalTripsForRate = trips.length || activeTrips || scheduledTrips;
     const effectiveDelayedTrips = delayedTrips;
     const onTimeTripsCount =
-      totalTripsForRate > 0 ? Math.max(0, totalTripsForRate - effectiveDelayedTrips - cancelledTrips) : 0;
-
-    const onTimeRate =
       totalTripsForRate > 0
-        ? clamp((onTimeTripsCount / totalTripsForRate) * 100, 0, 100).toFixed(1)
-        : "100.0";
+        ? Math.max(0, totalTripsForRate - effectiveDelayedTrips - cancelledTrips)
+        : 0;
+
+    let onTimeRateValue =
+      totalTripsForRate > 0
+        ? clamp((onTimeTripsCount / totalTripsForRate) * 100, 0, 100)
+        : 0;
+
+    if (onTimeRateValue <= 0) {
+      onTimeRateValue = deriveRateFromTrafficSummary(
+        trafficSummary,
+        totalStops > 0 || vehicles.length > 0 ? 85 : 0
+      );
+    }
+
+    const onTimeRate = onTimeRateValue.toFixed(1);
 
     const delayPerRoute = {};
     trips.forEach((trip, index) => {
@@ -204,15 +241,8 @@ export function useDashboardMetrics({
         delayPerRoute[routeId] = {
           totalDelay: 0,
           count: 0,
-          routeCode:
-            trip.routeCode ||
-            trip.route_short_name ||
-            routeId,
-          routeName:
-            trip.routeName ||
-            trip.route_long_name ||
-            trip.name ||
-            "Route",
+          routeCode: trip.routeCode || trip.route_short_name || routeId,
+          routeName: trip.routeName || trip.route_long_name || trip.name || "Route",
         };
       }
 
@@ -261,5 +291,5 @@ export function useDashboardMetrics({
       onTimeRate,
       mostDelayedRoute,
     };
-  }, [stops, vehicles, trips]);
+  }, [stops, vehicles, trips, trafficSummary]);
 }
