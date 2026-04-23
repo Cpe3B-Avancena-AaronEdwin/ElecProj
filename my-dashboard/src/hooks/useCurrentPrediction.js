@@ -1,31 +1,7 @@
 import { useMemo, useState } from "react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase/config";
 import { buildPrediction } from "../utils/predictionUtils";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
-
-async function postJson(url, body, fallbackMessage) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  let data = null;
-
-  try {
-    data = await response.json();
-  } catch {
-    data = null;
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.error || fallbackMessage);
-  }
-
-  return data;
-}
 
 export function useCurrentPrediction({
   routes = [],
@@ -74,20 +50,15 @@ export function useCurrentPrediction({
     setPredictionMessage("");
 
     try {
-      await postJson(
-        `${API_BASE}/api/predictions`,
-        {
-          prediction: {
-            ...currentPrediction,
-            generatedAtText: new Date().toISOString(),
-            sourceMode,
-          },
-          userId: user?.uid || null,
-        },
-        "Failed to save prediction."
-      );
+      await addDoc(collection(db, "predictions"), {
+        ...currentPrediction,
+        generatedAt: serverTimestamp(),
+        generatedAtText: new Date().toISOString(),
+        createdBy: user?.uid || null,
+        sourceMode,
+      });
 
-      setPredictionMessage("Prediction saved.");
+      setPredictionMessage("Prediction saved to Firestore.");
     } catch (error) {
       setPredictionError(error.message || "Failed to save prediction.");
     } finally {

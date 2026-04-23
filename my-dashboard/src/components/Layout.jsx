@@ -5,11 +5,7 @@ import { logoutUser } from "../firebase/auth";
 import SiteFooter from "./SiteFooter";
 
 function getFirstName(user) {
-  const rawName =
-    user?.displayName?.trim() ||
-    user?.email?.split("@")[0] ||
-    "User";
-
+  const rawName = user?.displayName?.trim() || user?.email?.split("@")[0] || "User";
   const firstToken = rawName.split(/\s+/)[0] || "User";
   return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
 }
@@ -20,7 +16,6 @@ export default function Layout({ children }) {
   const { user, role } = useAuth();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
-
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
 
@@ -32,7 +27,8 @@ export default function Layout({ children }) {
 
   useEffect(() => {
     function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (!dropdownRef.current) return;
+      if (!dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
     }
@@ -52,12 +48,13 @@ export default function Layout({ children }) {
     };
   }, []);
 
+  const closeDropdown = () => setDropdownOpen(false);
+
   const toggleDropdown = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     setDropdownOpen((prev) => !prev);
   };
-
-  const closeDropdown = () => setDropdownOpen(false);
 
   const handleLogout = async () => {
     closeDropdown();
@@ -70,28 +67,25 @@ export default function Layout({ children }) {
     navigate("/profile");
   };
 
-  const navItems = useMemo(() => {
-    const items = [
-      { label: "Dashboard", path: "/dashboard", icon: "🏠" },
-      { label: "Data", path: "/data", icon: "📊" },
-      { label: "Trip Planner", path: "/trip-planner", icon: "🧭" },
-    ];
+  const handleAdminUsers = () => {
+    closeDropdown();
+    navigate("/admin/users");
+  };
 
-    if (role === "admin") {
-      items.push(
-        { label: "User Management", path: "/admin/users", icon: "👤" },
-        { label: "Route Management", path: "/admin", icon: "🛣️" }
-      );
-    }
+  const handleAdminPanel = () => {
+    closeDropdown();
+    navigate("/admin");
+  };
 
-    return items;
-  }, [role]);
+  const navItems = [
+    { label: "Dashboard", path: "/dashboard" },
+    { label: "Traffic & Routes", path: "/traffic" },
+    { label: "About Us", path: "/about" },
+  ];
 
   return (
     <div className="app">
       <div className="main full-width">
-
-        {/* HEADER */}
         <div className="header">
           <div className="header-left">
             <div className="header-icon">
@@ -104,27 +98,60 @@ export default function Layout({ children }) {
             </div>
           </div>
 
-          {/* USER DROPDOWN */}
           <div className="header-right">
             <div className="dropdown-wrapper" ref={dropdownRef}>
+              <span className="user-label">Hello, {firstName}</span>
+
               <button
                 ref={buttonRef}
                 type="button"
-                className="user-label"
+                className="dropdown-trigger"
                 onClick={toggleDropdown}
+                aria-label="Open user menu"
+                aria-haspopup="menu"
+                aria-expanded={dropdownOpen}
               >
-                Hello, {firstName}
+                ☰
               </button>
 
               {dropdownOpen && (
-                <div className="dropdown-menu">
-                  <button className="dropdown-item" onClick={handleProfile}>
+                <div className="dropdown-menu" role="menu">
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={handleProfile}
+                    role="menuitem"
+                  >
                     Profile
                   </button>
 
+                  {role === "admin" && (
+                    <>
+                      <button
+                        type="button"
+                        className="dropdown-item"
+                        onClick={handleAdminUsers}
+                        role="menuitem"
+                      >
+                        Users Information Settings
+                      </button>
+
+                      <button
+                        type="button"
+                        className="dropdown-item"
+                        onClick={handleAdminPanel}
+                        role="menuitem"
+                      >
+                        Manage Routes
+                      </button>
+                    </>
+                  )}
+
                   <button
+                    type="button"
                     className="dropdown-item dropdown-item--danger"
                     onClick={handleLogout}
+                    role="menuitem"
                   >
                     Log out
                   </button>
@@ -134,29 +161,21 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        <div className="layout-body">
-          <aside className="nav-sidebar">
-            <nav className="sidebar-menu">
-              {navItems.map((item) => {
-                const isActive = location.pathname.startsWith(item.path);
-
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`nav-item ${isActive ? "active" : ""}`}
-                  >
-                    <span className="nav-icon">{item.icon}</span>
-                    <span className="nav-label">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-          </aside>
-
-          <div className="content">{children}</div>
+        <div className="nav-bar">
+          <nav className="horizontal-nav">
+            {navItems.map((item) => (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
         </div>
 
+        <div className="content">{children}</div>
         <SiteFooter />
       </div>
     </div>

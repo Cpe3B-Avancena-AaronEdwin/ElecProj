@@ -1,5 +1,5 @@
-﻿import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+﻿import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { loginUser, signInWithGoogle } from "../firebase/auth";
 import Input from "../components/input";
 import Button from "../components/button";
@@ -8,20 +8,11 @@ import "../styles/auth.css";
 
 export default function Login() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(searchParams.get("error") || "");
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-
-  useEffect(() => {
-    const urlError = searchParams.get("error") || "";
-    if (urlError) {
-      setError(urlError);
-    }
-  }, [searchParams]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -30,7 +21,7 @@ export default function Login() {
 
     try {
       await loginUser(identifier, password);
-  window.location.assign("/dashboard");
+      navigate("/dashboard");
     } catch (err) {
       console.error("Login error:", err);
       setError(err.message || "Login failed.");
@@ -39,10 +30,19 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setError("");
     setGoogleLoading(true);
-    signInWithGoogle();
+
+    try {
+      await signInWithGoogle();
+      navigate("/dashboard");
+    } catch (err) {
+      console.error("Google login error:", err);
+      setError(err.message || "Google sign-in failed.");
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -154,7 +154,8 @@ export default function Login() {
           </Button>
 
           <p className="login-hint">
-            Sign in using your email or username. Google login is handled by the backend.
+            Sign in using your email or username. Google login still works
+            separately.
           </p>
         </form>
       </div>
