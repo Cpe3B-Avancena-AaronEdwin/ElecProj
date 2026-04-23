@@ -83,7 +83,12 @@ async function fetchJson(url, fallbackMessage, options = {}) {
   return data;
 }
 
-async function fetchJsonWithTimeout(url, fallbackMessage, options = {}, timeoutMs = SNAPSHOT_TIMEOUT_MS) {
+async function fetchJsonWithTimeout(
+  url,
+  fallbackMessage,
+  options = {},
+  timeoutMs = SNAPSHOT_TIMEOUT_MS
+) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -209,12 +214,12 @@ function groupHistoryByMinute(history = []) {
         totalPassengers: entry.totalPassengers,
         source: "history-grouped",
         notes: "",
-time: new Date(entry.timestampMs).toLocaleTimeString("en-PH", {
-  timeZone: "Asia/Manila",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-}),
+        time: new Date(entry.timestampMs).toLocaleTimeString("en-PH", {
+          timeZone: "Asia/Manila",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }),
         timestampText: new Date(entry.timestampMs).toISOString(),
         timestampMs: entry.timestampMs,
         createdAt: new Date(entry.timestampMs).toISOString(),
@@ -361,7 +366,7 @@ export function useTrafficData(stops = [], _apiKey, options = {}) {
     }
 
     const historyRows = await fetchJson(
-      `${API_BASE}/api/traffic/history?hours=24&limit=96`,
+      `${API_BASE}/api/traffic/history?hours=24&limit=96&summaryOnly=1`,
       "Failed to load traffic history."
     );
 
@@ -456,12 +461,12 @@ export function useTrafficData(stops = [], _apiKey, options = {}) {
     return trafficHistory.map((item) => ({
       time:
         item.time ||
-new Date(item.createdAt || item.timestampText).toLocaleTimeString("en-PH", {
-  timeZone: "Asia/Manila",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-}),
+        new Date(item.createdAt || item.timestampText).toLocaleTimeString("en-PH", {
+          timeZone: "Asia/Manila",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false,
+        }),
       congestionScore: Number(item.congestionScore || 0),
       averageSpeed: Number(item.averageSpeed || 0),
       delayMinutes: Number(item.delayMinutes || 0),

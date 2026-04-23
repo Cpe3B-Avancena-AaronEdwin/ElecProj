@@ -42,6 +42,7 @@ function formatShortTime(value, fallbackText = "Now") {
     hour12: false,
   });
 }
+
 function buildChartDataFromHistory(trafficHistory = []) {
   const now = Date.now();
   const last24h = now - 24 * 60 * 60 * 1000;
@@ -83,7 +84,7 @@ function buildChartDataFromHistory(trafficHistory = []) {
     return acc;
   }, {});
 
-  return Object.values(grouped)
+  const realPoints = Object.values(grouped)
     .sort((a, b) => a.timestampMs - b.timestampMs)
     .map((item, index) => ({
       index,
@@ -91,8 +92,39 @@ function buildChartDataFromHistory(trafficHistory = []) {
       score: Number((item.totalScore / item.count).toFixed(2)),
       level: item.level,
       rawTimestamp: item.timestampMs,
+      isRealPoint: true,
     }))
     .slice(-96);
+
+  return realPoints;
+}
+
+function buildDisplayChartData(chartData = []) {
+  if (!Array.isArray(chartData) || chartData.length === 0) return [];
+
+  if (chartData.length >= 2) return chartData;
+
+  const onlyPoint = chartData[0];
+  const thirtyMinutes = 30 * 60 * 1000;
+
+  const beforeTs = Number(onlyPoint.rawTimestamp || Date.now()) - thirtyMinutes;
+  const afterTs = Number(onlyPoint.rawTimestamp || Date.now()) + thirtyMinutes;
+
+  return [
+    {
+      ...onlyPoint,
+      time: formatShortTime(beforeTs, onlyPoint.time),
+      rawTimestamp: beforeTs,
+      isRealPoint: false,
+    },
+    onlyPoint,
+    {
+      ...onlyPoint,
+      time: formatShortTime(afterTs, onlyPoint.time),
+      rawTimestamp: afterTs,
+      isRealPoint: false,
+    },
+  ];
 }
 
 function CustomTooltip({ active, payload, label }) {
@@ -116,6 +148,17 @@ function CustomTooltip({ active, payload, label }) {
       >
         level : {level}
       </div>
+      {!point?.isRealPoint && (
+        <div
+          style={{
+            color: "rgba(203, 213, 225, 0.82)",
+            fontSize: "0.82rem",
+            marginTop: "4px",
+          }}
+        >
+          visual guide point
+        </div>
+      )}
     </div>
   );
 }
@@ -252,8 +295,15 @@ export default function Dashboard() {
     return buildChartDataFromHistory(trafficHistory);
   }, [trafficHistory]);
 
+  const displayChartData = useMemo(() => {
+    return buildDisplayChartData(chartData);
+  }, [chartData]);
+
   const graphTitle = "LAST 24H CONGESTION TREND";
-  const graphNote = `Based on ${chartData.length} real snapshots from the last 24 hours.`;
+  const graphNote =
+    chartData.length === 1
+      ? "Based on 1 real snapshot from the last 24 hours."
+      : `Based on ${chartData.length} real snapshots from the last 24 hours.`;
 
   const derivedLastTrafficUpdated = useMemo(() => {
     if (lastTrafficUpdated) return lastTrafficUpdated;
@@ -339,36 +389,36 @@ export default function Dashboard() {
     return "Waiting for enough live traffic data to compute the schedule performance.";
   }, [metrics?.onTimeRate, trafficHistory]);
 
-const formatUpdatedAt = (isoString) => {
-  if (!isoString) return "No update yet";
+  const formatUpdatedAt = (isoString) => {
+    if (!isoString) return "No update yet";
 
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return "No update yet";
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return "No update yet";
 
-  return date.toLocaleString("en-PH", {
-    timeZone: "Asia/Manila",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-};
+    return date.toLocaleString("en-PH", {
+      timeZone: "Asia/Manila",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
 
-const timeSince = (isoString) => {
-  if (!isoString) return "";
+  const timeSince = (isoString) => {
+    if (!isoString) return "";
 
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return "";
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return "";
 
-  const ms = Date.now() - date.getTime();
-  if (ms < 0) return "";
-  const minutes = Math.floor(ms / 60000);
-  if (minutes < 1) return "less than a minute";
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  return `${hours}h ${minutes % 60}m`;
-};
+    const ms = Date.now() - date.getTime();
+    if (ms < 0) return "";
+    const minutes = Math.floor(ms / 60000);
+    if (minutes < 1) return "less than a minute";
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ${minutes % 60}m`;
+  };
 
   const recommendationTone =
     currentPrediction.predictedDelayRisk === "High"
@@ -680,7 +730,9 @@ const timeSince = (isoString) => {
                 fontWeight: 600,
               }}
             >
-              {trafficLoading ? "Fetching latest real traffic..." : "Showing latest saved traffic history"}
+              {trafficLoading
+                ? "Fetching latest real traffic..."
+                : "Showing latest saved traffic history"}
             </div>
           </div>
 
@@ -692,59 +744,90 @@ const timeSince = (isoString) => {
               padding: "0.75rem 0.75rem 0.25rem",
             }}
           >
-            <ResponsiveContainer width="100%" height={420}>
-              <LineChart
-                data={chartData}
-                margin={{ top: 12, right: 12, left: 8, bottom: 8 }}
+            {chartData.length === 0 ? (
+              <div
+                style={{
+                  height: "420px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "rgba(230, 252, 255, 0.75)",
+                  fontSize: "1rem",
+                  fontWeight: 600,
+                }}
               >
-                <CartesianGrid
-                  strokeDasharray="4 6"
-                  stroke="rgba(255,255,255,0.12)"
-                  vertical={true}
-                  horizontal={true}
-                />
+                No real traffic snapshots available yet for the last 24 hours.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={420}>
+                <LineChart
+                  data={displayChartData}
+                  margin={{ top: 12, right: 12, left: 8, bottom: 8 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="4 6"
+                    stroke="rgba(255,255,255,0.12)"
+                    vertical={true}
+                    horizontal={true}
+                  />
 
-                <XAxis
-                  dataKey="time"
-                  tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
-                  axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
-                  tickLine={false}
-                  interval="preserveStartEnd"
-                />
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                  />
 
-                <YAxis
-                  domain={[0, 100]}
-                  ticks={[0, 25, 50, 75, 100]}
-                  tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
-                  axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
-                  tickLine={false}
-                  width={54}
-                />
+                  <YAxis
+                    domain={[0, 100]}
+                    ticks={[0, 25, 50, 75, 100]}
+                    tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
+                    tickLine={false}
+                    width={54}
+                  />
 
-                <Tooltip
-                  content={<CustomTooltip />}
-                  cursor={{
-                    stroke: "rgba(255,255,255,0.95)",
-                    strokeWidth: 2,
-                  }}
-                />
+                  <Tooltip
+                    content={<CustomTooltip />}
+                    cursor={{
+                      stroke: "rgba(255,255,255,0.95)",
+                      strokeWidth: 2,
+                    }}
+                  />
 
-                <Line
-                  type="monotone"
-                  dataKey="score"
-                  stroke="#45f4ff"
-                  strokeWidth={5}
-                  dot={false}
-                  activeDot={{
-                    r: 8,
-                    fill: "#ffffff",
-                    stroke: "#45f4ff",
-                    strokeWidth: 4,
-                  }}
-                  isAnimationActive={true}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#45f4ff"
+                    strokeWidth={5}
+                    dot={(props) => {
+                      const { cx, cy, payload } = props;
+                      if (!payload?.isRealPoint) return null;
+
+                      return (
+                        <circle
+                          cx={cx}
+                          cy={cy}
+                          r={8}
+                          fill="#ffffff"
+                          stroke="#45f4ff"
+                          strokeWidth={4}
+                        />
+                      );
+                    }}
+                    activeDot={{
+                      r: 8,
+                      fill: "#ffffff",
+                      stroke: "#45f4ff",
+                      strokeWidth: 4,
+                    }}
+                    isAnimationActive={true}
+                    connectNulls={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           <div
