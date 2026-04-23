@@ -261,10 +261,11 @@ export default function Dashboard() {
     historyAnalytics = {},
     lastTrafficUpdated,
     trafficLoading,
+    nextAutoRefreshLabel,
     refreshTraffic,
   } = useTrafficData(gtfsStops, TOMTOM_API_KEY, {
     enabled: true,
-    liveTraffic: true,
+    liveTraffic: false,
     history: true,
     cacheKey: "dashboard-gtfs-network",
     maxSamplePoints: 15,
@@ -522,16 +523,28 @@ export default function Dashboard() {
             display: "flex",
             justifyContent: "flex-end",
             alignItems: "center",
+            gap: "0.9rem",
             marginTop: "-0.35rem",
             marginBottom: "-0.15rem",
+            flexWrap: "wrap",
           }}
         >
+          <div
+            style={{
+              color: "rgba(230, 252, 255, 0.74)",
+              fontSize: "0.95rem",
+              fontWeight: 600,
+            }}
+          >
+            {nextAutoRefreshLabel}
+          </div>
+
           <button
             type="button"
             onClick={() => refreshTraffic(true)}
             disabled={trafficLoading}
             style={refreshButtonStyle(trafficLoading)}
-            title="Fetch a fresh traffic snapshot and reload the latest real history"
+            title="Manually fetch a fresh traffic snapshot now"
           >
             <span
               style={{
@@ -858,13 +871,12 @@ export default function Dashboard() {
                 color: "#e6fcff",
               }}
             >
-              {currentPrediction.recommendation ||
-                "Monitor the route and allow extra time when congestion increases."}
+              {currentPrediction.recommendation}
             </div>
             <div style={{ color: "rgba(230, 252, 255, 0.72)", marginTop: "0.45rem" }}>
-              {currentPrediction.etaImpactMinutes != null
+              {currentPrediction.etaImpactMinutes > 0
                 ? `Expected delay impact: +${currentPrediction.etaImpactMinutes} minutes.`
-                : "No delay impact detected currently."}
+                : "No material delay impact is currently expected from the latest saved traffic snapshot."}
             </div>
           </div>
 
@@ -884,11 +896,10 @@ export default function Dashboard() {
                 color: "#e6fcff",
               }}
             >
-              {currentPrediction.predictedDelayRisk || "Stable"}
+              {currentPrediction.predictedDelayRisk}
             </div>
             <div style={{ color: "rgba(230, 252, 255, 0.72)", marginTop: "0.45rem" }}>
-              {predictionMessage ||
-                "The system compares current traffic and route conditions to give a simple on-time prediction."}
+              {predictionMessage || currentPrediction.explanation}
             </div>
           </div>
         </div>
