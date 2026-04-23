@@ -26,3 +26,36 @@ body{
 
 /* screen-reader only */
 .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.data-panels-grid > * {
+  height: 100%;
+}
+
+.data-panels-grid > * > *,
+.data-routing-grid > * > * {
+  height: 100%;
+}
+
+.data-panels-grid .route-summary-card,
+.data-panels-grid .card,
+.data-panels-grid .panel,
+.data-routing-grid .card,
+.data-routing-grid .panel {
+  background: rgba(8, 30, 50, 0.65) !important;
+  border: 1px solid rgba(34, 211, 238, 0.18) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2) !important;
+}
+
+.data-routing-grid .card,
+.data-routing-grid .panel {
+  background: rgba(8, 30, 50, 0.65) !important;
+}
+
+.data-routing-grid p,
+.data-routing-grid span,
+.data-routing-grid div,
+.data-panels-grid p,
+.data-panels-grid span,
+.data-panels-grid div {
+  color: inherit;
+}

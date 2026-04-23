@@ -7,11 +7,49 @@ import { useTrafficData } from "../hooks/useTrafficData";
 
 import Layout from "../components/Layout";
 import DashboardToolbar from "../components/dashboard/DashboardToolbar";
-import DashboardMap from "../components/dashboard/DashboardMap";
 import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
 import TrafficStatusPanel from "../components/dashboard/TrafficStatusPanel";
 import RouteSummaryPanel from "../components/dashboard/RouteSummaryPanel";
 import RoutingStatusPanel from "../components/dashboard/RoutingStatusPanel";
+
+const introCardStyle = {
+  background: "#071a2b",
+  border: "1px solid rgba(34, 211, 238, 0.2)",
+  borderRadius: "22px",
+  padding: "1.5rem",
+  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.18)",
+};
+
+const softCardStyle = {
+  background: "rgba(8, 30, 50, 0.58)",
+  border: "1px solid rgba(34, 211, 238, 0.18)",
+  borderRadius: "20px",
+  padding: "1.25rem",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
+  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.18)",
+};
+
+const statCardStyle = {
+  background: "rgba(8, 30, 50, 0.65)",
+  border: "1px solid rgba(34, 211, 238, 0.18)",
+  borderRadius: "20px",
+  padding: "1.4rem",
+  minHeight: "165px",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  backdropFilter: "blur(10px)",
+  WebkitBackdropFilter: "blur(10px)",
+  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.2)",
+};
+
+const miniInfoCardStyle = {
+  background: "rgba(34, 211, 238, 0.08)",
+  border: "1px solid rgba(34, 211, 238, 0.14)",
+  borderRadius: "16px",
+  padding: "1rem",
+};
 
 export default function Data() {
   useAuth();
@@ -99,133 +137,250 @@ export default function Data() {
     maxSamplePoints: 20,
   });
 
+  const formattedTrafficUpdate = lastTrafficUpdated
+    ? new Date(lastTrafficUpdated).toLocaleString()
+    : "No recent update";
+
   return (
     <Layout>
-      <div className="dashboard-container">
-        <DashboardToolbar
-          routes={sourceRoutes}
-          selectedRouteId={selectedRouteId}
-          onChangeRoute={setSelectedRouteId}
-          sourceMode={actualSourceMode}
-          onChangeSourceMode={setSourceMode}
-          showTrafficOverlay={showTrafficOverlay}
-          onChangeTrafficOverlay={setShowTrafficOverlay}
-          hasFirestoreData={hasFirestoreData}
-          trafficLoading={trafficLoading}
-          routingLoading={routingLoading}
-          onRefreshTraffic={refreshTraffic}
-          onRefreshRouteLines={refreshRouteLines}
-          tomtomEnabled={!!TOMTOM_API_KEY}
-          stats={{
-            sourceMode: actualSourceMode,
-            routesLoaded: sourceRoutes.length,
-            stopsLoaded: sourceStops.length,
-            tripsLoaded: sourceTrips.length,
-            vehiclesLoaded: sourceVehicles.length,
-            gtfsStatus: gtfsLoading ? "Loading" : gtfsError ? "Error" : "Ready",
-            trafficUpdated: lastTrafficUpdated || "—",
-            routesUpdated: lastRoutingUpdated || "—",
-          }}
-        />
+      <div
+        className="dashboard-container"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1.75rem",
+        }}
+      >
+        <div style={introCardStyle}>
+          <div
+            style={{
+              fontSize: "1.9rem",
+              fontWeight: 800,
+              color: "#e6fcff",
+              marginBottom: "0.45rem",
+            }}
+          >
+            Data Overview
+          </div>
 
-        <div className="dashboard-chart-row">
-          <div className="dashboard-panel-item">
-            <div
-              className="vehicle-flow-chart-box vehicle-flow-chart-box--full"
-              style={{
-                position: "relative",
-                height: "420px",
-                borderRadius: "18px",
-                overflow: "hidden",
-              }}
-            >
-              <DashboardMap
-                stops={sourceStops}
-                vehicles={sourceVehicles}
-                routePaths={routePaths}
-                trafficSamples={trafficSamples}
-                showTrafficFlow={showTrafficOverlay}
-                tomtomApiKey={TOMTOM_API_KEY}
-                showStops={false}
-                showRoutes={true}
-              />
+          <div
+            style={{
+              color: "rgba(230, 252, 255, 0.75)",
+              fontSize: "1rem",
+              lineHeight: 1.7,
+              maxWidth: "960px",
+            }}
+          >
+            This page gives you a structured view of transit records and operational
+            summaries. It is designed for quick review of route coverage, stop counts,
+            trip records, route line generation status, and traffic-supported data
+            monitoring without opening the live map.
+          </div>
 
-              <div className="map-legend">
-                <div className="legend-title">Traffic Legend</div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gap: "1.25rem",
+              alignItems: "stretch",
+              marginTop: "1.2rem",
+            }}
+          >
+            <div style={miniInfoCardStyle}>
+              <div
+                style={{
+                  color: "#e6fcff",
+                  fontWeight: 700,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                What this page contains
+              </div>
+              <div style={{ color: "rgba(230, 252, 255, 0.72)", lineHeight: 1.6 }}>
+                Route summaries, traffic summaries, route line generation status, and
+                operational cards based on the selected data source and route filter.
+              </div>
+            </div>
 
-                <div className="legend-item">
-                  <span className="legend-color red"></span>
-                  Heavy Traffic
-                </div>
+            <div style={miniInfoCardStyle}>
+              <div
+                style={{
+                  color: "#e6fcff",
+                  fontWeight: 700,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                How to use it
+              </div>
+              <div style={{ color: "rgba(230, 252, 255, 0.72)", lineHeight: 1.6 }}>
+                Use the toolbar to change route filters, switch data source, and refresh
+                traffic or route line data before reviewing the cards below.
+              </div>
+            </div>
 
-                <div className="legend-item">
-                  <span className="legend-color yellow"></span>
-                  Moderate Traffic
-                </div>
-
-                <div className="legend-item">
-                  <span className="legend-color green"></span>
-                  Light Traffic
-                </div>
+            <div style={miniInfoCardStyle}>
+              <div
+                style={{
+                  color: "#e6fcff",
+                  fontWeight: 700,
+                  marginBottom: "0.35rem",
+                }}
+              >
+                Why this page matters
+              </div>
+              <div style={{ color: "rgba(230, 252, 255, 0.72)", lineHeight: 1.6 }}>
+                It provides a cleaner analytics-focused view for admins and reviewers,
+                making the data easier to scan, compare, and explain.
               </div>
             </div>
           </div>
         </div>
 
-        <div className="dashboard-status-bottom-row">
-          <div className="status-card card">
-            <div className="status-card-title">Data Mode</div>
-            <div className="status-card-value">{actualSourceMode.toUpperCase()}</div>
-            <div className="status-card-note">
+        <div style={softCardStyle}>
+          <DashboardToolbar
+            routes={sourceRoutes}
+            selectedRouteId={selectedRouteId}
+            onChangeRoute={setSelectedRouteId}
+            sourceMode={actualSourceMode}
+            onChangeSourceMode={setSourceMode}
+            showTrafficOverlay={showTrafficOverlay}
+            onChangeTrafficOverlay={setShowTrafficOverlay}
+            hasFirestoreData={hasFirestoreData}
+            trafficLoading={trafficLoading}
+            routingLoading={routingLoading}
+            onRefreshTraffic={refreshTraffic}
+            onRefreshRouteLines={refreshRouteLines}
+            tomtomEnabled={!!TOMTOM_API_KEY}
+            stats={{
+              sourceMode: actualSourceMode,
+              routesLoaded: sourceRoutes.length,
+              stopsLoaded: sourceStops.length,
+              tripsLoaded: sourceTrips.length,
+              vehiclesLoaded: sourceVehicles.length,
+              gtfsStatus: gtfsLoading ? "Loading" : gtfsError ? "Error" : "Ready",
+              trafficUpdated: lastTrafficUpdated || "—",
+              routesUpdated: lastRoutingUpdated || "—",
+            }}
+          />
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: "1.25rem",
+          }}
+        >
+          <div style={statCardStyle}>
+            <div
+              style={{
+                color: "rgba(230, 252, 255, 0.7)",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "1rem",
+              }}
+            >
+              Data Mode
+            </div>
+
+            <div
+              style={{
+                color: "#ffffff",
+                fontSize: "2rem",
+                fontWeight: 800,
+                lineHeight: 1.1,
+                marginBottom: "0.75rem",
+              }}
+            >
+              {actualSourceMode.toUpperCase()}
+            </div>
+
+            <div
+              style={{
+                color: "rgba(230, 252, 255, 0.75)",
+                fontSize: "1rem",
+              }}
+            >
               {hasFirestoreData
                 ? "Using admin dataset when available."
                 : "Using GTFS data fallback."}
             </div>
           </div>
 
-          <div className="status-card card">
-            <div className="status-card-title">Latest Traffic Update</div>
-            <div className="status-card-value">
-              {lastTrafficUpdated
-                ? new Date(lastTrafficUpdated).toLocaleString()
-                : "No recent update"}
+          <div style={statCardStyle}>
+            <div
+              style={{
+                color: "rgba(230, 252, 255, 0.7)",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "1rem",
+              }}
+            >
+              Latest Traffic Update
             </div>
-            <div className="status-card-note">
+
+            <div
+              style={{
+                color: "#ffffff",
+                fontSize: "1.6rem",
+                fontWeight: 800,
+                lineHeight: 1.2,
+                marginBottom: "0.75rem",
+              }}
+            >
+              {formattedTrafficUpdate}
+            </div>
+
+            <div
+              style={{
+                color: "rgba(230, 252, 255, 0.75)",
+                fontSize: "1rem",
+              }}
+            >
               {trafficError || "Traffic status data is loaded here."}
             </div>
           </div>
         </div>
 
-        <div className="dashboard-panels-grid">
-          <div className="dashboard-panel-item">
-            <RouteSummaryPanel
-              routes={sourceRoutes}
-              sourceStops={sourceStops}
-              sourceTrips={sourceTrips}
-              sourceVehicles={sourceVehicles}
-            />
-          </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: "1.25rem",
+            alignItems: "start",
+          }}
+        >
+          <RouteSummaryPanel
+            routes={sourceRoutes}
+            sourceStops={sourceStops}
+            sourceTrips={sourceTrips}
+            sourceVehicles={sourceVehicles}
+          />
 
-          <div className="dashboard-panel-item">
-            <TrafficSummaryPanel summary={trafficSummary} />
-          </div>
+          <TrafficSummaryPanel summary={trafficSummary} />
 
-          <div className="dashboard-panel-item">
-            <TrafficStatusPanel
-              loading={trafficLoading}
-              error={trafficError}
-              sourceMode={actualSourceMode}
-              showTrafficOverlay={showTrafficOverlay}
-              samplePoints={trafficSamples.length}
-              apiConfigured={!!TOMTOM_API_KEY}
-            />
-          </div>
+          <TrafficStatusPanel
+            loading={trafficLoading}
+            error={trafficError}
+            sourceMode={actualSourceMode}
+            showTrafficOverlay={showTrafficOverlay}
+            samplePoints={trafficSamples.length}
+            apiConfigured={!!TOMTOM_API_KEY}
+          />
         </div>
 
-        <div className="dashboard-bottom-grid">
-          <div className="dashboard-panel-item">
-            <RoutingStatusPanel routes={routePaths} error={routingError} />
-          </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr",
+            gap: "1.25rem",
+          }}
+        >
+          <RoutingStatusPanel routes={routePaths} error={routingError} />
         </div>
       </div>
     </Layout>

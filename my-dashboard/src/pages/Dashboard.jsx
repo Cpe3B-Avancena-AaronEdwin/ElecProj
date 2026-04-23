@@ -92,19 +92,9 @@ function CustomTooltip({ active, payload, label }) {
   const level = point?.level || "Unknown";
 
   return (
-    <div
-      style={{
-        background: "rgba(12, 24, 53, 0.96)",
-        border: "1px solid rgba(90, 130, 220, 0.24)",
-        borderRadius: "16px",
-        padding: "12px 14px",
-        boxShadow: "0 18px 40px rgba(0, 0, 0, 0.35)",
-        color: "#e2e8f0",
-        backdropFilter: "blur(14px)",
-      }}
-    >
-      <div style={{ fontSize: "0.88rem", opacity: 0.8, marginBottom: "4px" }}>{label}</div>
-      <div style={{ fontSize: "1rem", fontWeight: 700 }}>Score: {score}</div>
+    <div className="vehicle-flow-tooltip live-tooltip">
+      <div className="vehicle-flow-tooltip-time">{label}</div>
+      <div className="vehicle-flow-tooltip-value">score : {score}</div>
       <div
         style={{
           color: "#cbd5e1",
@@ -113,11 +103,52 @@ function CustomTooltip({ active, payload, label }) {
           marginTop: "4px",
         }}
       >
-        Level: {level}
+        level : {level}
       </div>
     </div>
   );
 }
+
+const sectionCardStyle = {
+  background: "#071a2b",
+  border: "1px solid rgba(34, 211, 238, 0.2)",
+  borderRadius: "22px",
+  padding: "1.5rem",
+  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.18)",
+};
+
+const statCardStyle = {
+  background: "linear-gradient(180deg, #0b2150 0%, #071a2b 100%)",
+  border: "1px solid rgba(59, 130, 246, 0.18)",
+  borderRadius: "22px",
+  padding: "1.6rem",
+  minHeight: "170px",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.18)",
+};
+
+const smallCardStyle = {
+  background: "#071a2b",
+  border: "1px solid rgba(34, 211, 238, 0.18)",
+  borderRadius: "18px",
+  padding: "1.25rem",
+  boxShadow: "0 10px 24px rgba(0, 0, 0, 0.16)",
+};
+
+const tripButtonStyle = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "0.95rem 1.4rem",
+  borderRadius: "16px",
+  background: "linear-gradient(90deg, #22d3ee 0%, #3b82f6 100%)",
+  color: "#031525",
+  fontWeight: 800,
+  textDecoration: "none",
+  minWidth: "170px",
+};
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -251,410 +282,363 @@ export default function Dashboard() {
 
   const recommendationTone =
     currentPrediction.predictedDelayRisk === "High"
-      ? "linear-gradient(180deg, rgba(127, 29, 29, 0.22), rgba(15, 23, 42, 0.82))"
+      ? "rgba(239, 68, 68, 0.08)"
       : currentPrediction.predictedDelayRisk === "Medium"
-      ? "linear-gradient(180deg, rgba(120, 53, 15, 0.22), rgba(15, 23, 42, 0.82))"
-      : "linear-gradient(180deg, rgba(20, 83, 45, 0.20), rgba(15, 23, 42, 0.82))";
-
-  const shellStyle = {
-    minHeight: "100%",
-    padding: "22px",
-    borderRadius: "28px",
-    background:"transparent",
-    color: "#e5eefc",
-  };
-
-  const cardStyle = {
-    background: "linear-gradient(180deg, rgba(14, 29, 63, 0.96), rgba(11, 24, 51, 0.96))",
-    border: "1px solid rgba(104, 138, 215, 0.18)",
-    borderRadius: "26px",
-    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.34)",
-    backdropFilter: "blur(12px)",
-  };
-
-  const titleStyle = {
-    fontSize: "1.65rem",
-    fontWeight: 800,
-    letterSpacing: "-0.03em",
-    color: "#eef4ff",
-    marginBottom: "0.35rem",
-  };
-
-  const subText = {
-    color: "rgba(191, 209, 238, 0.74)",
-    fontSize: "0.98rem",
-  };
+      ? "rgba(245, 158, 11, 0.08)"
+      : "rgba(34, 197, 94, 0.08)";
 
   return (
     <Layout>
-      <div className="dashboard-container" style={shellStyle}>
+      <div
+        className="dashboard-container"
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1.5rem",
+        }}
+      >
         <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: "18px",
-            flexWrap: "wrap",
-            marginBottom: "18px",
-          }}
-        >
-          <div>
-            <div
-              style={{
-                fontSize: "3.20rem",
-                fontWeight: 900,
-                letterSpacing: "-0.04em",
-                lineHeight: 1.05,
-                background: "linear-gradient(90deg, #40d9ff 0%, #2684ff 55%, #7c5cff 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-              }}
-            >
-              Dashboard
-            </div>
-            <div style={{ ...subText, marginTop: "0.5rem" }}>
-              Commute and congestion monitoring
-            </div>
-          </div>
-        </div>
+  style={{
+    width: "100%",
+    marginBottom: "0.75rem",
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      borderRadius: "18px",
+      border: "1px solid rgba(34, 211, 238, 0.2)",
+      background: "#071a2b",
+      overflow: "hidden",
+      boxShadow: "0 10px 24px rgba(0, 0, 0, 0.16)",
+      minHeight: "56px",
+    }}
+  >
+    <input
+      type="text"
+      placeholder="Search route, stop, destination..."
+      style={{
+        flex: 1,
+        minWidth: 0,
+        padding: "1rem 1.1rem",
+        border: "none",
+        outline: "none",
+        background: "transparent",
+        color: "#e6fcff",
+        fontSize: "1rem",
+      }}
+    />
+
+    <div
+      style={{
+        width: "1px",
+        alignSelf: "stretch",
+        background: "rgba(34, 211, 238, 0.18)",
+      }}
+    />
+
+    <select
+      defaultValue=""
+      style={{
+        minWidth: "240px",
+        padding: "1rem 1.1rem",
+        border: "none",
+        outline: "none",
+        background: "#071a2b",
+        color: "#e6fcff",
+        fontSize: "1rem",
+        fontWeight: 600,
+        cursor: "pointer",
+        appearance: "none",
+        WebkitAppearance: "none",
+        MozAppearance: "none",
+        backgroundImage:
+          "linear-gradient(45deg, transparent 50%, #cfeef6 50%), linear-gradient(135deg, #cfeef6 50%, transparent 50%)",
+        backgroundPosition:
+          "calc(100% - 22px) calc(50% - 3px), calc(100% - 16px) calc(50% - 3px)",
+        backgroundSize: "6px 6px, 6px 6px",
+        backgroundRepeat: "no-repeat",
+        paddingRight: "2.5rem",
+      }}
+    >
+      <option value="" disabled>
+        Select current location
+      </option>
+      <option value="Bulacan">Bulacan</option>
+      <option value="Monumento">Monumento</option>
+      <option value="Caloocan">Caloocan</option>
+      <option value="Quezon City">Quezon City</option>
+      <option value="Manila">Manila</option>
+      <option value="Makati">Makati</option>
+      <option value="Pasig">Pasig</option>
+      <option value="Taguig">Taguig</option>
+    </select>
+  </div>
+</div>
 
         <div
-          className="dashboard-status-bottom-row"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "18px",
-            marginBottom: "20px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: "1.25rem",
           }}
         >
-          <div className="status-card card" style={{ ...cardStyle, padding: "24px" }}>
-            <div style={{ ...subText, marginBottom: "0.45rem" }}>Last Updated</div>
-            <div style={{ fontSize: "2.25rem", fontWeight: 900, color: "#f8fbff" }}>
+          <div style={statCardStyle}>
+            <div
+              style={{
+                color: "rgba(230, 252, 255, 0.7)",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "1rem",
+              }}
+            >
+              Last Updated
+            </div>
+            <div
+              style={{
+                color: "#ffffff",
+                fontSize: "2rem",
+                fontWeight: 800,
+                lineHeight: 1.1,
+                marginBottom: "0.75rem",
+              }}
+            >
               {formatUpdatedAt(lastTrafficUpdated)}
             </div>
-            <div style={{ ...subText, marginTop: "0.55rem" }}>
+            <div
+              style={{
+                color: "rgba(230, 252, 255, 0.75)",
+                fontSize: "1rem",
+              }}
+            >
               {lastTrafficUpdated
                 ? `Updated ${timeSince(lastTrafficUpdated)} ago`
                 : "Waiting for latest traffic refresh."}
             </div>
           </div>
 
-          <div className="status-card card" style={{ ...cardStyle, padding: "24px" }}>
-            <div style={{ ...subText, marginBottom: "0.45rem" }}>On-Time Rate</div>
-            <div style={{ fontSize: "2.25rem", fontWeight: 900, color: "#f8fbff" }}>
+          <div style={statCardStyle}>
+            <div
+              style={{
+                color: "rgba(230, 252, 255, 0.7)",
+                fontSize: "0.95rem",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+                marginBottom: "1rem",
+              }}
+            >
+              On-Time Rate
+            </div>
+            <div
+              style={{
+                color: "#ffffff",
+                fontSize: "2rem",
+                fontWeight: 800,
+                lineHeight: 1.1,
+                marginBottom: "0.75rem",
+              }}
+            >
               {metrics.onTimeRate}%
             </div>
-            <div style={{ ...subText, marginTop: "0.55rem" }}>
+            <div
+              style={{
+                color: "rgba(230, 252, 255, 0.75)",
+                fontSize: "1rem",
+              }}
+            >
               Percentage of trips meeting the planned schedule.
             </div>
           </div>
         </div>
 
-        <div className="dashboard-chart-row" style={{ marginBottom: "20px" }}>
+        <div style={sectionCardStyle}>
           <div
-            className="status-card card vehicle-flow-card vehicle-flow-card--full"
-            style={{ ...cardStyle, padding: "24px" }}
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "1rem",
+              flexWrap: "wrap",
+              gap: "1rem",
+            }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1rem",
-                gap: "1rem",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <div style={titleStyle}>Live Traffic Map</div>
-                <div style={subText}>Visual transit and congestion data across the network.</div>
-              </div>
-
+            <div>
               <div
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  flexWrap: "wrap",
+                  fontSize: "1.75rem",
+                  fontWeight: 800,
+                  color: "#e6fcff",
                 }}
               >
-                <div
-                  style={{
-                    padding: "10px 18px",
-                    borderRadius: "999px",
-                    background: "rgba(77, 108, 178, 0.20)",
-                    border: "1px solid rgba(122, 149, 221, 0.18)",
-                    color: "#c9d7f0",
-                    fontWeight: 700,
-                  }}
-                >
-                  Metro Manila Area
-                </div>
-
-                <Link
-                  to="/trip-planner"
-                  className="primary-button"
-                  style={{
-                    textDecoration: "none",
-                    borderRadius: "16px",
-                    padding: "0.95rem 1.4rem",
-                    fontWeight: 800,
-                    background: "linear-gradient(135deg, #2bd4ff 0%, #2979ff 100%)",
-                    color: "#06152f",
-                    boxShadow: "0 10px 30px rgba(41, 121, 255, 0.35)",
-                  }}
-                >
-                  Plan Your Trip
-                </Link>
+                Live Traffic Map
+              </div>
+              <div
+                style={{
+                  color: "rgba(230,252,255,0.75)",
+                  fontSize: "1rem",
+                  marginTop: "0.35rem",
+                }}
+              >
+                Visual transit and congestion data across the network.
               </div>
             </div>
 
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1.75fr) minmax(260px, 0.85fr)",
-                gap: "20px",
-              }}
-            >
-              <div
-                className="vehicle-flow-chart-box vehicle-flow-chart-box--full"
-                style={{
-                  position: "relative",
-                  height: "520px",
-                  borderRadius: "22px",
-                  overflow: "hidden",
-                  background:
-                    "linear-gradient(180deg, rgba(8, 18, 44, 0.95), rgba(6, 15, 36, 0.95))",
-                  border: "1px solid rgba(100, 132, 208, 0.14)",
-                }}
-              >
-                <DashboardMap
-                  stops={gtfsStops}
-                  vehicles={vehicles}
-                  routePaths={[]}
-                  trafficSamples={trafficSamples}
-                  showTrafficFlow={true}
-                  tomtomApiKey={TOMTOM_API_KEY}
-                  showStops={false}
-                  showRoutes={true}
-                />
+            <Link to="/trip-planner" style={tripButtonStyle}>
+              Plan Your Trip
+            </Link>
+          </div>
+
+          <div
+            style={{
+              position: "relative",
+              height: "420px",
+              borderRadius: "18px",
+              overflow: "hidden",
+            }}
+          >
+            <DashboardMap
+              stops={gtfsStops}
+              vehicles={vehicles}
+              routePaths={[]}
+              trafficSamples={trafficSamples}
+              showTrafficFlow={true}
+              tomtomApiKey={TOMTOM_API_KEY}
+              showStops={false}
+              showRoutes={true}
+            />
+
+            <div className="map-legend">
+              <div className="legend-title">Traffic Legend</div>
+
+              <div className="legend-item">
+                <span className="legend-color red"></span>
+                Heavy Traffic
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "18px", height: "100%" }}>
-                <div
-                  style={{
-                    ...cardStyle,
-                    padding: "24px",
-                    borderRadius: "24px",
-                    height: "520px",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "flex-start",
-                  }}
-                >
-                  <div
-                    style={{
-                      ...titleStyle,
-                      fontSize: "1.55rem",
-                      marginBottom: "6px",
-                    }}
-                  >
-                    Traffic Levels
-                  </div>
+              <div className="legend-item">
+                <span className="legend-color yellow"></span>
+                Moderate Traffic
+              </div>
 
-                  <div
-                    style={{
-                      display: "grid",
-                      gap: "14px",
-                      marginTop: "20px",
-                      alignContent: "start",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        padding: "16px 18px",
-                        borderRadius: "18px",
-                        background: "rgba(255,255,255,0.04)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: "14px",
-                          height: "14px",
-                          borderRadius: "999px",
-                          background: "#18d39b",
-                          boxShadow: "0 0 18px rgba(24, 211, 155, 0.6)",
-                          display: "inline-block",
-                        }}
-                      />
-                      <span style={{ color: "#d8e3f5", fontWeight: 600 }}>Low - Free Flow</span>
-                    </div>
-
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        padding: "16px 18px",
-                        borderRadius: "18px",
-                        background: "rgba(255,255,255,0.04)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: "14px",
-                          height: "14px",
-                          borderRadius: "999px",
-                          background: "#f6b81a",
-                          boxShadow: "0 0 18px rgba(246, 184, 26, 0.55)",
-                          display: "inline-block",
-                        }}
-                      />
-                      <span style={{ color: "#d8e3f5", fontWeight: 600 }}>
-                        Medium - Moderate
-                      </span>
-                    </div>
-
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "12px",
-                        padding: "16px 18px",
-                        borderRadius: "18px",
-                        background: "rgba(255,255,255,0.04)",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: "14px",
-                          height: "14px",
-                          borderRadius: "999px",
-                          background: "#ff6b6b",
-                          boxShadow: "0 0 18px rgba(255, 107, 107, 0.55)",
-                          display: "inline-block",
-                        }}
-                      />
-                      <span style={{ color: "#d8e3f5", fontWeight: 600 }}>
-                        High - Congested
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                
+              <div className="legend-item">
+                <span className="legend-color green"></span>
+                Light Traffic
               </div>
             </div>
           </div>
         </div>
 
-        <div className="dashboard-chart-row" style={{ marginBottom: "20px" }}>
+        <div style={sectionCardStyle}>
           <div
-            className="status-card card vehicle-flow-card vehicle-flow-card--full"
-            style={{ ...cardStyle, padding: "24px" }}
+            style={{
+              fontSize: "1.5rem",
+              fontWeight: 800,
+              color: "#e6fcff",
+              marginBottom: "1rem",
+            }}
           >
-            <div style={titleStyle}>{graphTitle}</div>
+            {graphTitle}
+          </div>
 
-            <div
-              className="vehicle-flow-chart-box vehicle-flow-chart-box--full"
-              style={{
-                marginTop: "12px",
-                borderRadius: "22px",
-                padding: "18px 10px 10px 0",
-                background:
-                  "linear-gradient(180deg, rgba(8, 18, 44, 0.92), rgba(7, 16, 37, 0.92))",
-                border: "1px solid rgba(100, 132, 208, 0.14)",
-              }}
-            >
-              <ResponsiveContainer width="100%" height={420}>
-                <LineChart
-                  data={chartData}
-                  margin={{ top: 12, right: 16, left: 16, bottom: 10 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="4 6"
-                    stroke="rgba(255,255,255,0.08)"
-                    vertical={true}
-                    horizontal={true}
-                  />
+          <div
+            className="vehicle-flow-chart-box vehicle-flow-chart-box--full"
+            style={{
+              background: "rgba(5, 18, 35, 0.78)",
+              borderRadius: "18px",
+              padding: "0.75rem 0.75rem 0.25rem",
+            }}
+          >
+            <ResponsiveContainer width="100%" height={420}>
+              <LineChart
+                data={chartData}
+                margin={{ top: 12, right: 12, left: 8, bottom: 8 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="4 6"
+                  stroke="rgba(255,255,255,0.12)"
+                  vertical={true}
+                  horizontal={true}
+                />
 
-                  <XAxis
-                    dataKey="time"
-                    tick={{ fill: "rgba(219,231,255,0.82)", fontSize: 14, fontWeight: 600 }}
-                    axisLine={{ stroke: "rgba(255,255,255,0.20)", strokeWidth: 1.4 }}
-                    tickLine={false}
-                    interval="preserveStartEnd"
-                  />
+                <XAxis
+                  dataKey="time"
+                  tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
+                  axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
+                  tickLine={false}
+                  interval="preserveStartEnd"
+                />
 
-                  <YAxis
-                    domain={[0, 100]}
-                    ticks={[0, 25, 50, 75, 100]}
-                    tick={{ fill: "rgba(219,231,255,0.82)", fontSize: 14, fontWeight: 600 }}
-                    axisLine={{ stroke: "rgba(255,255,255,0.20)", strokeWidth: 1.4 }}
-                    tickLine={false}
-                    width={54}
-                  />
+                <YAxis
+                  domain={[0, 100]}
+                  ticks={[0, 25, 50, 75, 100]}
+                  tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
+                  axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
+                  tickLine={false}
+                  width={54}
+                />
 
-                  <Tooltip
-                    content={<CustomTooltip />}
-                    cursor={{
-                      stroke: "rgba(255,255,255,0.32)",
-                      strokeWidth: 1.5,
-                    }}
-                  />
+                <Tooltip
+                  content={<CustomTooltip />}
+                  cursor={{
+                    stroke: "rgba(255,255,255,0.95)",
+                    strokeWidth: 2,
+                  }}
+                />
 
-                  <Line
-                    type="monotone"
-                    dataKey="score"
-                    stroke="#8b7bff"
-                    strokeWidth={4}
-                    dot={{
-                      r: 3,
-                      fill: "#a99cff",
-                      stroke: "#0b1733",
-                      strokeWidth: 2,
-                    }}
-                    activeDot={{
-                      r: 7,
-                      fill: "#d7d0ff",
-                      stroke: "#8b7bff",
-                      strokeWidth: 3,
-                    }}
-                    isAnimationActive={true}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+                <Line
+                  type="monotone"
+                  dataKey="score"
+                  stroke="#45f4ff"
+                  strokeWidth={5}
+                  dot={false}
+                  activeDot={{
+                    r: 8,
+                    fill: "#ffffff",
+                    stroke: "#45f4ff",
+                    strokeWidth: 4,
+                  }}
+                  isAnimationActive={true}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
 
-            <div style={{ ...subText, marginTop: "14px" }}>{graphNote}</div>
+          <div
+            style={{
+              color: "rgba(230, 252, 255, 0.75)",
+              marginTop: "0.9rem",
+            }}
+          >
+            {graphNote}
           </div>
         </div>
 
         <div
-          className="dashboard-insights-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "18px",
+            gap: "1.25rem",
           }}
         >
-          <div className="card dashboard-small-card" style={{ ...cardStyle, padding: "24px" }}>
-            <div style={{ ...subText, marginBottom: "0.5rem" }}>Recommended Action</div>
+          <div style={smallCardStyle}>
+            <div style={{ color: "rgba(230, 252, 255, 0.68)", marginBottom: "0.5rem" }}>
+              Recommended Action
+            </div>
             <div
               style={{
-                fontSize: "1.12rem",
-                fontWeight: 800,
-                color: "#f8fbff",
-                lineHeight: 1.5,
+                fontSize: "1.05rem",
+                fontWeight: 700,
+                color: "#e6fcff",
               }}
             >
               {currentPrediction.recommendation ||
                 "Monitor the route and allow extra time when congestion increases."}
             </div>
-            <div style={{ ...subText, marginTop: "0.6rem" }}>
+            <div style={{ color: "rgba(230, 252, 255, 0.72)", marginTop: "0.45rem" }}>
               {currentPrediction.etaImpactMinutes != null
                 ? `Expected delay impact: +${currentPrediction.etaImpactMinutes} minutes.`
                 : "No delay impact detected currently."}
@@ -662,25 +646,24 @@ export default function Dashboard() {
           </div>
 
           <div
-            className="card dashboard-small-card"
             style={{
-              ...cardStyle,
-              padding: "24px",
+              ...smallCardStyle,
               background: recommendationTone,
             }}
           >
-            <div style={{ ...subText, marginBottom: "0.5rem" }}>Smart Prediction</div>
+            <div style={{ color: "rgba(230, 252, 255, 0.68)", marginBottom: "0.5rem" }}>
+              Smart Prediction
+            </div>
             <div
               style={{
-                fontSize: "1.12rem",
-                fontWeight: 800,
-                color: "#f8fbff",
-                lineHeight: 1.5,
+                fontSize: "1.05rem",
+                fontWeight: 700,
+                color: "#e6fcff",
               }}
             >
               {currentPrediction.predictedDelayRisk || "Stable"}
             </div>
-            <div style={{ ...subText, marginTop: "0.6rem" }}>
+            <div style={{ color: "rgba(230, 252, 255, 0.72)", marginTop: "0.45rem" }}>
               {predictionMessage ||
                 "The system compares current traffic and route conditions to give a simple on-time prediction."}
             </div>
