@@ -22,7 +22,7 @@ async function parseResponse(response, fallbackMessage) {
 }
 
 async function apiFetch(path, fallbackMessage, options = {}) {
-const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(`${API_BASE}${path}`, {
     credentials: "include",
     ...options,
     headers: {
@@ -72,11 +72,45 @@ export async function registerUser(fullName, username, email, password) {
 }
 
 export function signInWithGoogle() {
-window.location.assign(`${API_BASE}/api/auth/google`);
+  window.location.assign(`${API_BASE}/api/auth/google`);
+}
+
+export async function getCurrentUser() {
+  try {
+    const data = await apiFetch("/api/auth/me", "Failed to load current user.");
+    return syncCurrentUser(data?.user || null);
+  } catch (error) {
+    if (String(error?.message || "").toLowerCase().includes("unauthorized")) {
+      clearAuthCurrentUser();
+      return null;
+    }
+
+    throw error;
+  }
+}
+
+export async function logoutUser() {
+  try {
+    await apiFetch("/api/auth/logout", "Logout failed.", {
+      method: "POST",
+    });
+  } finally {
+    clearAuthCurrentUser();
+    window.location.assign("/login");
+  }
+}
+
+export async function getCurrentUserProviders() {
+  const data = await apiFetch(
+    "/api/auth/providers",
+    "Failed to load login providers."
+  );
+
+  return Array.isArray(data?.providers) ? data.providers : [];
 }
 
 export function linkGoogleToCurrentUser() {
-window.location.assign(`${API_BASE}/api/auth/google?mode=link`);
+  window.location.assign(`${API_BASE}/api/auth/google?mode=link`);
 }
 
 export async function linkPasswordToCurrentUser(email, password) {
@@ -94,38 +128,4 @@ export async function linkPasswordToCurrentUser(email, password) {
 
   syncCurrentUser(data?.user || null);
   return data;
-}
-
-export async function getCurrentUser() {
-  try {
-    const data = await apiFetch("/api/auth/me", "Failed to load current user.");
-    return syncCurrentUser(data?.user || null);
-  } catch (error) {
-    if (String(error?.message || "").toLowerCase().includes("unauthorized")) {
-      clearAuthCurrentUser();
-      return null;
-    }
-
-    throw error;
-  }
-}
-
-export async function getCurrentUserProviders() {
-  const data = await apiFetch(
-    "/api/auth/providers",
-    "Failed to load login providers."
-  );
-
-  return Array.isArray(data?.providers) ? data.providers : [];
-}
-
-export async function logoutUser() {
-  try {
-    await apiFetch("/api/auth/logout", "Logout failed.", {
-      method: "POST",
-    });
-  } finally {
-    clearAuthCurrentUser();
-    window.location.assign("/login");
-  }
 }
