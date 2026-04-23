@@ -63,8 +63,8 @@ function mapUser(row) {
     uid: row.uid,
     email: row.email || "",
     username: row.username || "",
-    displayName: row.display_name || "",
-    fullName: row.full_name || "",
+    displayName: row.display_name || row.full_name || "",
+    fullName: row.full_name || row.display_name || "",
     photoURL: row.photo_url || "",
     role: row.role || "viewer",
     googleId: row.google_id || "",
@@ -102,19 +102,25 @@ function setAuthCookie(res, user) {
     { expiresIn: "7d" }
   );
 
+  const isProduction = process.env.NODE_ENV === "production";
+
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
     maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: "/",
   });
 }
 
 function clearAuthCookie(res) {
+  const isProduction = process.env.NODE_ENV === "production";
+
   res.clearCookie(COOKIE_NAME, {
     httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: isProduction ? "none" : "lax",
+    secure: isProduction,
+    path: "/",
   });
 }
 
@@ -468,6 +474,9 @@ router.get("/google/callback", (req, res, next) => {
           "UPDATE users SET google_id = ?, photo_url = COALESCE(NULLIF(photo_url, ''), ?), updated_at = ? WHERE uid = ?",
           [googleId, photoURL || "", new Date(), currentAuthUser.uid]
         );
+
+        const linkedUser = mapUser(await findUserByUid(currentAuthUser.uid));
+        setAuthCookie(res, linkedUser);
 
         return res.redirect(
           `${FRONTEND_URL}/profile?success=${encodeURIComponent(
