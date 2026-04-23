@@ -8,7 +8,7 @@ export default function UserSessions({ setMessage }) {
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const data = await getUserSessions(auth.currentUser.uid);
+        const data = await getUserSessions(auth.currentUser?.uid || "");
         setSessions(data || []);
       } catch {
         setMessage({ type: "error", text: "Failed to load sessions." });

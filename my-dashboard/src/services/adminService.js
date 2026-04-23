@@ -1,12 +1,20 @@
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from "../firebase/config";
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+async function handleResponse(response, fallbackMessage) {
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || fallbackMessage);
+  }
+
+  return data;
+}
 
 export async function saveRoute({ form, editingId, userId }) {
   const payload = {
@@ -14,20 +22,26 @@ export async function saveRoute({ form, editingId, userId }) {
     routeName: form.routeName.trim(),
     color: form.color,
     active: form.active,
-    updatedAt: serverTimestamp(),
+    createdBy: userId || "",
   };
 
-  if (editingId) {
-    await updateDoc(doc(db, "routes", editingId), payload);
-    return "Route updated successfully.";
-  }
+  const response = await fetch(
+    editingId ? `${API_BASE}/api/routes/${editingId}` : `${API_BASE}/api/routes`,
+    {
+      method: editingId ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }
+  );
 
-  await addDoc(collection(db, "routes"), {
-    ...payload,
-    createdAt: serverTimestamp(),
-    createdBy: userId || "",
-  });
-  return "Route added successfully.";
+  const data = await handleResponse(
+    response,
+    editingId ? "Failed to update route." : "Failed to add route."
+  );
+
+  return data.message || (editingId ? "Route updated successfully." : "Route added successfully.");
 }
 
 export async function saveStop({ form, editingId, userId }) {
@@ -38,20 +52,26 @@ export async function saveStop({ form, editingId, userId }) {
     routeId: form.routeId,
     simulatedDelay: Number(form.simulatedDelay || 0),
     simulatedPassengers: Number(form.simulatedPassengers || 0),
-    updatedAt: serverTimestamp(),
+    createdBy: userId || "",
   };
 
-  if (editingId) {
-    await updateDoc(doc(db, "stops", editingId), payload);
-    return "Stop updated successfully.";
-  }
+  const response = await fetch(
+    editingId ? `${API_BASE}/api/stops/${editingId}` : `${API_BASE}/api/stops`,
+    {
+      method: editingId ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }
+  );
 
-  await addDoc(collection(db, "stops"), {
-    ...payload,
-    createdAt: serverTimestamp(),
-    createdBy: userId || "",
-  });
-  return "Stop added successfully.";
+  const data = await handleResponse(
+    response,
+    editingId ? "Failed to update stop." : "Failed to add stop."
+  );
+
+  return data.message || (editingId ? "Stop updated successfully." : "Stop added successfully.");
 }
 
 export async function saveVehicle({ form, editingId, userId }) {
@@ -60,20 +80,26 @@ export async function saveVehicle({ form, editingId, userId }) {
     plateNumber: form.plateNumber.trim(),
     routeId: form.routeId,
     status: form.status,
-    updatedAt: serverTimestamp(),
+    createdBy: userId || "",
   };
 
-  if (editingId) {
-    await updateDoc(doc(db, "vehicles", editingId), payload);
-    return "Vehicle updated successfully.";
-  }
+  const response = await fetch(
+    editingId ? `${API_BASE}/api/vehicles/${editingId}` : `${API_BASE}/api/vehicles`,
+    {
+      method: editingId ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }
+  );
 
-  await addDoc(collection(db, "vehicles"), {
-    ...payload,
-    createdAt: serverTimestamp(),
-    createdBy: userId || "",
-  });
-  return "Vehicle added successfully.";
+  const data = await handleResponse(
+    response,
+    editingId ? "Failed to update vehicle." : "Failed to add vehicle."
+  );
+
+  return data.message || (editingId ? "Vehicle updated successfully." : "Vehicle added successfully.");
 }
 
 export async function saveTrip({ form, editingId, userId }) {
@@ -87,38 +113,60 @@ export async function saveTrip({ form, editingId, userId }) {
     status: form.status,
     delayMinutes: Number(form.delayMinutes || 0),
     notes: form.notes.trim(),
-    updatedAt: serverTimestamp(),
+    createdBy: userId || "",
   };
 
-  if (editingId) {
-    await updateDoc(doc(db, "trips", editingId), payload);
-    return "Trip updated successfully.";
-  }
+  const response = await fetch(
+    editingId ? `${API_BASE}/api/trips/${editingId}` : `${API_BASE}/api/trips`,
+    {
+      method: editingId ? "PUT" : "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }
+  );
 
-  await addDoc(collection(db, "trips"), {
-    ...payload,
-    createdAt: serverTimestamp(),
-    createdBy: userId || "",
-  });
-  return "Trip added successfully.";
+  const data = await handleResponse(
+    response,
+    editingId ? "Failed to update trip." : "Failed to add trip."
+  );
+
+  return data.message || (editingId ? "Trip updated successfully." : "Trip added successfully.");
 }
 
 export async function removeRoute(id) {
-  await deleteDoc(doc(db, "routes", id));
-  return "Route deleted successfully.";
+  const response = await fetch(`${API_BASE}/api/routes/${id}`, {
+    method: "DELETE",
+  });
+
+  const data = await handleResponse(response, "Failed to delete route.");
+  return data.message || "Route deleted successfully.";
 }
 
 export async function removeStop(id) {
-  await deleteDoc(doc(db, "stops", id));
-  return "Stop deleted successfully.";
+  const response = await fetch(`${API_BASE}/api/stops/${id}`, {
+    method: "DELETE",
+  });
+
+  const data = await handleResponse(response, "Failed to delete stop.");
+  return data.message || "Stop deleted successfully.";
 }
 
 export async function removeVehicle(id) {
-  await deleteDoc(doc(db, "vehicles", id));
-  return "Vehicle deleted successfully.";
+  const response = await fetch(`${API_BASE}/api/vehicles/${id}`, {
+    method: "DELETE",
+  });
+
+  const data = await handleResponse(response, "Failed to delete vehicle.");
+  return data.message || "Vehicle deleted successfully.";
 }
 
 export async function removeTrip(id) {
-  await deleteDoc(doc(db, "trips", id));
-  return "Trip deleted successfully.";
+  const response = await fetch(`${API_BASE}/api/trips/${id}`, {
+    method: "DELETE",
+  });
+
+  const data = await handleResponse(response, "Failed to delete trip.");
+  return data.message || "Trip deleted successfully.";
 }

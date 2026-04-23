@@ -1,12 +1,13 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Dashboard from "./pages/Dashboard";
+import Data from "./pages/Data";
+import TripPlanner from "./pages/TripPlanner";
 import Admin from "./pages/Admin";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Reports from "./pages/Reports";
-import Traffic from "./pages/Traffic";
 import About from "./pages/About";
 import Profile from "./pages/Profile";
 import "./App.css";
@@ -45,13 +46,25 @@ export default function App() {
           />
 
           <Route
-            path="/traffic"
+            path="/data"
             element={
               <ProtectedRoute allowedRoles={["admin", "operator", "viewer"]}>
-                <Traffic />
+                <Data />
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/trip-planner"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "operator", "viewer"]}>
+                <TripPlanner />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route path="/traffic" element={<Navigate to="/data" replace />} />
+          <Route path="/routes" element={<Navigate to="/data" replace />} />
 
           <Route
             path="/reports"

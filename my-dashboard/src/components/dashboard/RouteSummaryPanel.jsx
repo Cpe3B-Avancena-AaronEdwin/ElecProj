@@ -58,6 +58,13 @@ export default function RouteSummaryPanel({
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
+        background: "rgba(34, 211, 238, 0.12)",
+        border: "1px solid rgba(34, 211, 238, 0.38)",
+        borderRadius: "18px",
+        padding: "1.2rem",
+        boxShadow: "0 0 16px rgba(34, 211, 238, 0.12)",
+        backdropFilter: "blur(10px)",
+        WebkitBackdropFilter: "blur(10px)",
       }}
     >
       <div
@@ -68,12 +75,16 @@ export default function RouteSummaryPanel({
           marginBottom: "12px",
         }}
       >
-        <h3 style={{ margin: 0 }}>Route Summary</h3>
-        <span style={{ opacity: 0.8 }}>{routeStats.length} routes</span>
+        <h3 style={{ margin: 0, color: "#e6fcff" }}>Route Summary</h3>
+        <span style={{ color: "rgba(230, 252, 255, 0.75)" }}>
+          {routeStats.length} routes
+        </span>
       </div>
 
       {routeStats.length === 0 ? (
-        <p>No routes available.</p>
+        <p style={{ color: "rgba(230, 252, 255, 0.72)" }}>
+          No routes available.
+        </p>
       ) : (
         <div
           style={{
@@ -91,7 +102,7 @@ export default function RouteSummaryPanel({
                 justifyContent: "space-between",
                 gap: "10px",
                 padding: "10px 0",
-                borderBottom: "1px solid var(--border)",
+                borderBottom: "1px solid rgba(34, 211, 238, 0.18)",
               }}
             >
               <div
@@ -102,6 +113,7 @@ export default function RouteSummaryPanel({
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                   fontWeight: 600,
+                  color: "#e6fcff",
                 }}
                 title={route.label}
               >
@@ -114,6 +126,7 @@ export default function RouteSummaryPanel({
                   gap: "12px",
                   whiteSpace: "nowrap",
                   flexShrink: 0,
+                  color: "rgba(230, 252, 255, 0.75)",
                 }}
               >
                 <span>S: {route.stops}</span>

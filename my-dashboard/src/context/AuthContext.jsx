@@ -1,16 +1,35 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase/config";
-import { observeAuthState } from "../firebase/auth";
-
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { getCurrentUser } from "../firebase/auth";
+import {
+  setAuthCurrentUser,
+  clearAuthCurrentUser,
+} from "../firebase/config";
 import {
   updateUserProfile,
   updatePassword,
   getUserSessions,
-  deleteUserAccount
+  deleteUserAccount,
 } from "../components/user/UserService";
 
-const AuthContext = createContext();
+const AuthContext = createContext(null);
+
+function normalizeAuthUser(authUser) {
+  if (!authUser) return null;
+
+  return {
+    ...authUser,
+    uid: authUser.uid || "",
+    displayName: authUser.displayName || authUser.fullName || "",
+    fullName: authUser.fullName || authUser.displayName || "",
+    username: authUser.username || "",
+    photoURL: authUser.photoURL || "",
+    email: authUser.email || "",
+    role: authUser.role || "viewer",
+    providerData: Array.isArray(authUser.providerData)
+      ? authUser.providerData
+      : [],
+  };
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -18,93 +37,140 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = observeAuthState(async (firebaseUser) => {
+    let isActive = true;
+
+    const loadAuthenticatedUser = async () => {
       try {
-        if (firebaseUser) {
-          const userRef = doc(db, "users", firebaseUser.uid);
-          const userSnap = await getDoc(userRef);
+        const currentUser = await getCurrentUser();
 
-          if (userSnap.exists()) {
-            const userData = userSnap.data();
+        if (!isActive) return;
 
-            setUser({
-              ...firebaseUser,
-              displayName:
-                userData.displayName ||
-                firebaseUser.displayName ||
-                "",
-              fullName:
-                userData.displayName ||
-                firebaseUser.displayName ||
-                "",
-              username: userData.username || "",
-              photoURL: userData.photoURL || firebaseUser.photoURL || "",
-              email: userData.email || firebaseUser.email || "",
-            });
+        const normalizedUser = normalizeAuthUser(currentUser);
 
-            setRole(userData.role || "viewer");
-          } else {
-            setUser(firebaseUser);
-            setRole("viewer");
-          }
+        if (normalizedUser) {
+          setUser(normalizedUser);
+          setRole(normalizedUser.role || "viewer");
+          setAuthCurrentUser(normalizedUser);
         } else {
           setUser(null);
           setRole(null);
+          clearAuthCurrentUser();
         }
       } catch (error) {
         console.error("Auth context error:", error);
-        setUser(firebaseUser || null);
-        setRole(null);
-      } finally {
-        setLoading(false);
-      }
-    });
 
-    return () => unsubscribe();
+        if (!isActive) return;
+
+        setUser(null);
+        setRole(null);
+        clearAuthCurrentUser();
+      } finally {
+        if (isActive) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadAuthenticatedUser();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
+
+  const syncUserState = (updater) => {
+    setUser((previousUser) => {
+      const nextUser =
+        typeof updater === "function" ? updater(previousUser) : updater;
+
+      const normalizedUser = normalizeAuthUser(nextUser);
+
+      if (normalizedUser) {
+        setAuthCurrentUser(normalizedUser);
+        setRole(normalizedUser.role || "viewer");
+      } else {
+        clearAuthCurrentUser();
+        setRole(null);
+      }
+
+      return normalizedUser;
+    });
+  };
+
+  const refreshUser = async () => {
+    const currentUser = await getCurrentUser();
+    const normalizedUser = normalizeAuthUser(currentUser);
+
+    syncUserState(normalizedUser);
+    return normalizedUser;
+  };
 
   const updateProfileInfo = async (data) => {
     await updateUserProfile(data);
 
-    setUser((prev) => ({
-      ...prev,
-      displayName: data.displayName || prev?.displayName || "",
-      fullName: data.displayName || prev?.fullName || "",
-      photoURL: data.photoURL || prev?.photoURL || "",
+    syncUserState((previousUser) => ({
+      ...(previousUser || {}),
+      displayName:
+        data.displayName !== undefined
+          ? data.displayName
+          : previousUser?.displayName || "",
+      fullName:
+        data.fullName !== undefined
+          ? data.fullName
+          : data.displayName !== undefined
+          ? data.displayName
+          : previousUser?.fullName || "",
+      username:
+        data.username !== undefined
+          ? data.username
+          : previousUser?.username || "",
+      photoURL:
+        data.photoURL !== undefined
+          ? data.photoURL
+          : previousUser?.photoURL || "",
+      email:
+        data.email !== undefined
+          ? data.email
+          : previousUser?.email || "",
     }));
   };
 
-  const changePassword = async (newPassword) => {
-    await updatePassword(newPassword);
+  const changePassword = async (newPassword, currentPassword = "") => {
+    await updatePassword(newPassword, currentPassword);
   };
 
   const fetchSessions = async () => {
-    return await getUserSessions();
+    return getUserSessions();
   };
 
   const removeAccount = async () => {
     await deleteUserAccount();
-    setUser(null);
-    setRole(null);
+    syncUserState(null);
   };
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        role,
-        loading,
-        updateProfileInfo,
-        changePassword,
-        fetchSessions,
-        removeAccount
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      user,
+      role,
+      loading,
+      refreshUser,
+      updateProfileInfo,
+      changePassword,
+      fetchSessions,
+      removeAccount,
+    }),
+    [user, role, loading]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const context = useContext(AuthContext);
+
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider.");
+  }
+
+  return context;
 }
