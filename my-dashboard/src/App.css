@@ -43,7 +43,6 @@ body,
 /* =========================
    HEADER
 ========================= */
-
 .header {
   height: auto;
   background-image: url("/header.gif");
@@ -54,14 +53,17 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 24px;
+  padding: 18px 24px 18px 90px;
   gap: 16px;
+  position: relative;
+  z-index: 20;
+  transition: padding-left 0.25s ease;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   flex: 1;
 }
 
@@ -227,6 +229,7 @@ body,
 }
 
 /* =========================
+   VERTICAL SIDEBAR NAV
    DASHBOARD / SHARED PAGE LAYOUT
 ========================= */
 
@@ -630,6 +633,52 @@ body,
 }
 
 @media (max-width: 900px) {
+  .layout-body {
+    flex-direction: column;
+  }
+
+  .nav-sidebar {
+    width: 100%;
+    min-width: 0;
+    border-right: none;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    flex-direction: row;
+    justify-content: center;
+    padding: 34px 0 16px;
+    gap: 0;
+  }
+
+  .nav-sidebar:hover {
+    width: 100%;
+  }
+
+  .sidebar-brand {
+    display: none;
+  }
+
+  .sidebar-brand-text,
+  .nav-label {
+    opacity: 1;
+  }
+
+  .sidebar-menu {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .nav-item {
+    justify-content: center;
+    margin: 0 4px;
+  }
+
+  .content {
+    padding: 12px;
+  }
+}
+
+@media (max-width: 900px) {
   .admin-grid {
     grid-template-columns: 1fr;
   }
@@ -645,8 +694,8 @@ body,
 
 @media (max-width: 768px) {
   .header {
-    padding: 14px;
-  }
+  padding: 18px 24px 18px 90px;
+}
 
   .header-title {
     font-size: 1.4rem;

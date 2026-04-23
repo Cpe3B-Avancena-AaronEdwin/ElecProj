@@ -66,22 +66,23 @@ export default function Layout({ children }) {
     closeDropdown();
     navigate("/profile");
   };
-
-  const handleAdminUsers = () => {
-    closeDropdown();
-    navigate("/admin/users");
-  };
-
-  const handleAdminPanel = () => {
-    closeDropdown();
-    navigate("/admin");
-  };
-
-  const navItems = [
-    { label: "Dashboard", path: "/dashboard" },
-    { label: "Traffic & Routes", path: "/traffic" },
-    { label: "About Us", path: "/about" },
+const navItems = useMemo(() => {
+  const items = [
+    { label: "Dashboard", path: "/dashboard", icon: "🏠" },
+    { label: "Traffic & Routes", path: "/traffic", icon: "📊" },
+    { label: "About Us", path: "/about", icon: "ℹ️" },
+    { label: "Trip Planner", path: "/trip-planner", icon: "🧭" },
   ];
+
+  if (role === "admin") {
+    items.push(
+      { label: "Users Information Settings", path: "/admin/users", icon: "👤" },
+      { label: "Manage Routes", path: "/admin", icon: "🗺️" }
+    );
+  }
+
+  return items;
+}, [role]);
 
   return (
     <div className="app">
@@ -107,7 +108,6 @@ export default function Layout({ children }) {
                 type="button"
                 className="dropdown-trigger"
                 onClick={toggleDropdown}
-                aria-label="Open user menu"
                 aria-haspopup="menu"
                 aria-expanded={dropdownOpen}
               >
@@ -120,7 +120,6 @@ export default function Layout({ children }) {
                     type="button"
                     className="dropdown-item"
                     onClick={handleProfile}
-                    role="menuitem"
                   >
                     Profile
                   </button>
@@ -161,18 +160,27 @@ export default function Layout({ children }) {
           </div>
         </div>
 
-        <div className="nav-bar">
-          <nav className="horizontal-nav">
-            {navItems.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`nav-item ${location.pathname === item.path ? "active" : ""}`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+        <div className="layout-body">
+          <aside className="nav-sidebar">
+            <nav className="sidebar-menu">
+              {navItems.map((item) => {
+                const isActive = location.pathname === item.path;
+
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`nav-item ${isActive ? "active" : ""}`}
+                  >
+                    <span className="nav-icon">{item.icon}</span>
+                    <span className="nav-label">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </aside>
+
+          <main className="content">{children}</main>
         </div>
 
         <div className="content">{children}</div>
