@@ -4,12 +4,14 @@ import { useGtfsBundle } from "../hooks/useGtfsBundle";
 import Layout from "../components/Layout";
 import TripPlannerPanel from "../components/dashboard/TripPlannerPanel";
 
-// ✅ SAME STYLE AS DATA PAGE
+// SAME STYLE AS DATA PAGE
 const pageWrapperStyle = {
   display: "flex",
   flexDirection: "column",
   gap: "1.75rem",
   width: "100%",
+  minHeight: "100%",
+  flex: 1,
 };
 
 const contentWidthStyle = {
@@ -34,6 +36,7 @@ const mainCardStyle = {
   backdropFilter: "blur(10px)",
   WebkitBackdropFilter: "blur(10px)",
   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.2)",
+  flex: 1,
 };
 
 export default function TripPlanner() {
@@ -44,7 +47,6 @@ export default function TripPlanner() {
   return (
     <Layout>
       <div className="dashboard-container" style={pageWrapperStyle}>
-        {/* 🔹 INTRO CARD */}
         <div style={contentWidthStyle}>
           <div style={introCardStyle}>
             <div
@@ -73,7 +75,6 @@ export default function TripPlanner() {
           </div>
         </div>
 
-        {/* 🔹 MAIN CONTENT CARD */}
         <div style={contentWidthStyle}>
           <div style={mainCardStyle}>
             <TripPlannerPanel
