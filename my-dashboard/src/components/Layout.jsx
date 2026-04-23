@@ -10,6 +10,7 @@ function getFirstName(user) {
   return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
 }
 
+
 export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -69,9 +70,9 @@ export default function Layout({ children }) {
 const navItems = useMemo(() => {
   const items = [
     { label: "Dashboard", path: "/dashboard", icon: "🏠" },
-    { label: "Traffic & Routes", path: "/traffic", icon: "📊" },
-    { label: "About Us", path: "/about", icon: "ℹ️" },
+    { label: "Data", path: "/traffic", icon: "📊" },
     { label: "Trip Planner", path: "/trip-planner", icon: "🧭" },
+    { label: "About Us", path: "/about", icon: "ℹ️" },
   ];
 
   if (role === "admin") {
