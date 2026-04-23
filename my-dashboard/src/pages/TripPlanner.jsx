@@ -9,6 +9,13 @@ const pageWrapperStyle = {
   display: "flex",
   flexDirection: "column",
   gap: "1.75rem",
+  width: "100%",
+};
+
+const contentWidthStyle = {
+  width: "100%",
+  maxWidth: "1200px",
+  margin: "0 auto",
 };
 
 const introCardStyle = {
@@ -37,49 +44,38 @@ export default function TripPlanner() {
   return (
     <Layout>
       <div className="dashboard-container" style={pageWrapperStyle}>
-        
-        {/* 🔹 INTRO CARD (matches Data page) */}
-        <div style={introCardStyle}>
-          <div
-            style={{
-              fontSize: "1.9rem",
-              fontWeight: 800,
-              color: "#e6fcff",
-              marginBottom: "0.45rem",
-            }}
-          >
-            Trip Planner
-          </div>
+        {/* 🔹 INTRO CARD */}
+        <div style={contentWidthStyle}>
+          <div style={introCardStyle}>
+            <div
+              style={{
+                fontSize: "1.9rem",
+                fontWeight: 800,
+                color: "#e6fcff",
+                marginBottom: "0.45rem",
+              }}
+            >
+              Trip Planner
+            </div>
 
-          <div
-            style={{
-              color: "rgba(230, 252, 255, 0.75)",
-              fontSize: "1rem",
-              lineHeight: 1.7,
-              maxWidth: "900px",
-            }}
-          >
-            Plan routes across the transit network by selecting your origin and
-            destination. The system analyzes available routes and suggests optimal
-            travel paths based on GTFS data.
+            <div
+              style={{
+                color: "rgba(230, 252, 255, 0.75)",
+                fontSize: "1rem",
+                lineHeight: 1.7,
+                maxWidth: "900px",
+              }}
+            >
+              Plan routes across the transit network by selecting your origin and
+              destination. The system analyzes available routes and suggests optimal
+              travel paths based on GTFS data.
+            </div>
           </div>
         </div>
 
         {/* 🔹 MAIN CONTENT CARD */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            width: "100%",
-          }}
-        >
-          <div
-            style={{
-              ...mainCardStyle,
-              width: "100%",
-              maxWidth: "1200px",
-            }}
-          >
+        <div style={contentWidthStyle}>
+          <div style={mainCardStyle}>
             <TripPlannerPanel
               gtfsBundle={gtfsBundle}
               onPlanSelected={() => {}}

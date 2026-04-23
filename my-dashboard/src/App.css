@@ -267,7 +267,7 @@ body,
 }
 
 .nav-sidebar:hover {
-  width: 280px;
+  width: 320px;
 }
 
 .main.full-width:has(.nav-sidebar:hover) .header {
