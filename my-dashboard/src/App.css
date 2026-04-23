@@ -47,7 +47,7 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 24px 18px 90px;
+  padding: 18px 24px 18px 8px;
   gap: 16px;
   position: relative;
   z-index: 20;
@@ -245,6 +245,7 @@ body,
   gap: 0;
   align-items: stretch;
   position: relative;
+  min-height: calc(100vh - 94px); /* adjust if your header height differs */
 }
 
 .nav-sidebar {
@@ -258,10 +259,10 @@ body,
   padding: 16px 0;
   gap: 8px;
   overflow: hidden;
-  position: absolute;
-  top: -98px;   /* adjust to your header height */
-  left: 0;
-  bottom: 0;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: calc(100vh - 94px);
   z-index: 40;
   transition: width 0.25s ease;
 }
@@ -270,9 +271,16 @@ body,
   width: 320px;
 }
 
-.main.full-width:has(.nav-sidebar:hover) .header {
-  padding-left: 300px;
+.content {
+  flex: 1;
+  min-width: 0;
+  padding: 14px;
+  background: var(--color-base);
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: calc(100vh - 94px);
 }
+
 .sidebar-brand {
   display: flex;
   flex-direction: column;
@@ -366,14 +374,13 @@ body,
   flex: 1;
   min-width: 0;
   margin-left: 72px;
+  padding: 14px;
   background: var(--color-base);
+  overflow-x: hidden;
   overflow-y: auto;
   transition: margin-left 0.25s ease;
 }
 
-.main.full-width:has(.nav-sidebar:hover) .content {
-  margin-left: 280px;
-}
 
 /* =========================
    DASHBOARD / SHARED PAGE LAYOUT
@@ -386,6 +393,7 @@ body,
   padding: 14px 18px 18px;
   box-sizing: border-box;
   flex: 1;
+  min-width: 0;
   background: var(--color-base);
   color: var(--color-text-on-dark);
 }
@@ -651,6 +659,50 @@ body,
   height: 100%;
 }
 
+
+.trip-planner-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.trip-planner-meta {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+
+.trip-planner-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.trip-planner-action-button {
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  border: none;
+  background: var(--primary, #3b82f6);
+  color: white;
+  cursor: pointer;
+  font-weight: 700;
+  min-width: 120px;
+}
+
+.trip-planner-swap-button {
+  padding: 0.8rem 0.95rem;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-on-dark);
+  cursor: pointer;
+  font-weight: 700;
+}
+
 /* TRAFFIC PAGE BOTTOM PANELS */
 
 .traffic-bottom-grid {
@@ -868,8 +920,8 @@ body,
 
 @media (max-width: 768px) {
   .header {
-  padding: 18px 24px 18px 90px;
-}
+    padding: 16px 18px 16px 16px;
+  }
 
   .header-title {
     font-size: 1.4rem;
@@ -965,3 +1017,148 @@ body,
 .legend-color.red { background: #ef4444; }
 .legend-color.yellow { background: #facc15; }
 .legend-color.green { background: #22c55e; }
+
+@media (max-width: 900px) {
+  .header {
+    padding: 16px 18px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .header-left,
+  .header-right {
+    width: 100%;
+  }
+
+  .header-right {
+    justify-content: flex-start;
+  }
+
+  .nav-sidebar {
+    position: relative;
+    top: 0;
+    bottom: auto;
+    left: 0;
+    width: 100%;
+    min-width: 0;
+    padding: 12px;
+    border-right: none;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+    overflow: visible;
+  }
+
+  .nav-sidebar:hover {
+    width: 100%;
+  }
+
+  .main.full-width:has(.nav-sidebar:hover) .header,
+  .main.full-width:has(.nav-sidebar:hover) .content {
+    padding-left: 18px;
+    margin-left: 0;
+  }
+
+  .sidebar-menu {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .nav-item {
+    margin: 0;
+    padding: 10px 12px;
+    font-size: 1rem;
+    justify-content: center;
+  }
+
+  .content {
+    margin-left: 0;
+    padding: 12px;
+  }
+
+  .trip-planner-form-grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .trip-planner-action-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 8px;
+  }
+
+  .dashboard-metrics-grid,
+  .dashboard-status-bottom-row,
+  .dashboard-insights-grid,
+  .dashboard-panels-grid,
+  .dashboard-bottom-grid,
+  .traffic-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vehicle-flow-chart-box,
+  .vehicle-flow-chart-box--full {
+    height: 320px;
+    min-height: 320px;
+  }
+
+  .trip-planner-meta {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 640px) {
+  .header-title {
+    font-size: 1.5rem;
+  }
+
+  .header-subtitle {
+    font-size: 0.88rem;
+  }
+
+  .header-icon {
+    width: 48px;
+    height: 48px;
+  }
+
+  .trip-planner-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trip-planner-swap-button,
+  .trip-planner-action-button {
+    width: 100%;
+  }
+
+  .card,
+  .panel,
+  .status-card,
+  .stat-card {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .content {
+    padding: 8px;
+  }
+
+  .header {
+    padding: 14px 12px;
+  }
+
+  .user-label {
+    width: 100%;
+  }
+
+  .dropdown-wrapper {
+    width: 100%;
+  }
+
+  .nav-item {
+    width: calc(50% - 4px);
+  }
+}

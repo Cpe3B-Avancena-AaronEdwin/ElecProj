@@ -14,7 +14,6 @@ function getFirstName(user) {
   return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
 }
 
-
 export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -70,27 +69,43 @@ export default function Layout({ children }) {
     closeDropdown();
     navigate("/profile");
   };
-const navItems = useMemo(() => {
-  const items = [
-    { label: "Dashboard", path: "/dashboard", icon: "🏠" },
-    { label: "Data", path: "/traffic", icon: "📊" },
-    { label: "Trip Planner", path: "/trip-planner", icon: "🧭" },
-    { label: "About Us", path: "/about", icon: "ℹ️" },
-  ];
 
-  if (role === "admin") {
-    items.push(
-      { label: "Users Information Settings", path: "/admin/users", icon: "👤" },
-      { label: "Manage Routes", path: "/admin", icon: "🗺️" }
-    );
-  }
+  const navItems = useMemo(() => {
+    const items = [
+      { label: "Dashboard", path: "/dashboard", icon: "🏠" },
+      { label: "Data", path: "/traffic", icon: "📊" },
+      { label: "Trip Planner", path: "/trip-planner", icon: "🧭" },
+      { label: "About Us", path: "/about", icon: "ℹ️" },
+    ];
 
-  return items;
-}, [role]);
+    if (role === "admin") {
+      items.push(
+        { label: "Users Information Settings", path: "/admin/users", icon: "👤" },
+        { label: "Manage Routes", path: "/admin", icon: "🗺️" }
+      );
+    }
+
+    return items;
+  }, [role]);
 
   return (
-    <div className="app">
-      <div className="main full-width">
+    <div
+      className="app"
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        className="main full-width"
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+        }}
+      >
         <div className="header">
           <div className="header-left">
             <div className="header-icon">
@@ -139,7 +154,15 @@ const navItems = useMemo(() => {
           </div>
         </div>
 
-        <div className="layout-body">
+        <div
+          className="layout-body"
+          style={{
+            display: "flex",
+            flex: 1,
+            minHeight: 0,
+            alignItems: "stretch",
+          }}
+        >
           <aside className="nav-sidebar">
             <nav className="sidebar-menu">
               {navItems.map((item) => {
@@ -159,10 +182,19 @@ const navItems = useMemo(() => {
             </nav>
           </aside>
 
-          <main className="content">{children}</main>
+          <main
+            className="content"
+            style={{
+              flex: 1,
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {children}
+            <SiteFooter />
+          </main>
         </div>
-
-        <SiteFooter />
       </div>
     </div>
   );

@@ -12,43 +12,50 @@ import TrafficStatusPanel from "../components/dashboard/TrafficStatusPanel";
 import RouteSummaryPanel from "../components/dashboard/RouteSummaryPanel";
 import RoutingStatusPanel from "../components/dashboard/RoutingStatusPanel";
 
-const introCardStyle = {
-  background: "#071a2b",
-  border: "1px solid rgba(34, 211, 238, 0.2)",
-  borderRadius: "22px",
-  padding: "1.5rem",
-  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.18)",
-};
-
-const softCardStyle = {
-  background: "rgba(8, 30, 50, 0.58)",
+const unifiedCardStyle = {
+  background: "rgba(8, 30, 50, 0.65)",
   border: "1px solid rgba(34, 211, 238, 0.18)",
   borderRadius: "20px",
   padding: "1.25rem",
   backdropFilter: "blur(10px)",
   WebkitBackdropFilter: "blur(10px)",
-  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.18)",
+  boxShadow: "0 8px 24px rgba(0, 0, 0, 0.2)",
+};
+
+const introCardStyle = {
+  ...unifiedCardStyle,
+  borderRadius: "22px",
+  padding: "1.5rem",
+};
+
+const softCardStyle = {
+  ...unifiedCardStyle,
 };
 
 const statCardStyle = {
-  background: "rgba(8, 30, 50, 0.65)",
-  border: "1px solid rgba(34, 211, 238, 0.18)",
-  borderRadius: "20px",
+  ...unifiedCardStyle,
   padding: "1.4rem",
   minHeight: "165px",
   display: "flex",
   flexDirection: "column",
   justifyContent: "center",
+};
+
+const miniInfoCardStyle = {
+  background: "rgba(8, 30, 50, 0.65)",
+  border: "1px solid rgba(34, 211, 238, 0.18)",
+  borderRadius: "16px",
+  padding: "1rem",
   backdropFilter: "blur(10px)",
   WebkitBackdropFilter: "blur(10px)",
   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.2)",
 };
 
-const miniInfoCardStyle = {
-  background: "rgba(34, 211, 238, 0.08)",
-  border: "1px solid rgba(34, 211, 238, 0.14)",
-  borderRadius: "16px",
-  padding: "1rem",
+const equalPanelWrapStyle = {
+  ...unifiedCardStyle,
+  height: "100%",
+  display: "flex",
+  flexDirection: "column",
 };
 
 export default function Data() {
@@ -269,6 +276,7 @@ export default function Data() {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
             gap: "1.25rem",
+            alignItems: "stretch",
           }}
         >
           <div style={statCardStyle}>
@@ -351,26 +359,32 @@ export default function Data() {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
             gap: "1.25rem",
-            alignItems: "start",
+            alignItems: "stretch",
           }}
         >
-          <RouteSummaryPanel
-            routes={sourceRoutes}
-            sourceStops={sourceStops}
-            sourceTrips={sourceTrips}
-            sourceVehicles={sourceVehicles}
-          />
+          <div style={equalPanelWrapStyle}>
+            <RouteSummaryPanel
+              routes={sourceRoutes}
+              sourceStops={sourceStops}
+              sourceTrips={sourceTrips}
+              sourceVehicles={sourceVehicles}
+            />
+          </div>
 
-          <TrafficSummaryPanel summary={trafficSummary} />
+          <div style={equalPanelWrapStyle}>
+            <TrafficSummaryPanel summary={trafficSummary} />
+          </div>
 
-          <TrafficStatusPanel
-            loading={trafficLoading}
-            error={trafficError}
-            sourceMode={actualSourceMode}
-            showTrafficOverlay={showTrafficOverlay}
-            samplePoints={trafficSamples.length}
-            apiConfigured={!!TOMTOM_API_KEY}
-          />
+          <div style={equalPanelWrapStyle}>
+            <TrafficStatusPanel
+              loading={trafficLoading}
+              error={trafficError}
+              sourceMode={actualSourceMode}
+              showTrafficOverlay={showTrafficOverlay}
+              samplePoints={trafficSamples.length}
+              apiConfigured={!!TOMTOM_API_KEY}
+            />
+          </div>
         </div>
 
         <div
@@ -380,7 +394,9 @@ export default function Data() {
             gap: "1.25rem",
           }}
         >
-          <RoutingStatusPanel routes={routePaths} error={routingError} />
+          <div style={equalPanelWrapStyle}>
+            <RoutingStatusPanel routes={routePaths} error={routingError} />
+          </div>
         </div>
       </div>
     </Layout>
