@@ -1,7 +1,14 @@
 import { auth } from "../../firebase/config";
 import { authFetch } from "../../utils/authFetch";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
+const API_BASE = import.meta.env.DEV
+  ? import.meta.env.VITE_API_BASE_URL || "http://localhost:5000"
+  : "";
+
+function buildApiUrl(path) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE}${normalizedPath}`;
+}
 
 async function handleResponse(response, fallbackMessage) {
   let data = null;
@@ -35,7 +42,7 @@ export const updateUserProfile = async ({
     throw new Error("No user ID available for profile update.");
   }
 
-  const response = await authFetch(`${API_BASE}/api/users/${targetUserId}`, {
+  const response = await authFetch(buildApiUrl(`/api/users/${targetUserId}`), {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -50,8 +57,8 @@ export const updateUserProfile = async ({
     }),
   });
 
-  await handleResponse(response, "Failed to update user profile.");
-  return { success: true };
+  const data = await handleResponse(response, "Failed to update user profile.");
+  return { success: true, data };
 };
 
 export const updatePassword = async (newPassword, currentPassword = "") => {
@@ -59,7 +66,7 @@ export const updatePassword = async (newPassword, currentPassword = "") => {
     throw new Error("Password must be at least 6 characters.");
   }
 
-  const response = await authFetch(`${API_BASE}/api/auth/password`, {
+  const response = await authFetch(buildApiUrl("/api/auth/password"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -70,8 +77,8 @@ export const updatePassword = async (newPassword, currentPassword = "") => {
     }),
   });
 
-  await handleResponse(response, "Failed to update password.");
-  return { success: true };
+  const data = await handleResponse(response, "Failed to update password.");
+  return { success: true, data };
 };
 
 export const getUserSessions = async (userId) => {
@@ -92,10 +99,10 @@ export const deleteUserAccount = async (userId) => {
     throw new Error("No authenticated user.");
   }
 
-  const response = await authFetch(`${API_BASE}/api/users/${targetUserId}`, {
+  const response = await authFetch(buildApiUrl(`/api/users/${targetUserId}`), {
     method: "DELETE",
   });
 
-  await handleResponse(response, "Failed to delete user.");
-  return { success: true };
+  const data = await handleResponse(response, "Failed to delete user.");
+  return { success: true, data };
 };
