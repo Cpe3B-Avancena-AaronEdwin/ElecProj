@@ -321,100 +321,6 @@ router.get("/providers", requireAuth, async (req, res, next) => {
   }
 });
 
-router.post("/password", requireAuth, async (req, res, next) => {
-  try {
-    const currentPassword = String(req.body.currentPassword || "");
-    const newPassword = String(req.body.newPassword || "");
-
-    if (!currentPassword) {
-      return res.status(400).json({ error: "Current password is required." });
-    }
-
-    if (!newPassword || newPassword.length < 6) {
-      return res
-        .status(400)
-        .json({ error: "New password must be at least 6 characters." });
-    }
-
-    const userRow = await findUserByUid(req.user.uid);
-
-    if (!userRow) {
-      return res.status(404).json({ error: "User not found." });
-    }
-
-    if (!userRow.password_hash) {
-      return res.status(400).json({
-        error:
-          "This account does not have password login enabled yet. Add a password first in Profile.",
-      });
-    }
-
-    const matches = await bcrypt.compare(currentPassword, userRow.password_hash);
-
-    if (!matches) {
-      return res.status(401).json({ error: "Current password is incorrect." });
-    }
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-
-    await pool.query(
-      "UPDATE users SET password_hash = ?, updated_at = ? WHERE uid = ?",
-      [passwordHash, new Date(), userRow.uid]
-    );
-
-    res.json({ message: "Password updated successfully." });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.post("/link/password", requireAuth, async (req, res, next) => {
-  try {
-    const email = normalizeEmail(req.body.email || "");
-    const password = String(req.body.password || "");
-
-    if (!email) {
-      return res.status(400).json({ error: "Email is required." });
-    }
-
-    if (!password || password.length < 6) {
-      return res
-        .status(400)
-        .json({ error: "Password must be at least 6 characters." });
-    }
-
-    const userRow = await findUserByUid(req.user.uid);
-
-    if (!userRow) {
-      return res.status(404).json({ error: "User not found." });
-    }
-
-    const existingEmail = await findUserByEmail(email);
-    if (existingEmail && existingEmail.uid !== req.user.uid) {
-      return res
-        .status(409)
-        .json({ error: "That email is already being used by another account." });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    await pool.query(
-      "UPDATE users SET email = ?, password_hash = ?, updated_at = ? WHERE uid = ?",
-      [email, passwordHash, new Date(), req.user.uid]
-    );
-
-    const user = mapUser(await findUserByUid(req.user.uid));
-    setAuthCookie(res, user);
-
-    res.json({
-      message: "Password login added successfully.",
-      user: buildAuthResponse(user),
-    });
-  } catch (error) {
-    next(error);
-  }
-});
-
 router.get("/google", (req, res, next) => {
   if (!googleClientId || !googleClientSecret) {
     return res
@@ -422,12 +328,9 @@ router.get("/google", (req, res, next) => {
       .json({ error: "Google OAuth is not configured on the backend." });
   }
 
-  const mode = req.query.mode === "link" ? "link" : "login";
-
   passport.authenticate("google", {
     scope: ["profile", "email"],
     session: false,
-    state: mode,
     prompt: "select_account",
   })(req, res, next);
 });
@@ -435,7 +338,10 @@ router.get("/google", (req, res, next) => {
 router.get("/google/callback", (req, res, next) => {
   passport.authenticate("google", { session: false }, async (err, profile) => {
     try {
-      if (err) return next(err);
+      if (err) {
+        console.error("Google callback error:", err);
+        return next(err);
+      }
 
       if (!profile) {
         return res.redirect(
@@ -449,41 +355,6 @@ router.get("/google/callback", (req, res, next) => {
       const email = normalizeEmail(profile.emails?.[0]?.value || "");
       const displayName = String(profile.displayName || "User").trim();
       const photoURL = String(profile.photos?.[0]?.value || "").trim();
-      const mode = req.query.state === "link" ? "link" : "login";
-      const currentAuthUser = await getAuthUserFromRequest(req);
-
-      if (mode === "link") {
-        if (!currentAuthUser?.uid) {
-          return res.redirect(
-            `${FRONTEND_URL}/profile?error=${encodeURIComponent(
-              "You must be logged in before linking Google."
-            )}`
-          );
-        }
-
-        const existingGoogle = await findUserByGoogleId(googleId);
-        if (existingGoogle && existingGoogle.uid !== currentAuthUser.uid) {
-          return res.redirect(
-            `${FRONTEND_URL}/profile?error=${encodeURIComponent(
-              "This Google account is already linked to another user."
-            )}`
-          );
-        }
-
-        await pool.query(
-          "UPDATE users SET google_id = ?, photo_url = COALESCE(NULLIF(photo_url, ''), ?), updated_at = ? WHERE uid = ?",
-          [googleId, photoURL || "", new Date(), currentAuthUser.uid]
-        );
-
-        const linkedUser = mapUser(await findUserByUid(currentAuthUser.uid));
-        setAuthCookie(res, linkedUser);
-
-        return res.redirect(
-          `${FRONTEND_URL}/profile?success=${encodeURIComponent(
-            "Google account linked successfully."
-          )}`
-        );
-      }
 
       let userRow = (await findUserByGoogleId(googleId)) || null;
 
@@ -546,6 +417,7 @@ router.get("/google/callback", (req, res, next) => {
 
       return res.redirect(`${FRONTEND_URL}/dashboard`);
     } catch (error) {
+      console.error("Google callback failure:", error);
       next(error);
     }
   })(req, res, next);

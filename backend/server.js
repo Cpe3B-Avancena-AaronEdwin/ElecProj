@@ -28,21 +28,22 @@ app.use(
   cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+
+      const isAllowedExact = allowedOrigins.includes(origin);
+      const isVercelPreview =
+        typeof origin === "string" &&
+        origin.startsWith("https://") &&
+        origin.includes(".vercel.app");
+
+      if (isAllowedExact || isVercelPreview) {
+        return callback(null, true);
+      }
 
       return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
   })
 );
-
-app.use((req, res, next) => {
-  const contentLength = req.headers["content-length"] || "0";
-  console.log(
-    `[REQ] ${req.method} ${req.originalUrl} content-length=${contentLength}`
-  );
-  next();
-});
 
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
