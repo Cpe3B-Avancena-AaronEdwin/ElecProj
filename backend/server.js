@@ -26,8 +26,17 @@ app.use(
   })
 );
 
+app.use((req, res, next) => {
+  const contentLength = req.headers["content-length"] || "0";
+  console.log(
+    `[REQ] ${req.method} ${req.originalUrl} content-length=${contentLength}`
+  );
+  next();
+});
+
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(passport.initialize());
 
 app.get("/", (req, res) => {
@@ -61,8 +70,15 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error("Server error:", err);
-  res.status(500).json({
+  console.error(`Server error on: ${req.method} ${req.originalUrl}`);
+  console.error(err);
+
+  const statusCode =
+    err.type === "entity.too.large"
+      ? 413
+      : err.statusCode || err.status || 500;
+
+  res.status(statusCode).json({
     error: err.message || "Internal server error",
   });
 });
@@ -71,7 +87,7 @@ const PORT = process.env.PORT || 5000;
 
 testDbConnection()
   .then(() => {
-    app.listen(PORT, () => {
+    app.listen(PORT, "0.0.0.0", () => {
       console.log(`Backend running on http://localhost:${PORT}`);
     });
   })
