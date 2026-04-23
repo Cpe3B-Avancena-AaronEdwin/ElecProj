@@ -20,34 +20,53 @@ dotenv.config();
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 const allowedOrigins = [
   "http://localhost:5173",
-  process.env.FRONTEND_URL,
-  process.env.FRONTEND_URL_WWW,
   "https://citybloop.com",
   "https://www.citybloop.com",
-].filter(Boolean);
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_WWW,
+]
+  .filter(Boolean)
+  .map((origin) => String(origin).trim().replace(/\/+$/, ""));
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true);
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
 
-      const isAllowedExact = allowedOrigins.includes(origin);
-      const isVercelPreview =
-        typeof origin === "string" &&
-        origin.startsWith("https://") &&
-        origin.includes(".vercel.app");
+    const normalizedOrigin = String(origin).trim().replace(/\/+$/, "");
 
-      if (isAllowedExact || isVercelPreview) {
-        return callback(null, true);
-      }
+    const isAllowedExact = allowedOrigins.includes(normalizedOrigin);
 
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
-    credentials: true,
-  })
-);
+    const isVercelPreview =
+      normalizedOrigin.startsWith("https://") &&
+      normalizedOrigin.endsWith(".vercel.app");
+
+    if (isAllowedExact || isVercelPreview) {
+      return callback(null, true);
+    }
+
+    console.error(`CORS blocked for origin: ${normalizedOrigin}`);
+    return callback(new Error(`CORS blocked for origin: ${normalizedOrigin}`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+  ],
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 app.use(cookieParser());
 app.use(express.json({ limit: "10mb" }));
@@ -58,6 +77,7 @@ app.get("/", (req, res) => {
   res.json({
     ok: true,
     message: "Backend is running",
+    allowedOrigins,
   });
 });
 
@@ -65,6 +85,7 @@ app.get("/api/health", (req, res) => {
   res.json({
     ok: true,
     message: "Express backend is running",
+    allowedOrigins,
   });
 });
 
@@ -104,6 +125,7 @@ testDbConnection()
   .then(() => {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Backend running on http://localhost:${PORT}`);
+      console.log("Allowed CORS origins:", allowedOrigins);
       startSnapshotJob();
     });
   })
