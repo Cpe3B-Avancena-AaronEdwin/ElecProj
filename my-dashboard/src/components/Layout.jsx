@@ -69,29 +69,27 @@ export default function Layout({ children }) {
     closeDropdown();
     navigate("/profile");
   };
+const navItems = useMemo(() => {
+  const items = [
+    { label: "Dashboard", path: "/dashboard", icon: "🏠" },
+    { label: "Traffic & Routes", path: "/traffic", icon: "📊" },
+    { label: "About Us", path: "/about", icon: "ℹ️" },
+    { label: "Trip Planner", path: "/trip-planner", icon: "🧭" },
+  ];
 
-  const navItems = useMemo(() => {
-    const items = [
-      { label: "Dashboard", path: "/dashboard", icon: "🏠" },
-      { label: "Data", path: "/data", icon: "📊" },
-      { label: "Trip Planner", path: "/trip-planner", icon: "🧭" },
-    ];
+  if (role === "admin") {
+    items.push(
+      { label: "Users Information Settings", path: "/admin/users", icon: "👤" },
+      { label: "Manage Routes", path: "/admin", icon: "🗺️" }
+    );
+  }
 
-    if (role === "admin") {
-      items.push(
-        { label: "User Management", path: "/admin/users", icon: "👤" },
-        { label: "Route Management", path: "/admin", icon: "🛣️" }
-      );
-    }
-
-    return items;
-  }, [role]);
+  return items;
+}, [role]);
 
   return (
     <div className="app">
       <div className="main full-width">
-
-        {/* HEADER */}
         <div className="header">
           <div className="header-left">
             <div className="header-icon">
@@ -104,7 +102,6 @@ export default function Layout({ children }) {
             </div>
           </div>
 
-          {/* USER DROPDOWN */}
           <div className="header-right">
             <div className="dropdown-wrapper" ref={dropdownRef}>
               <button
@@ -112,17 +109,24 @@ export default function Layout({ children }) {
                 type="button"
                 className="user-label"
                 onClick={toggleDropdown}
+                aria-haspopup="menu"
+                aria-expanded={dropdownOpen}
               >
                 Hello, {firstName}
               </button>
 
               {dropdownOpen && (
-                <div className="dropdown-menu">
-                  <button className="dropdown-item" onClick={handleProfile}>
+                <div className="dropdown-menu" role="menu">
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={handleProfile}
+                  >
                     Profile
                   </button>
 
                   <button
+                    type="button"
                     className="dropdown-item dropdown-item--danger"
                     onClick={handleLogout}
                   >
@@ -138,7 +142,7 @@ export default function Layout({ children }) {
           <aside className="nav-sidebar">
             <nav className="sidebar-menu">
               {navItems.map((item) => {
-                const isActive = location.pathname.startsWith(item.path);
+                const isActive = location.pathname === item.path;
 
                 return (
                   <Link
@@ -154,7 +158,7 @@ export default function Layout({ children }) {
             </nav>
           </aside>
 
-          <div className="content">{children}</div>
+          <main className="content">{children}</main>
         </div>
 
         <SiteFooter />

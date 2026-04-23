@@ -37,7 +37,6 @@ body,
 /* =========================
    HEADER
 ========================= */
-
 .header {
   height: auto;
   background-image: url("/header.gif");
@@ -48,14 +47,17 @@ body,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 18px 24px;
+  padding: 18px 24px 18px 90px;
   gap: 16px;
+  position: relative;
+  z-index: 20;
+  transition: padding-left 0.25s ease;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   flex: 1;
 }
 
@@ -239,29 +241,38 @@ body,
 .layout-body {
   display: flex;
   flex: 1;
+  width: 100%;
   gap: 0;
+  align-items: stretch;
+  position: relative;
 }
 
 .nav-sidebar {
-  width: 70px;
-  min-width: 70px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.98));
+  width: 72px;
+  min-width: 72px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.98));
   border-right: 1px solid rgba(148, 163, 184, 0.12);
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 16px 0;
   gap: 8px;
-  transition: width 0.25s ease;
-  position: relative;
-  z-index: 100;
   overflow: hidden;
+  position: absolute;
+  top: -98px;   /* adjust to your header height */
+  left: 0;
+  bottom: 0;
+  z-index: 40;
+  transition: width 0.25s ease;
 }
 
 .nav-sidebar:hover {
-  width: 330px;
+  width: 280px;
 }
 
+.main.full-width:has(.nav-sidebar:hover) .header {
+  padding-left: 300px;
+}
 .sidebar-brand {
   display: flex;
   flex-direction: column;
@@ -350,10 +361,18 @@ body,
   opacity: 1;
 }
 
+
 .content {
   flex: 1;
-  overflow-y: auto;
+  min-width: 0;
+  margin-left: 72px;
   background: var(--color-base);
+  overflow-y: auto;
+  transition: margin-left 0.25s ease;
+}
+
+.main.full-width:has(.nav-sidebar:hover) .content {
+  margin-left: 280px;
 }
 
 /* =========================
@@ -799,7 +818,7 @@ body,
     border-bottom: 1px solid rgba(148, 163, 184, 0.12);
     flex-direction: row;
     justify-content: center;
-    padding: 10px 0;
+    padding: 34px 0 16px;
     gap: 0;
   }
 
@@ -849,8 +868,8 @@ body,
 
 @media (max-width: 768px) {
   .header {
-    padding: 14px;
-  }
+  padding: 18px 24px 18px 90px;
+}
 
   .header-title {
     font-size: 1.4rem;
