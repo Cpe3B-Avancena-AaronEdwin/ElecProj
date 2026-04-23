@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_MAX_SAMPLE_POINTS = 15;
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 const SNAPSHOT_TIMEOUT_MS = 15000;
+
+const API_BASE = import.meta.env.DEV
+  ? (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000")
+  : "";
 
 const EMPTY_SUMMARY = {
   total: 0,
@@ -54,6 +57,11 @@ function resolveOptions(options) {
     maxSamplePoints: options?.maxSamplePoints ?? DEFAULT_MAX_SAMPLE_POINTS,
     skipWhenHidden: options?.skipWhenHidden ?? true,
   };
+}
+
+function buildApiUrl(path) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_BASE}${normalizedPath}`;
 }
 
 function toLatLng(stop) {
@@ -366,7 +374,7 @@ export function useTrafficData(stops = [], _apiKey, options = {}) {
     }
 
     const historyRows = await fetchJson(
-      `${API_BASE}/api/traffic/history?hours=24&limit=96&summaryOnly=1`,
+      buildApiUrl("/api/traffic/history?hours=24&limit=96&summaryOnly=1"),
       "Failed to load traffic history."
     );
 
@@ -415,7 +423,7 @@ export function useTrafficData(stops = [], _apiKey, options = {}) {
         if (liveTraffic) {
           try {
             await fetchJsonWithTimeout(
-              `${API_BASE}/api/traffic/snapshot`,
+              buildApiUrl("/api/traffic/snapshot"),
               "Failed to generate traffic snapshot.",
               {
                 method: "POST",
