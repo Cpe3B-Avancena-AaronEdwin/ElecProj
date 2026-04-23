@@ -55,8 +55,7 @@ export default function Signup() {
 
     try {
       await registerUser(fullName, username, email, password);
-    
-      window.location.assign("/dashboard");
+      navigate("/dashboard");
     } catch (err) {
       console.error("Signup error:", err);
       setError(err.message || "Sign up failed.");
@@ -65,10 +64,19 @@ export default function Signup() {
     }
   };
 
-  const handleGoogleSignup = () => {
+  const handleGoogleSignup = async () => {
     setError("");
     setGoogleLoading(true);
-    signInWithGoogle();
+
+    try {
+      await signInWithGoogle();
+      navigate("/dashboard");
+    } catch (err) {
+      console.error("Google signup error:", err);
+      setError(err.message || "Google sign-up failed.");
+    } finally {
+      setGoogleLoading(false);
+    }
   };
 
   return (
@@ -81,7 +89,7 @@ export default function Signup() {
           <div className="brand-copy">
             <h1 className="brand-name">Create Account</h1>
             <p className="brand-subtitle">
-              Set up your CityBloop access using backend auth.
+              Set up your CityBloop access in Firebase.
             </p>
           </div>
         </div>
@@ -174,7 +182,8 @@ export default function Signup() {
           </Button>
 
           <p className="login-hint">
-            Usernames are unique and saved in lowercase. Google sign-up is handled by the backend.
+            Usernames are unique and are saved in lowercase. Google signup still
+            works, but Google users can set their username later in Profile.
           </p>
         </form>
       </div>

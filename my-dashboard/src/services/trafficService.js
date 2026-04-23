@@ -1,80 +1,23 @@
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
+export async function fetchTrafficData(points, apiKey) {
+  const results = [];
 
-async function handleResponse(response, fallbackMessage) {
-  let data = null;
+  for (const pt of points) {
+    const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${pt.lat},${pt.lng}&key=${apiKey}`;
 
-  try {
-    data = await response.json();
-  } catch {
-    data = null;
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+
+      results.push({
+        lat: pt.lat,
+        lng: pt.lng,
+        speed: data?.flowSegmentData?.currentSpeed || 0,
+        freeFlow: data?.flowSegmentData?.freeFlowSpeed || 1,
+      });
+    } catch (e) {
+      console.error("Traffic fetch error:", e);
+    }
   }
 
-  if (!response.ok) {
-    throw new Error(data?.error || fallbackMessage);
-  }
-
-  return data;
-}
-
-export async function fetchTrafficData(points) {
-  if (!Array.isArray(points) || points.length === 0) return [];
-
-  const response = await fetch(`${API_BASE}/api/traffic`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ points }),
-  });
-
-  const data = await handleResponse(response, "Failed to fetch traffic data");
-  return Array.isArray(data.results) ? data.results : [];
-}
-
-export async function fetchTrafficSummary(points) {
-  const results = await fetchTrafficData(points);
-
-  if (!results.length) {
-    return {
-      averageSpeed: 0,
-      averageFreeFlow: 0,
-      congestionScore: 0,
-      congestionLevel: "Low",
-      points: [],
-    };
-  }
-
-  const totalSpeed = results.reduce(
-    (sum, item) => sum + Number(item.speed || 0),
-    0
-  );
-
-  const totalFreeFlow = results.reduce(
-    (sum, item) => sum + Number(item.freeFlow || 0),
-    0
-  );
-
-  const averageSpeed = totalSpeed / results.length;
-  const averageFreeFlow = totalFreeFlow / results.length || 1;
-
-  const ratio = averageSpeed / averageFreeFlow;
-  const congestionScore = Math.max(
-    0,
-    Math.min(100, Math.round((1 - ratio) * 100))
-  );
-
-  let congestionLevel = "Low";
-  if (congestionScore >= 67) {
-    congestionLevel = "High";
-  } else if (congestionScore >= 34) {
-    congestionLevel = "Medium";
-  }
-
-  return {
-    averageSpeed,
-    averageFreeFlow,
-    congestionScore,
-    congestionLevel,
-    points: results,
-  };
+  return results;
 }

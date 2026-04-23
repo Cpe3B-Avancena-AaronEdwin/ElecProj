@@ -5,11 +5,7 @@ import { logoutUser } from "../firebase/auth";
 import SiteFooter from "./SiteFooter";
 
 function getFirstName(user) {
-  const rawName =
-    user?.displayName?.trim() ||
-    user?.email?.split("@")[0] ||
-    "User";
-
+  const rawName = user?.displayName?.trim() || user?.email?.split("@")[0] || "User";
   const firstToken = rawName.split(/\s+/)[0] || "User";
   return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
 }
@@ -20,7 +16,6 @@ export default function Layout({ children }) {
   const { user, role } = useAuth();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
-
   const dropdownRef = useRef(null);
   const buttonRef = useRef(null);
 
@@ -32,7 +27,8 @@ export default function Layout({ children }) {
 
   useEffect(() => {
     function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (!dropdownRef.current) return;
+      if (!dropdownRef.current.contains(e.target)) {
         setDropdownOpen(false);
       }
     }
@@ -52,12 +48,13 @@ export default function Layout({ children }) {
     };
   }, []);
 
+  const closeDropdown = () => setDropdownOpen(false);
+
   const toggleDropdown = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     setDropdownOpen((prev) => !prev);
   };
-
-  const closeDropdown = () => setDropdownOpen(false);
 
   const handleLogout = async () => {
     closeDropdown();
@@ -104,15 +101,17 @@ const navItems = useMemo(() => {
 
           <div className="header-right">
             <div className="dropdown-wrapper" ref={dropdownRef}>
+              <span className="user-label">Hello, {firstName}</span>
+
               <button
                 ref={buttonRef}
                 type="button"
-                className="user-label"
+                className="dropdown-trigger"
                 onClick={toggleDropdown}
                 aria-haspopup="menu"
                 aria-expanded={dropdownOpen}
               >
-                Hello, {firstName}
+                ☰
               </button>
 
               {dropdownOpen && (
@@ -125,10 +124,33 @@ const navItems = useMemo(() => {
                     Profile
                   </button>
 
+                  {role === "admin" && (
+                    <>
+                      <button
+                        type="button"
+                        className="dropdown-item"
+                        onClick={handleAdminUsers}
+                        role="menuitem"
+                      >
+                        Users Information Settings
+                      </button>
+
+                      <button
+                        type="button"
+                        className="dropdown-item"
+                        onClick={handleAdminPanel}
+                        role="menuitem"
+                      >
+                        Manage Routes
+                      </button>
+                    </>
+                  )}
+
                   <button
                     type="button"
                     className="dropdown-item dropdown-item--danger"
                     onClick={handleLogout}
+                    role="menuitem"
                   >
                     Log out
                   </button>
@@ -161,6 +183,7 @@ const navItems = useMemo(() => {
           <main className="content">{children}</main>
         </div>
 
+        <div className="content">{children}</div>
         <SiteFooter />
       </div>
     </div>

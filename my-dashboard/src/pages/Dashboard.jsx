@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   ResponsiveContainer,
@@ -17,7 +16,13 @@ import { useTrafficData } from "../hooks/useTrafficData";
 import { useDashboardMetrics } from "../hooks/useDashboardMetrics";
 import { useCurrentPrediction } from "../hooks/useCurrentPrediction";
 
-import DashboardMap from "../components/dashboard/DashboardMap";
+import DashboardStats from "../components/dashboard/DashboardStats";
+import GtfsStatusPanel from "../components/dashboard/GtfsStatusPanel";
+import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
+import CurrentPredictionPanel from "../components/dashboard/CurrentPredictionPanel";
+import TrafficStatusPanel from "../components/dashboard/TrafficStatusPanel";
+import PredictionStatusPanel from "../components/dashboard/PredictionStatusPanel";
+
 import Layout from "../components/Layout";
 
 function scoreToRatio(score) {
@@ -109,47 +114,6 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-const sectionCardStyle = {
-  background: "#071a2b",
-  border: "1px solid rgba(34, 211, 238, 0.2)",
-  borderRadius: "22px",
-  padding: "1.5rem",
-  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.18)",
-};
-
-const statCardStyle = {
-  background: "linear-gradient(180deg, #0b2150 0%, #071a2b 100%)",
-  border: "1px solid rgba(59, 130, 246, 0.18)",
-  borderRadius: "22px",
-  padding: "1.6rem",
-  minHeight: "170px",
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "center",
-  boxShadow: "0 10px 30px rgba(0, 0, 0, 0.18)",
-};
-
-const smallCardStyle = {
-  background: "#071a2b",
-  border: "1px solid rgba(34, 211, 238, 0.18)",
-  borderRadius: "18px",
-  padding: "1.25rem",
-  boxShadow: "0 10px 24px rgba(0, 0, 0, 0.16)",
-};
-
-const tripButtonStyle = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "0.95rem 1.4rem",
-  borderRadius: "16px",
-  background: "linear-gradient(90deg, #22d3ee 0%, #3b82f6 100%)",
-  color: "#031525",
-  fontWeight: 800,
-  textDecoration: "none",
-  minWidth: "170px",
-};
-
 export default function Dashboard() {
   const { user } = useAuth();
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
@@ -164,7 +128,7 @@ export default function Dashboard() {
     cacheMs: 5 * 60 * 1000,
   });
 
-  const { gtfsBundle } = useGtfsBundle();
+  const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
 
   const gtfsRoutes = gtfsBundle?.routes || [];
   const gtfsStops = gtfsBundle?.stops || [];
@@ -183,6 +147,8 @@ export default function Dashboard() {
     trafficSummary = {},
     trafficHistory = [],
     historyAnalytics = {},
+    trafficLoading,
+    trafficError,
     lastTrafficUpdated,
   } = useTrafficData(gtfsStops, TOMTOM_API_KEY, {
     enabled: true,
@@ -200,7 +166,7 @@ export default function Dashboard() {
     trafficSummary,
   });
 
-  const { currentPrediction, predictionMessage } = useCurrentPrediction({
+  const { currentPrediction, predictionError, predictionMessage } = useCurrentPrediction({
     routes: gtfsRoutes,
     stops: gtfsStops,
     trips: gtfsTrips,
@@ -212,6 +178,28 @@ export default function Dashboard() {
     sourceRouteMap: gtfsRouteMap,
     sourceMode: "gtfs",
   });
+
+  const quickAlert = useMemo(() => {
+    if (trafficSummary.closed > 0) {
+      return { level: "critical", message: "⚠ Road closure detected on monitored corridor" };
+    }
+
+    if (currentPrediction.predictedDelayRisk === "High") {
+      return {
+        level: "heavy",
+        message: `⚠ ${currentPrediction.routeCode} likely delayed by ${currentPrediction.etaImpactMinutes} mins`,
+      };
+    }
+
+    if (currentPrediction.trend === "Rising" || currentPrediction.trend === "Worsening") {
+      return {
+        level: "moderate",
+        message: "⚠ Congestion trend is rising across key corridors",
+      };
+    }
+
+    return { level: "normal", message: "✅ Traffic is flowing smoothly" };
+  }, [currentPrediction, trafficSummary.closed]);
 
   const graphPoints = useMemo(() => {
     if (trafficHistory.length >= 2) {
@@ -289,384 +277,184 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div
-        className="dashboard-container"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "1.5rem",
-        }}
-      >
-        <div
-  style={{
-    width: "100%",
-    marginBottom: "0.75rem",
-  }}
->
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      borderRadius: "18px",
-      border: "1px solid rgba(34, 211, 238, 0.2)",
-      background: "#071a2b",
-      overflow: "hidden",
-      boxShadow: "0 10px 24px rgba(0, 0, 0, 0.16)",
-      minHeight: "56px",
-    }}
-  >
-    <input
-      type="text"
-      placeholder="Search route, stop, destination..."
-      style={{
-        flex: 1,
-        minWidth: 0,
-        padding: "1rem 1.1rem",
-        border: "none",
-        outline: "none",
-        background: "transparent",
-        color: "#e6fcff",
-        fontSize: "1rem",
-      }}
-    />
+      <div className="dashboard-container">
+        <DashboardStats metrics={metrics} />
 
-    <div
-      style={{
-        width: "1px",
-        alignSelf: "stretch",
-        background: "rgba(34, 211, 238, 0.18)",
-      }}
-    />
+        <div className="dashboard-chart-row">
+          <div className="status-card card vehicle-flow-card vehicle-flow-card--full">
+            <div className="vehicle-flow-title">{graphTitle}</div>
 
-    <select
-      defaultValue=""
-      style={{
-        minWidth: "240px",
-        padding: "1rem 1.1rem",
-        border: "none",
-        outline: "none",
-        background: "#071a2b",
-        color: "#e6fcff",
-        fontSize: "1rem",
-        fontWeight: 600,
-        cursor: "pointer",
-        appearance: "none",
-        WebkitAppearance: "none",
-        MozAppearance: "none",
-        backgroundImage:
-          "linear-gradient(45deg, transparent 50%, #cfeef6 50%), linear-gradient(135deg, #cfeef6 50%, transparent 50%)",
-        backgroundPosition:
-          "calc(100% - 22px) calc(50% - 3px), calc(100% - 16px) calc(50% - 3px)",
-        backgroundSize: "6px 6px, 6px 6px",
-        backgroundRepeat: "no-repeat",
-        paddingRight: "2.5rem",
-      }}
-    >
-      <option value="" disabled>
-        Select current location
-      </option>
-      <option value="Bulacan">Bulacan</option>
-      <option value="Monumento">Monumento</option>
-      <option value="Caloocan">Caloocan</option>
-      <option value="Quezon City">Quezon City</option>
-      <option value="Manila">Manila</option>
-      <option value="Makati">Makati</option>
-      <option value="Pasig">Pasig</option>
-      <option value="Taguig">Taguig</option>
-    </select>
-  </div>
-</div>
+            <div className="vehicle-flow-chart-box vehicle-flow-chart-box--full">
+              <ResponsiveContainer width="100%" height={420}>
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 12, right: 12, left: 8, bottom: 8 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="4 6"
+                    stroke="rgba(255,255,255,0.12)"
+                    vertical={true}
+                    horizontal={true}
+                  />
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: "1.25rem",
-          }}
-        >
-          <div style={statCardStyle}>
-            <div
-              style={{
-                color: "rgba(230, 252, 255, 0.7)",
-                fontSize: "0.95rem",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                marginBottom: "1rem",
-              }}
-            >
-              Last Updated
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                  />
+
+                  <YAxis
+                    domain={[0, 100]}
+                    ticks={[0, 25, 50, 75, 100]}
+                    tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
+                    axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
+                    tickLine={false}
+                    width={54}
+                  />
+
+                  <Tooltip
+                    content={<CustomTooltip />}
+                    cursor={{
+                      stroke: "rgba(255,255,255,0.95)",
+                      strokeWidth: 2,
+                    }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#45f4ff"
+                    strokeWidth={5}
+                    dot={false}
+                    activeDot={{
+                      r: 8,
+                      fill: "#ffffff",
+                      stroke: "#45f4ff",
+                      strokeWidth: 4,
+                    }}
+                    isAnimationActive={true}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            <div
-              style={{
-                color: "#ffffff",
-                fontSize: "2rem",
-                fontWeight: 800,
-                lineHeight: 1.1,
-                marginBottom: "0.75rem",
-              }}
-            >
-              {formatUpdatedAt(lastTrafficUpdated)}
-            </div>
-            <div
-              style={{
-                color: "rgba(230, 252, 255, 0.75)",
-                fontSize: "1rem",
-              }}
-            >
+
+            <div className="status-card-note">{graphNote}</div>
+          </div>
+        </div>
+
+        <div className="dashboard-status-bottom-row">
+          <div className="status-card card">
+            <div className="status-card-title">Last Updated</div>
+            <div className="status-card-value">{formatUpdatedAt(lastTrafficUpdated)}</div>
+            <div className="status-card-note">
               {lastTrafficUpdated
                 ? `Updated ${timeSince(lastTrafficUpdated)} ago`
                 : "Waiting for latest traffic refresh."}
             </div>
           </div>
 
-          <div style={statCardStyle}>
-            <div
-              style={{
-                color: "rgba(230, 252, 255, 0.7)",
-                fontSize: "0.95rem",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                marginBottom: "1rem",
-              }}
-            >
-              On-Time Rate
+          <div className="status-card card">
+            <div className="status-card-title">Quick Alerts</div>
+            <div className={`alert-pill alert-pill--${quickAlert.level}`}>
+              {quickAlert.message}
+            </div>
+            <div className="status-card-note">{currentPrediction.congestionForecast}</div>
+          </div>
+        </div>
+
+        <div className="dashboard-insights-grid">
+          <div className="card dashboard-small-card">
+            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
+              Prediction Confidence
             </div>
             <div
               style={{
-                color: "#ffffff",
                 fontSize: "2rem",
                 fontWeight: 800,
-                lineHeight: 1.1,
-                marginBottom: "0.75rem",
+                color: "var(--text-on-dark)",
               }}
             >
-              {metrics.onTimeRate}%
+              {currentPrediction.confidence}%
             </div>
-            <div
-              style={{
-                color: "rgba(230, 252, 255, 0.75)",
-                fontSize: "1rem",
-              }}
-            >
-              Percentage of trips meeting the planned schedule.
+            <div style={{ color: "var(--text-sub)", marginTop: "0.35rem" }}>
+              Based on {currentPrediction.basedOnTrafficSamples} live samples,{" "}
+              {currentPrediction.historicalSnapshotCount24h} last-24h snapshots, and{" "}
+              {currentPrediction.historicalSnapshotCount7d} seven-day snapshots.
             </div>
           </div>
-        </div>
 
-        <div style={sectionCardStyle}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "1rem",
-              flexWrap: "wrap",
-              gap: "1rem",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  fontSize: "1.75rem",
-                  fontWeight: 800,
-                  color: "#e6fcff",
-                }}
-              >
-                Live Traffic Map
-              </div>
-              <div
-                style={{
-                  color: "rgba(230,252,255,0.75)",
-                  fontSize: "1rem",
-                  marginTop: "0.35rem",
-                }}
-              >
-                Visual transit and congestion data across the network.
-              </div>
-            </div>
-
-            <Link to="/trip-planner" style={tripButtonStyle}>
-              Plan Your Trip
-            </Link>
-          </div>
-
-          <div
-            style={{
-              position: "relative",
-              height: "420px",
-              borderRadius: "18px",
-              overflow: "hidden",
-            }}
-          >
-            <DashboardMap
-              stops={gtfsStops}
-              vehicles={vehicles}
-              routePaths={[]}
-              trafficSamples={trafficSamples}
-              showTrafficFlow={true}
-              tomtomApiKey={TOMTOM_API_KEY}
-              showStops={false}
-              showRoutes={true}
-            />
-
-            <div className="map-legend">
-              <div className="legend-title">Traffic Legend</div>
-
-              <div className="legend-item">
-                <span className="legend-color red"></span>
-                Heavy Traffic
-              </div>
-
-              <div className="legend-item">
-                <span className="legend-color yellow"></span>
-                Moderate Traffic
-              </div>
-
-              <div className="legend-item">
-                <span className="legend-color green"></span>
-                Light Traffic
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div style={sectionCardStyle}>
-          <div
-            style={{
-              fontSize: "1.5rem",
-              fontWeight: 800,
-              color: "#e6fcff",
-              marginBottom: "1rem",
-            }}
-          >
-            {graphTitle}
-          </div>
-
-          <div
-            className="vehicle-flow-chart-box vehicle-flow-chart-box--full"
-            style={{
-              background: "rgba(5, 18, 35, 0.78)",
-              borderRadius: "18px",
-              padding: "0.75rem 0.75rem 0.25rem",
-            }}
-          >
-            <ResponsiveContainer width="100%" height={420}>
-              <LineChart
-                data={chartData}
-                margin={{ top: 12, right: 12, left: 8, bottom: 8 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="4 6"
-                  stroke="rgba(255,255,255,0.12)"
-                  vertical={true}
-                  horizontal={true}
-                />
-
-                <XAxis
-                  dataKey="time"
-                  tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
-                  axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
-                  tickLine={false}
-                  interval="preserveStartEnd"
-                />
-
-                <YAxis
-                  domain={[0, 100]}
-                  ticks={[0, 25, 50, 75, 100]}
-                  tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
-                  axisLine={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }}
-                  tickLine={false}
-                  width={54}
-                />
-
-                <Tooltip
-                  content={<CustomTooltip />}
-                  cursor={{
-                    stroke: "rgba(255,255,255,0.95)",
-                    strokeWidth: 2,
-                  }}
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="score"
-                  stroke="#45f4ff"
-                  strokeWidth={5}
-                  dot={false}
-                  activeDot={{
-                    r: 8,
-                    fill: "#ffffff",
-                    stroke: "#45f4ff",
-                    strokeWidth: 4,
-                  }}
-                  isAnimationActive={true}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div
-            style={{
-              color: "rgba(230, 252, 255, 0.75)",
-              marginTop: "0.9rem",
-            }}
-          >
-            {graphNote}
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "1.25rem",
-          }}
-        >
-          <div style={smallCardStyle}>
-            <div style={{ color: "rgba(230, 252, 255, 0.68)", marginBottom: "0.5rem" }}>
+          <div className="card dashboard-small-card" style={{ background: recommendationTone }}>
+            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
               Recommended Action
             </div>
             <div
               style={{
                 fontSize: "1.05rem",
                 fontWeight: 700,
-                color: "#e6fcff",
+                color: "var(--text-on-dark)",
               }}
             >
-              {currentPrediction.recommendation ||
-                "Monitor the route and allow extra time when congestion increases."}
+              {currentPrediction.recommendation}
             </div>
-            <div style={{ color: "rgba(230, 252, 255, 0.72)", marginTop: "0.45rem" }}>
-              {currentPrediction.etaImpactMinutes != null
-                ? `Expected delay impact: +${currentPrediction.etaImpactMinutes} minutes.`
-                : "No delay impact detected currently."}
+            <div style={{ color: "var(--text-sub)", marginTop: "0.45rem" }}>
+              Estimated delay impact: +{currentPrediction.etaImpactMinutes} minutes.
             </div>
           </div>
 
-          <div
-            style={{
-              ...smallCardStyle,
-              background: recommendationTone,
-            }}
-          >
-            <div style={{ color: "rgba(230, 252, 255, 0.68)", marginBottom: "0.5rem" }}>
-              Smart Prediction
+          <div className="card dashboard-small-card">
+            <div style={{ color: "var(--text-sub)", marginBottom: "0.5rem" }}>
+              Historical Peak Window
             </div>
             <div
               style={{
-                fontSize: "1.05rem",
+                color: "var(--text-on-dark)",
                 fontWeight: 700,
-                color: "#e6fcff",
+                marginBottom: "0.35rem",
               }}
             >
-              {currentPrediction.predictedDelayRisk || "Stable"}
+              {currentPrediction.predictedPeakWindow || "Building history"}
             </div>
-            <div style={{ color: "rgba(230, 252, 255, 0.72)", marginTop: "0.45rem" }}>
-              {predictionMessage ||
-                "The system compares current traffic and route conditions to give a simple on-time prediction."}
+            <div style={{ color: "var(--text-sub)" }}>
+              24h avg: {currentPrediction.historicalAverageScore24h ?? 0}/100 • 7d avg:{" "}
+              {currentPrediction.historicalAverageScore7d ?? 0}/100
             </div>
+          </div>
+        </div>
+
+        <div className="dashboard-panels-grid">
+          <div className="dashboard-panel-item">
+            <GtfsStatusPanel gtfsBundle={gtfsBundle} loading={gtfsLoading} error={gtfsError} />
+          </div>
+
+          <div className="dashboard-panel-item">
+            <TrafficSummaryPanel summary={trafficSummary} />
+          </div>
+
+          <div className="dashboard-panel-item">
+            <TrafficStatusPanel
+              loading={trafficLoading}
+              error={trafficError}
+              sourceMode="gtfs"
+              showTrafficOverlay={true}
+              samplePoints={trafficSamples.length}
+              apiConfigured={!!TOMTOM_API_KEY}
+            />
+          </div>
+        </div>
+
+        <div className="dashboard-bottom-grid">
+          <div className="dashboard-panel-item">
+            <CurrentPredictionPanel prediction={currentPrediction} />
+          </div>
+
+          <div className="dashboard-panel-item">
+            <PredictionStatusPanel
+              prediction={currentPrediction}
+              error={predictionError}
+              message={predictionMessage}
+            />
           </div>
         </div>
       </div>

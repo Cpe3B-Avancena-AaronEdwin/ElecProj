@@ -27,6 +27,12 @@ body,
   flex-direction: column;
 }
 
+.content {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--color-base);
+}
+
 .sidebar,
 .topbar,
 .page-title,
@@ -109,41 +115,29 @@ body,
 ========================= */
 
 .user-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-
-  padding: 8px 14px;
-  height: 40px;
-
-  border-radius: 10px;
-  border: 1px solid #475569;
   background: #1e293b;
   color: #f8fafc;
-
+  padding: 8px 14px;
+  border-radius: 10px;
   font-weight: 600;
   font-size: 0.95rem;
-
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
-
-.user-label:hover {
-  background: #334155;
-  border-color: #60a5fa;
-  transform: scale(1.05);
-}
-
-.user-label:active {
-  transform: scale(0.95);
+  border: 1px solid #475569;
 }
 
 .dropdown-wrapper {
   position: relative;
-  display: inline-flex;
-  align-items: center;
+}
+
+.dropdown-trigger {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid #475569;
+  background: #1e293b;
+  color: #ffffff;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
 }
 
 .dropdown-trigger:hover {
@@ -236,146 +230,6 @@ body,
 
 /* =========================
    VERTICAL SIDEBAR NAV
-========================= */
-
-.layout-body {
-  display: flex;
-  flex: 1;
-  width: 100%;
-  gap: 0;
-  align-items: stretch;
-  position: relative;
-}
-
-.nav-sidebar {
-  width: 72px;
-  min-width: 72px;
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(15, 23, 42, 0.98));
-  border-right: 1px solid rgba(148, 163, 184, 0.12);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16px 0;
-  gap: 8px;
-  overflow: hidden;
-  position: absolute;
-  top: -98px;   /* adjust to your header height */
-  left: 0;
-  bottom: 0;
-  z-index: 40;
-  transition: width 0.25s ease;
-}
-
-.nav-sidebar:hover {
-  width: 280px;
-}
-
-.main.full-width:has(.nav-sidebar:hover) .header {
-  padding-left: 300px;
-}
-.sidebar-brand {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  width: 100%;
-  margin-bottom: 12px;
-}
-
-.sidebar-brand-icon {
-  font-size: 1.8rem;
-  line-height: 1;
-}
-
-.sidebar-brand-text {
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: var(--text-sub);
-  opacity: 0;
-  white-space: nowrap;
-  transition: opacity 0.25s ease;
-}
-
-.nav-sidebar:hover .sidebar-brand-text {
-  opacity: 1;
-}
-
-.sidebar-menu {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  color: var(--text-sub);
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 1.5rem;
-  border: 1px solid transparent;
-  transition: all 0.15s ease;
-  border-radius: 10px;
-  margin: 0 8px;
-  justify-content: flex-start;
-  white-space: nowrap;
-}
-
-.nav-item:hover {
-  background: rgba(34, 211, 238, 0.08);
-  color: var(--accent);
-  border-color: rgba(34, 211, 238, 0.2);
-}
-
-.nav-item.active {
-  color: var(--accent);
-  border-color: rgba(34, 211, 238, 0.35);
-  background: rgba(34, 211, 238, 0.12);
-}
-
-.nav-icon {
-  font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  min-width: 24px;
-}
-
-.nav-label {
-  opacity: 0;
-  transition: opacity 0.25s ease;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.nav-sidebar:hover .nav-label {
-  opacity: 1;
-}
-
-
-.content {
-  flex: 1;
-  min-width: 0;
-  margin-left: 72px;
-  background: var(--color-base);
-  overflow-y: auto;
-  transition: margin-left 0.25s ease;
-}
-
-.main.full-width:has(.nav-sidebar:hover) .content {
-  margin-left: 280px;
-}
-
-/* =========================
    DASHBOARD / SHARED PAGE LAYOUT
 ========================= */
 
@@ -454,19 +308,13 @@ body,
   height: 390px;
   min-height: 390px;
   border-radius: 18px;
-  padding: 0px;
+  padding: 8px;
   background: linear-gradient(
     180deg,
     rgba(59, 130, 246, 0.04),
     rgba(15, 23, 42, 0.02)
   );
   overflow: hidden;
-}
-
-/* 🔥 FIX: make Leaflet map follow rounded corners */
-.vehicle-flow-chart-box .leaflet-container {
-  border-bottom-left-radius: 18px;
-  border-bottom-right-radius: 18px;
 }
 
 .vehicle-flow-chart-box--full {
@@ -687,28 +535,6 @@ body,
   box-sizing: border-box;
 }
 
-.primary-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--accent);
-  color: #0f172a;
-  text-decoration: none;
-  border: none;
-  border-radius: 14px;
-
-  padding: 1.2rem 1.8rem;   /* ⬅️ bigger */
-  font-size: 1.15rem;       /* ⬅️ larger text */
-  font-weight: 700;
-
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.primary-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 30px rgba(56, 189, 248, 0.18);
-}
-
 .dashboard-panels-grid .card,
 .dashboard-panels-grid .panel,
 .dashboard-bottom-grid .card,
@@ -921,47 +747,3 @@ body,
     min-height: 250px;
   }
 }
-
-/* =========================
-   MAP LEGEND (ADD THIS AT THE VERY BOTTOM)
-========================= */
-
-.map-legend {
-  position: absolute;
-  bottom: 16px;
-  left: 16px;
-
-  background: rgba(15, 23, 42, 0.9);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 12px;
-
-  padding: 12px 14px;
-  color: #fff;
-  font-size: 0.9rem;
-  z-index: 500;
-
-  backdrop-filter: blur(6px);
-}
-
-.legend-title {
-  font-weight: 700;
-  margin-bottom: 8px;
-  font-size: 0.95rem;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.legend-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.legend-color.red { background: #ef4444; }
-.legend-color.yellow { background: #facc15; }
-.legend-color.green { background: #22c55e; }

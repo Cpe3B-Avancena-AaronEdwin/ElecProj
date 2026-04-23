@@ -81,10 +81,7 @@ export default function Routes() {
         id: routeId,
         routeCode: route.routeCode || route.route_short_name || "N/A",
         routeName:
-          route.routeName ||
-          route.route_long_name ||
-          route.route_desc ||
-          "Unnamed Route",
+          route.routeName || route.route_long_name || route.route_desc || "Unnamed Route",
       };
     });
     return map;
@@ -103,10 +100,7 @@ export default function Routes() {
       id: route.id || route.route_id,
       code: route.routeCode || route.route_short_name || "N/A",
       name:
-        route.routeName ||
-        route.route_long_name ||
-        route.route_desc ||
-        "Unnamed Route",
+        route.routeName || route.route_long_name || route.route_desc || "Unnamed Route",
     };
   }, [selectedRouteId, sourceRouteMap]);
 
@@ -180,15 +174,21 @@ export default function Routes() {
     const shapePoints = rawGtfsShapes
       .filter((shape) => (shape.shape_id || shape.shapeId) === selectedShapeId)
       .sort((a, b) => {
-        const seqA = Number(a.shape_pt_sequence ?? a.shapePtSequence ?? 0);
-        const seqB = Number(b.shape_pt_sequence ?? b.shapePtSequence ?? 0);
+        const seqA = Number(
+          a.shape_pt_sequence ?? a.shapePtSequence ?? 0
+        );
+        const seqB = Number(
+          b.shape_pt_sequence ?? b.shapePtSequence ?? 0
+        );
         return seqA - seqB;
       })
       .map((shape) => [
         parseFloat(shape.shape_pt_lat ?? shape.shapePtLat),
         parseFloat(shape.shape_pt_lon ?? shape.shapePtLon),
       ])
-      .filter((point) => !Number.isNaN(point[0]) && !Number.isNaN(point[1]));
+      .filter(
+        (point) => !Number.isNaN(point[0]) && !Number.isNaN(point[1])
+      );
 
     return {
       filteredStops: orderedStops,
@@ -234,8 +234,7 @@ export default function Routes() {
     return filteredStops;
   }, [filteredStops, isAllGtfs]);
 
-  const trafficEnabled =
-    showTrafficOverlay && !isAllGtfs && selectedRouteId !== "all";
+  const trafficEnabled = showTrafficOverlay && !isAllGtfs && selectedRouteId !== "all";
 
   const {
     trafficSamples = [],
@@ -270,29 +269,15 @@ export default function Routes() {
     }
   );
 
-  const isLoading = sourceMode === "gtfs" ? gtfsLoading : loadingMapData;
+  const isLoading =
+    sourceMode === "gtfs" ? gtfsLoading : loadingMapData;
 
   return (
     <Layout>
-      <div className="dashboard-container route-management-page">
-        <div
-          style={{
-            marginBottom: "1.5rem",
-            padding: "1.4rem 1.6rem",
-            borderRadius: "18px",
-            background: "rgba(34, 211, 238, 0.12)",
-            border: "1px solid rgba(34, 211, 238, 0.38)",
-            boxShadow: "0 0 16px rgba(34, 211, 238, 0.12)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
-          }}
-        >
-          <h1 style={{ margin: "0 0 0.35rem", color: "#e6fcff" }}>
-            Route Management
-          </h1>
-          <p style={{ margin: 0, color: "rgba(230, 252, 255, 0.75)" }}>
-            View routes, route lines, stops, and traffic overlay on the map.
-          </p>
+      <div className="dashboard-container">
+        <div className="page-header">
+          <h1>Route Management</h1>
+          <p>View routes, route lines, stops, and traffic overlay on the map</p>
         </div>
 
         <DashboardToolbar
@@ -300,9 +285,13 @@ export default function Routes() {
           selectedRouteId={selectedRouteId}
           onChangeRoute={setSelectedRouteId}
           sourceMode={sourceMode}
-          onChangeSourceMode={(mode) => setUseFirestoreData(mode === "firestore")}
+          onChangeSourceMode={(mode) =>
+            setUseFirestoreData(mode === "firestore")
+          }
           showTrafficOverlay={showTrafficOverlay}
-          onChangeTrafficOverlay={(value) => setShowTrafficOverlay(value)}
+          onChangeTrafficOverlay={(value) =>
+            setShowTrafficOverlay(value)
+          }
           hasFirestoreData={hasFirestoreData}
           trafficLoading={trafficLoading}
           routingLoading={routingLoading}
@@ -336,28 +325,16 @@ export default function Routes() {
             sourceVehicles={sourceVehicles}
           />
 
-          <RoutingStatusPanel routes={routePaths} error={routingError} />
+          <RoutingStatusPanel
+            routes={routePaths}
+            error={routingError}
+          />
         </div>
 
         {!isLoading ? (
-          <div
-            style={{
-              background: "rgba(34, 211, 238, 0.12)",
-              border: "1px solid rgba(34, 211, 238, 0.38)",
-              borderRadius: "18px",
-              padding: "1rem",
-              boxShadow: "0 0 16px rgba(34, 211, 238, 0.12)",
-              backdropFilter: "blur(10px)",
-              WebkitBackdropFilter: "blur(10px)",
-            }}
-          >
+          <div className="card">
             {isAllGtfs ? (
-              <div
-                style={{
-                  marginBottom: "1rem",
-                  color: "rgba(230, 252, 255, 0.75)",
-                }}
-              >
+              <div style={{ marginBottom: "1rem", color: "#cbd5e1" }}>
                 Select a specific route to display stop markers and route lines.
               </div>
             ) : null}
@@ -374,20 +351,7 @@ export default function Routes() {
             />
           </div>
         ) : (
-          <div
-            style={{
-              background: "rgba(34, 211, 238, 0.12)",
-              border: "1px solid rgba(34, 211, 238, 0.38)",
-              borderRadius: "18px",
-              padding: "1rem",
-              color: "#e6fcff",
-              boxShadow: "0 0 16px rgba(34, 211, 238, 0.12)",
-              backdropFilter: "blur(10px)",
-              WebkitBackdropFilter: "blur(10px)",
-            }}
-          >
-            Loading route data...
-          </div>
+          <div className="card">Loading route data...</div>
         )}
       </div>
     </Layout>

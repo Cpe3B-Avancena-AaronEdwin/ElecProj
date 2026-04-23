@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
+import {
+  collection,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+} from "firebase/firestore";
+import { db } from "../firebase/config";
 
 const DEFAULT_OPTIONS = {
   routes: false,
@@ -8,11 +15,13 @@ const DEFAULT_OPTIONS = {
   vehicles: false,
   trips: false,
   predictions: false,
+
   realtimeRoutes: false,
   realtimeStops: false,
   realtimeVehicles: false,
   realtimeTrips: false,
   realtimePredictions: false,
+
   predictionsLimit: 10,
   cacheMs: 5 * 60 * 1000,
 };
@@ -47,30 +56,32 @@ function setCache(key, data) {
       })
     );
   } catch {
-    // ignore
+    // ignore cache write errors
   }
 }
 
-async function fetchCollectionOnce({ endpoint, cacheKey, cacheMs }) {
+function buildOrderedQuery(collectionName, orderField, itemLimit = null) {
+  const parts = [collection(db, collectionName), orderBy(orderField, "desc")];
+  const q = query(parts[0], parts[1], ...(itemLimit ? [limit(itemLimit)] : []));
+  return q;
+}
+
+async function fetchCollectionOnce({
+  collectionName,
+  orderField,
+  cacheKey,
+  cacheMs,
+  itemLimit = null,
+}) {
   const cached = getCache(cacheKey, cacheMs);
   if (cached) return cached;
 
-  const response = await fetch(`${API_BASE}${endpoint}`);
-  let data = null;
+  const q = buildOrderedQuery(collectionName, orderField, itemLimit);
+  const snap = await getDocs(q);
+  const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-  try {
-    data = await response.json();
-  } catch {
-    data = null;
-  }
-
-  if (!response.ok) {
-    throw new Error(data?.error || `Failed to fetch ${endpoint}`);
-  }
-
-  const safeData = Array.isArray(data) ? data : [];
-  setCache(cacheKey, safeData);
-  return safeData;
+  setCache(cacheKey, data);
+  return data;
 }
 
 export function useFirestoreTransitData(options = {}) {
@@ -85,6 +96,7 @@ export function useFirestoreTransitData(options = {}) {
 
   useEffect(() => {
     let cancelled = false;
+    const unsubscribers = [];
 
     async function loadData() {
       setLoadingMapData(true);
@@ -93,84 +105,143 @@ export function useFirestoreTransitData(options = {}) {
         const tasks = [];
 
         if (resolved.routes) {
-          tasks.push(
-            fetchCollectionOnce({
-              endpoint: "/api/routes",
-              cacheKey: "api:routes",
-              cacheMs: resolved.cacheMs,
-            }).then((data) => {
-              if (!cancelled) setRoutes(data);
-            })
-          );
+          if (resolved.realtimeRoutes) {
+            const q = buildOrderedQuery("routes", "createdAt");
+            const unsub = onSnapshot(q, (snap) => {
+              if (cancelled) return;
+              const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+              setRoutes(data);
+              setCache("fs:routes", data);
+            });
+            unsubscribers.push(unsub);
+          } else {
+            tasks.push(
+              fetchCollectionOnce({
+                collectionName: "routes",
+                orderField: "createdAt",
+                cacheKey: "fs:routes",
+                cacheMs: resolved.cacheMs,
+              }).then((data) => {
+                if (!cancelled) setRoutes(data);
+              })
+            );
+          }
         } else {
           setRoutes([]);
         }
 
         if (resolved.stops) {
-          tasks.push(
-            fetchCollectionOnce({
-              endpoint: "/api/stops",
-              cacheKey: "api:stops",
-              cacheMs: resolved.cacheMs,
-            }).then((data) => {
-              if (!cancelled) setStops(data);
-            })
-          );
+          if (resolved.realtimeStops) {
+            const q = buildOrderedQuery("stops", "createdAt");
+            const unsub = onSnapshot(q, (snap) => {
+              if (cancelled) return;
+              const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+              setStops(data);
+              setCache("fs:stops", data);
+            });
+            unsubscribers.push(unsub);
+          } else {
+            tasks.push(
+              fetchCollectionOnce({
+                collectionName: "stops",
+                orderField: "createdAt",
+                cacheKey: "fs:stops",
+                cacheMs: resolved.cacheMs,
+              }).then((data) => {
+                if (!cancelled) setStops(data);
+              })
+            );
+          }
         } else {
           setStops([]);
         }
 
         if (resolved.vehicles) {
-          tasks.push(
-            fetchCollectionOnce({
-              endpoint: "/api/vehicles",
-              cacheKey: "api:vehicles",
-              cacheMs: resolved.cacheMs,
-            }).then((data) => {
-              if (!cancelled) setVehicles(data);
-            })
-          );
+          if (resolved.realtimeVehicles) {
+            const q = buildOrderedQuery("vehicles", "createdAt");
+            const unsub = onSnapshot(q, (snap) => {
+              if (cancelled) return;
+              const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+              setVehicles(data);
+              setCache("fs:vehicles", data);
+            });
+            unsubscribers.push(unsub);
+          } else {
+            tasks.push(
+              fetchCollectionOnce({
+                collectionName: "vehicles",
+                orderField: "createdAt",
+                cacheKey: "fs:vehicles",
+                cacheMs: resolved.cacheMs,
+              }).then((data) => {
+                if (!cancelled) setVehicles(data);
+              })
+            );
+          }
         } else {
           setVehicles([]);
         }
 
         if (resolved.trips) {
-          tasks.push(
-            fetchCollectionOnce({
-              endpoint: "/api/trips",
-              cacheKey: "api:trips",
-              cacheMs: resolved.cacheMs,
-            }).then((data) => {
-              if (!cancelled) setTrips(data);
-            })
-          );
+          if (resolved.realtimeTrips) {
+            const q = buildOrderedQuery("trips", "createdAt");
+            const unsub = onSnapshot(q, (snap) => {
+              if (cancelled) return;
+              const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+              setTrips(data);
+              setCache("fs:trips", data);
+            });
+            unsubscribers.push(unsub);
+          } else {
+            tasks.push(
+              fetchCollectionOnce({
+                collectionName: "trips",
+                orderField: "createdAt",
+                cacheKey: "fs:trips",
+                cacheMs: resolved.cacheMs,
+              }).then((data) => {
+                if (!cancelled) setTrips(data);
+              })
+            );
+          }
         } else {
           setTrips([]);
         }
 
         if (resolved.predictions) {
-          tasks.push(
-            fetchCollectionOnce({
-              endpoint: "/api/predictions",
-              cacheKey: `api:predictions:${resolved.predictionsLimit}`,
-              cacheMs: resolved.cacheMs,
-            }).then((data) => {
-              if (!cancelled) {
-                setPredictions(
-                  Array.isArray(data)
-                    ? data.slice(0, resolved.predictionsLimit)
-                    : []
-                );
-              }
-            })
-          );
+          if (resolved.realtimePredictions) {
+            const q = buildOrderedQuery(
+              "predictions",
+              "generatedAt",
+              resolved.predictionsLimit
+            );
+            const unsub = onSnapshot(q, (snap) => {
+              if (cancelled) return;
+              const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+              setPredictions(data);
+              setCache("fs:predictions", data);
+            });
+            unsubscribers.push(unsub);
+          } else {
+            tasks.push(
+              fetchCollectionOnce({
+                collectionName: "predictions",
+                orderField: "generatedAt",
+                cacheKey: `fs:predictions:${resolved.predictionsLimit}`,
+                cacheMs: resolved.cacheMs,
+                itemLimit: resolved.predictionsLimit,
+              }).then((data) => {
+                if (!cancelled) setPredictions(data);
+              })
+            );
+          }
         } else {
           setPredictions([]);
         }
 
         await Promise.all(tasks);
       } catch (error) {
-        console.error("Failed to load API transit data:", error);
+        console.error("Failed to load Firestore transit data:", error);
       } finally {
         if (!cancelled) setLoadingMapData(false);
       }
@@ -180,6 +251,7 @@ export function useFirestoreTransitData(options = {}) {
 
     return () => {
       cancelled = true;
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
     };
   }, [
     resolved.routes,
@@ -187,6 +259,11 @@ export function useFirestoreTransitData(options = {}) {
     resolved.vehicles,
     resolved.trips,
     resolved.predictions,
+    resolved.realtimeRoutes,
+    resolved.realtimeStops,
+    resolved.realtimeVehicles,
+    resolved.realtimeTrips,
+    resolved.realtimePredictions,
     resolved.predictionsLimit,
     resolved.cacheMs,
   ]);

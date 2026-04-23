@@ -3,7 +3,6 @@ import { useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useAdminData } from "../hooks/useAdminData";
 import { useAdminForms } from "../hooks/useAdminForms";
-import Layout from "../components/Layout";
 import {
   removeRoute,
   removeStop,
@@ -22,6 +21,7 @@ import RoutesTab from "../components/admin/tabs/RoutesTab";
 import StopsTab from "../components/admin/tabs/StopsTab";
 import VehiclesTab from "../components/admin/tabs/VehiclesTab";
 import TripsTab from "../components/admin/tabs/TripsTab";
+import SiteFooter from "../components/SiteFooter";
 import {
   initialRouteForm,
   initialStopForm,
@@ -33,6 +33,7 @@ import "../styles/admin.css";
 export default function Admin() {
   const navigate = useNavigate();
   const { user, role } = useAuth();
+
   const [activeTab, setActiveTab] = useState("routes");
 
   const {
@@ -51,6 +52,7 @@ export default function Admin() {
 
   const submitRoute = async (e) => {
     e.preventDefault();
+
     if (!forms.routeForm.routeCode.trim() || !forms.routeForm.routeName.trim()) {
       showMessage("Please fill in route code and route name.");
       return;
@@ -62,6 +64,7 @@ export default function Admin() {
         editingId: forms.editingRouteId,
         userId: user?.uid,
       });
+
       showMessage(result);
       forms.setRouteForm(initialRouteForm);
       forms.setEditingRouteId(null);
@@ -73,6 +76,7 @@ export default function Admin() {
 
   const submitStop = async (e) => {
     e.preventDefault();
+
     if (
       !forms.stopForm.stopName.trim() ||
       forms.stopForm.latitude === "" ||
@@ -88,6 +92,7 @@ export default function Admin() {
         editingId: forms.editingStopId,
         userId: user?.uid,
       });
+
       showMessage(result);
       forms.setStopForm(initialStopForm);
       forms.setEditingStopId(null);
@@ -99,6 +104,7 @@ export default function Admin() {
 
   const submitVehicle = async (e) => {
     e.preventDefault();
+
     if (
       !forms.vehicleForm.vehicleCode.trim() ||
       !forms.vehicleForm.plateNumber.trim()
@@ -113,6 +119,7 @@ export default function Admin() {
         editingId: forms.editingVehicleId,
         userId: user?.uid,
       });
+
       showMessage(result);
       forms.setVehicleForm(initialVehicleForm);
       forms.setEditingVehicleId(null);
@@ -124,6 +131,7 @@ export default function Admin() {
 
   const submitTrip = async (e) => {
     e.preventDefault();
+
     if (
       !forms.tripForm.tripCode.trim() ||
       !forms.tripForm.routeId ||
@@ -143,6 +151,7 @@ export default function Admin() {
         editingId: forms.editingTripId,
         userId: user?.uid,
       });
+
       showMessage(result);
       forms.setTripForm(initialTripForm);
       forms.setEditingTripId(null);
@@ -154,6 +163,7 @@ export default function Admin() {
 
   const handleDeleteRoute = async (id) => {
     if (!window.confirm("Delete this route?")) return;
+
     try {
       const result = await removeRoute(id);
       showMessage(result);
@@ -165,6 +175,7 @@ export default function Admin() {
 
   const handleDeleteStop = async (id) => {
     if (!window.confirm("Delete this stop?")) return;
+
     try {
       const result = await removeStop(id);
       showMessage(result);
@@ -176,6 +187,7 @@ export default function Admin() {
 
   const handleDeleteVehicle = async (id) => {
     if (!window.confirm("Delete this vehicle?")) return;
+
     try {
       const result = await removeVehicle(id);
       showMessage(result);
@@ -187,6 +199,7 @@ export default function Admin() {
 
   const handleDeleteTrip = async (id) => {
     if (!window.confirm("Delete this trip?")) return;
+
     try {
       const result = await removeTrip(id);
       showMessage(result);
@@ -217,101 +230,101 @@ export default function Admin() {
   };
 
   return (
-    <Layout>
-      <div className="admin-page-shell">
-        <div className="admin-page-container">
-          <AdminHeader
-            user={user}
-            role={role}
-            onBack={() => navigate("/dashboard")}
-          />
+    <div className="admin-page-shell">
+      <div className="admin-page-container">
+        <AdminHeader
+          user={user}
+          role={role}
+          onBack={() => navigate("/dashboard")}
+        />
 
-          <AdminMessage message={message} />
+        <AdminMessage message={message} />
 
-          <Outlet />
+        <Outlet />
 
-          <div className="admin-layout">
-            <div className="admin-sidebar-wrap">
-              <AdminSidebar
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                routesCount={routes.length}
-                stopsCount={stops.length}
-                vehiclesCount={vehicles.length}
-                tripsCount={trips.length}
-              />
-            </div>
+        <div className="admin-layout">
+          <div className="admin-sidebar-wrap">
+            <AdminSidebar
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              routesCount={routes.length}
+              stopsCount={stops.length}
+              vehiclesCount={vehicles.length}
+              tripsCount={trips.length}
+            />
+          </div>
 
-            <div className="admin-content-card">
-              {loading ? (
-                <div className="admin-loading-state">Loading data...</div>
-              ) : (
-                <>
-                  {activeTab === "routes" && (
-                    <RoutesTab
-                      routes={routes}
-                      routeForm={forms.routeForm}
-                      handleRouteChange={forms.handleRouteChange}
-                      submitRoute={submitRoute}
-                      editingRouteId={forms.editingRouteId}
-                      cancelRouteEdit={forms.cancelRouteEdit}
-                      onEditRoute={handleEditRoute}
-                      onDeleteRoute={handleDeleteRoute}
-                    />
-                  )}
+          <div className="admin-content-card">
+            {loading ? (
+              <div className="admin-loading-state">Loading data...</div>
+            ) : (
+              <>
+                {activeTab === "routes" && (
+                  <RoutesTab
+                    routes={routes}
+                    routeForm={forms.routeForm}
+                    handleRouteChange={forms.handleRouteChange}
+                    submitRoute={submitRoute}
+                    editingRouteId={forms.editingRouteId}
+                    cancelRouteEdit={forms.cancelRouteEdit}
+                    onEditRoute={handleEditRoute}
+                    onDeleteRoute={handleDeleteRoute}
+                  />
+                )}
 
-                  {activeTab === "stops" && (
-                    <StopsTab
-                      stops={stops}
-                      routes={routes}
-                      routeMap={routeMap}
-                      stopForm={forms.stopForm}
-                      handleStopChange={forms.handleStopChange}
-                      submitStop={submitStop}
-                      editingStopId={forms.editingStopId}
-                      cancelStopEdit={forms.cancelStopEdit}
-                      onEditStop={handleEditStop}
-                      onDeleteStop={handleDeleteStop}
-                    />
-                  )}
+                {activeTab === "stops" && (
+                  <StopsTab
+                    stops={stops}
+                    routes={routes}
+                    routeMap={routeMap}
+                    stopForm={forms.stopForm}
+                    handleStopChange={forms.handleStopChange}
+                    submitStop={submitStop}
+                    editingStopId={forms.editingStopId}
+                    cancelStopEdit={forms.cancelStopEdit}
+                    onEditStop={handleEditStop}
+                    onDeleteStop={handleDeleteStop}
+                  />
+                )}
 
-                  {activeTab === "vehicles" && (
-                    <VehiclesTab
-                      vehicles={vehicles}
-                      routes={routes}
-                      routeMap={routeMap}
-                      vehicleForm={forms.vehicleForm}
-                      handleVehicleChange={forms.handleVehicleChange}
-                      submitVehicle={submitVehicle}
-                      editingVehicleId={forms.editingVehicleId}
-                      cancelVehicleEdit={forms.cancelVehicleEdit}
-                      onEditVehicle={handleEditVehicle}
-                      onDeleteVehicle={handleDeleteVehicle}
-                    />
-                  )}
+                {activeTab === "vehicles" && (
+                  <VehiclesTab
+                    vehicles={vehicles}
+                    routes={routes}
+                    routeMap={routeMap}
+                    vehicleForm={forms.vehicleForm}
+                    handleVehicleChange={forms.handleVehicleChange}
+                    submitVehicle={submitVehicle}
+                    editingVehicleId={forms.editingVehicleId}
+                    cancelVehicleEdit={forms.cancelVehicleEdit}
+                    onEditVehicle={handleEditVehicle}
+                    onDeleteVehicle={handleDeleteVehicle}
+                  />
+                )}
 
-                  {activeTab === "trips" && (
-                    <TripsTab
-                      trips={trips}
-                      routes={routes}
-                      routeMap={routeMap}
-                      vehicleMap={vehicleMap}
-                      tripForm={forms.tripForm}
-                      handleTripChange={forms.handleTripChange}
-                      submitTrip={submitTrip}
-                      editingTripId={forms.editingTripId}
-                      cancelTripEdit={forms.cancelTripEdit}
-                      filteredVehiclesForTrip={forms.filteredVehiclesForTrip}
-                      onEditTrip={handleEditTrip}
-                      onDeleteTrip={handleDeleteTrip}
-                    />
-                  )}
-                </>
-              )}
-            </div>
+                {activeTab === "trips" && (
+                  <TripsTab
+                    trips={trips}
+                    routes={routes}
+                    routeMap={routeMap}
+                    vehicleMap={vehicleMap}
+                    tripForm={forms.tripForm}
+                    handleTripChange={forms.handleTripChange}
+                    submitTrip={submitTrip}
+                    editingTripId={forms.editingTripId}
+                    cancelTripEdit={forms.cancelTripEdit}
+                    filteredVehiclesForTrip={forms.filteredVehiclesForTrip}
+                    onEditTrip={handleEditTrip}
+                    onDeleteTrip={handleDeleteTrip}
+                  />
+                )}
+              </>
+            )}
           </div>
         </div>
+
+        <SiteFooter />
       </div>
-    </Layout>
+    </div>
   );
 }
