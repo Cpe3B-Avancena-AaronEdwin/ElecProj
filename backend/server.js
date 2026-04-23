@@ -14,6 +14,7 @@ import trafficRoutes from "./routes/traffic.js";
 import predictionRoutes from "./routes/predictions.js";
 import routingRoutes from "./routes/routing.js";
 import userRoutes from "./routes/users.js";
+import { startSnapshotJob } from "./services/snapshotService.js";
 
 dotenv.config();
 
@@ -103,6 +104,7 @@ testDbConnection()
   .then(() => {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`Backend running on http://localhost:${PORT}`);
+      startSnapshotJob();
     });
   })
   .catch((error) => {

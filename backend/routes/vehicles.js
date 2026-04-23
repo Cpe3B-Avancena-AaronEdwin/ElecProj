@@ -7,49 +7,58 @@ import { requireAdmin } from "../middleware/adminMiddleware.js";
 const router = express.Router();
 
 function randomVehicleId() {
-  return `vehicle_${crypto.randomUUID().replace(/-/g, "")}`;
+  return `veh_${crypto.randomUUID().replace(/-/g, "")}`;
+}
+
+function toNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function mapVehicle(row) {
   return {
-    id: row.vehicle_id,
+    id: row.vehicle_id || "",
     docId: row.id,
-    vehicleId: row.vehicle_id,
-    vehicleNumber: row.vehicle_number || "",
+    vehicleId: row.vehicle_id || "",
+    label: row.label || "",
     routeId: row.route_id || "",
-    type: row.type || "",
-    capacity: row.capacity !== null ? Number(row.capacity) : 0,
     status: row.status || "active",
-    driverName: row.driver_name || "",
-    plateNumber: row.plate_number || "",
-    latitude: row.latitude !== null ? Number(row.latitude) : 0,
-    longitude: row.longitude !== null ? Number(row.longitude) : 0,
+    latitude: row.latitude !== null ? Number(row.latitude) : null,
+    longitude: row.longitude !== null ? Number(row.longitude) : null,
     speed: row.speed !== null ? Number(row.speed) : 0,
-    occupancy: row.occupancy !== null ? Number(row.occupancy) : 0,
-    description: row.description || "",
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    capacity: row.capacity !== null ? Number(row.capacity) : 0,
+    createdAt:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : row.created_at || null,
   };
 }
 
 router.get("/", async (req, res, next) => {
   try {
     const routeId = String(req.query.routeId || "").trim();
+    const status = String(req.query.status || "").trim();
 
-    let rows;
+    let query = `
+      SELECT *
+      FROM vehicles
+      WHERE 1=1
+    `;
+    const params = [];
+
     if (routeId) {
-      const [filtered] = await pool.query(
-        "SELECT * FROM vehicles WHERE route_id = ? ORDER BY vehicle_number ASC",
-        [routeId]
-      );
-      rows = filtered;
-    } else {
-      const [all] = await pool.query(
-        "SELECT * FROM vehicles ORDER BY vehicle_number ASC, created_at DESC"
-      );
-      rows = all;
+      query += ` AND route_id = ?`;
+      params.push(routeId);
     }
 
+    if (status) {
+      query += ` AND status = ?`;
+      params.push(status);
+    }
+
+    query += ` ORDER BY vehicle_id ASC, id ASC`;
+
+    const [rows] = await pool.query(query, params);
     res.json(rows.map(mapVehicle));
   } catch (error) {
     next(error);
@@ -58,10 +67,15 @@ router.get("/", async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
-    const identifier = String(req.params.id).trim();
+    const identifier = String(req.params.id || "").trim();
 
     const [rows] = await pool.query(
-      "SELECT * FROM vehicles WHERE vehicle_id = ? OR id = ? LIMIT 1",
+      `
+      SELECT *
+      FROM vehicles
+      WHERE vehicle_id = ? OR id = ?
+      LIMIT 1
+      `,
       [identifier, Number(identifier) || 0]
     );
 
@@ -79,29 +93,26 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
   try {
     const vehicleId =
       String(req.body.vehicleId || "").trim() || randomVehicleId();
-    const vehicleNumber = String(req.body.vehicleNumber || "").trim();
+    const label = String(req.body.label || "").trim();
     const routeId = String(req.body.routeId || "").trim();
-    const type = String(req.body.type || "").trim();
-    const capacity = Number(req.body.capacity || 0);
     const status = String(req.body.status || "active").trim();
-    const driverName = String(req.body.driverName || "").trim();
-    const plateNumber = String(req.body.plateNumber || "").trim();
-    const latitude = Number(req.body.latitude || 0);
-    const longitude = Number(req.body.longitude || 0);
-    const speed = Number(req.body.speed || 0);
-    const occupancy = Number(req.body.occupancy || 0);
-    const description = String(req.body.description || "").trim();
+    const latitude =
+      req.body.latitude !== undefined && req.body.latitude !== null
+        ? toNumber(req.body.latitude, null)
+        : null;
+    const longitude =
+      req.body.longitude !== undefined && req.body.longitude !== null
+        ? toNumber(req.body.longitude, null)
+        : null;
+    const speed = toNumber(req.body.speed, 0);
+    const capacity = Math.max(0, Math.floor(toNumber(req.body.capacity, 0)));
 
-    if (!vehicleNumber) {
-      return res.status(400).json({ error: "vehicleNumber is required" });
-    }
-
-    const [existing] = await pool.query(
-      "SELECT vehicle_id FROM vehicles WHERE vehicle_id = ? LIMIT 1",
+    const [existingRows] = await pool.query(
+      "SELECT id FROM vehicles WHERE vehicle_id = ? LIMIT 1",
       [vehicleId]
     );
 
-    if (existing.length) {
+    if (existingRows.length) {
       return res.status(409).json({ error: "vehicleId already exists" });
     }
 
@@ -117,24 +128,12 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
     }
 
     await pool.query(
-      `INSERT INTO vehicles
-      (vehicle_id, vehicle_number, route_id, type, capacity, status, driver_name, plate_number, latitude, longitude, speed, occupancy, description)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        vehicleId,
-        vehicleNumber,
-        routeId || null,
-        type || null,
-        capacity,
-        status,
-        driverName || null,
-        plateNumber || null,
-        latitude,
-        longitude,
-        speed,
-        occupancy,
-        description || null,
-      ]
+      `
+      INSERT INTO vehicles
+      (vehicle_id, label, route_id, status, latitude, longitude, speed, capacity)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+      [vehicleId, label || null, routeId || null, status, latitude, longitude, speed, capacity]
     );
 
     const [rows] = await pool.query(
@@ -153,10 +152,15 @@ router.post("/", requireAuth, requireAdmin, async (req, res, next) => {
 
 router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const identifier = String(req.params.id).trim();
+    const identifier = String(req.params.id || "").trim();
 
     const [existingRows] = await pool.query(
-      "SELECT * FROM vehicles WHERE vehicle_id = ? OR id = ? LIMIT 1",
+      `
+      SELECT *
+      FROM vehicles
+      WHERE vehicle_id = ? OR id = ?
+      LIMIT 1
+      `,
       [identifier, Number(identifier) || 0]
     );
 
@@ -166,19 +170,34 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
 
     const existing = existingRows[0];
 
-    const vehicleNumber =
-      req.body.vehicleNumber !== undefined
-        ? String(req.body.vehicleNumber).trim()
-        : existing.vehicle_number;
-
-    if (!vehicleNumber) {
-      return res.status(400).json({ error: "vehicleNumber is required" });
-    }
-
+    const label =
+      req.body.label !== undefined ? String(req.body.label).trim() : existing.label;
     const routeId =
       req.body.routeId !== undefined
         ? String(req.body.routeId).trim()
         : existing.route_id || "";
+    const status =
+      req.body.status !== undefined
+        ? String(req.body.status).trim()
+        : existing.status || "active";
+    const latitude =
+      req.body.latitude !== undefined
+        ? req.body.latitude === null || req.body.latitude === ""
+          ? null
+          : toNumber(req.body.latitude, null)
+        : existing.latitude;
+    const longitude =
+      req.body.longitude !== undefined
+        ? req.body.longitude === null || req.body.longitude === ""
+          ? null
+          : toNumber(req.body.longitude, null)
+        : existing.longitude;
+    const speed =
+      req.body.speed !== undefined ? toNumber(req.body.speed, 0) : existing.speed;
+    const capacity =
+      req.body.capacity !== undefined
+        ? Math.max(0, Math.floor(toNumber(req.body.capacity, 0)))
+        : existing.capacity;
 
     if (routeId) {
       const [routeRows] = await pool.query(
@@ -191,74 +210,26 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
       }
     }
 
-    const type =
-      req.body.type !== undefined
-        ? String(req.body.type).trim()
-        : existing.type || "";
-
-    const capacity =
-      req.body.capacity !== undefined
-        ? Number(req.body.capacity)
-        : Number(existing.capacity || 0);
-
-    const status =
-      req.body.status !== undefined
-        ? String(req.body.status).trim()
-        : existing.status;
-
-    const driverName =
-      req.body.driverName !== undefined
-        ? String(req.body.driverName).trim()
-        : existing.driver_name || "";
-
-    const plateNumber =
-      req.body.plateNumber !== undefined
-        ? String(req.body.plateNumber).trim()
-        : existing.plate_number || "";
-
-    const latitude =
-      req.body.latitude !== undefined
-        ? Number(req.body.latitude)
-        : Number(existing.latitude || 0);
-
-    const longitude =
-      req.body.longitude !== undefined
-        ? Number(req.body.longitude)
-        : Number(existing.longitude || 0);
-
-    const speed =
-      req.body.speed !== undefined
-        ? Number(req.body.speed)
-        : Number(existing.speed || 0);
-
-    const occupancy =
-      req.body.occupancy !== undefined
-        ? Number(req.body.occupancy)
-        : Number(existing.occupancy || 0);
-
-    const description =
-      req.body.description !== undefined
-        ? String(req.body.description).trim()
-        : existing.description || "";
-
     await pool.query(
-      `UPDATE vehicles
-       SET vehicle_number = ?, route_id = ?, type = ?, capacity = ?, status = ?, driver_name = ?, plate_number = ?, latitude = ?, longitude = ?, speed = ?, occupancy = ?, description = ?, updated_at = ?
-       WHERE vehicle_id = ?`,
+      `
+      UPDATE vehicles
+      SET label = ?,
+          route_id = ?,
+          status = ?,
+          latitude = ?,
+          longitude = ?,
+          speed = ?,
+          capacity = ?
+      WHERE vehicle_id = ?
+      `,
       [
-        vehicleNumber,
+        label || null,
         routeId || null,
-        type || null,
-        capacity,
         status,
-        driverName || null,
-        plateNumber || null,
         latitude,
         longitude,
         speed,
-        occupancy,
-        description || null,
-        new Date(),
+        capacity,
         existing.vehicle_id,
       ]
     );
@@ -279,19 +250,24 @@ router.put("/:id", requireAuth, requireAdmin, async (req, res, next) => {
 
 router.delete("/:id", requireAuth, requireAdmin, async (req, res, next) => {
   try {
-    const identifier = String(req.params.id).trim();
+    const identifier = String(req.params.id || "").trim();
 
-    const [existingRows] = await pool.query(
-      "SELECT * FROM vehicles WHERE vehicle_id = ? OR id = ? LIMIT 1",
+    const [rows] = await pool.query(
+      `
+      SELECT *
+      FROM vehicles
+      WHERE vehicle_id = ? OR id = ?
+      LIMIT 1
+      `,
       [identifier, Number(identifier) || 0]
     );
 
-    if (!existingRows.length) {
+    if (!rows.length) {
       return res.status(404).json({ error: "Vehicle not found" });
     }
 
     await pool.query("DELETE FROM vehicles WHERE vehicle_id = ?", [
-      existingRows[0].vehicle_id,
+      rows[0].vehicle_id,
     ]);
 
     res.json({ message: "Vehicle deleted successfully" });

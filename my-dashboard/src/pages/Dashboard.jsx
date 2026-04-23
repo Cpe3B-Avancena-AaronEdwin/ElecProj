@@ -20,11 +20,6 @@ import { useCurrentPrediction } from "../hooks/useCurrentPrediction";
 import DashboardMap from "../components/dashboard/DashboardMap";
 import Layout from "../components/Layout";
 
-function scoreToRatio(score) {
-  const value = Number(score || 0);
-  return Math.max(0, Math.min(1, value / 100));
-}
-
 function formatShortTime(value, fallbackText = "Now") {
   if (!value) return fallbackText;
 
@@ -40,13 +35,13 @@ function formatShortTime(value, fallbackText = "Now") {
 
   if (!date || Number.isNaN(date.getTime())) return fallbackText;
 
-  return date.toLocaleTimeString([], {
+  return date.toLocaleTimeString("en-PH", {
+    timeZone: "Asia/Manila",
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
   });
 }
-
 function buildChartDataFromHistory(trafficHistory = []) {
   const now = Date.now();
   const last24h = now - 24 * 60 * 60 * 1000;
@@ -59,29 +54,45 @@ function buildChartDataFromHistory(trafficHistory = []) {
     return Number.isFinite(ts) && ts >= last24h;
   });
 
-  return filtered.map((item, index) => {
-    const score = Number(item.congestionScore || 0);
+  const grouped = filtered.reduce((acc, item) => {
+    const ts =
+      Number(item.timestampMs) ||
+      new Date(item.timestampText || item.timestamp || item.createdAt || 0).getTime();
 
-    return {
+    if (!Number.isFinite(ts)) return acc;
+
+    const d = new Date(ts);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate()
+    ).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(
+      d.getMinutes()
+    ).padStart(2, "0")}`;
+
+    if (!acc[key]) {
+      acc[key] = {
+        totalScore: 0,
+        count: 0,
+        timestampMs: ts,
+        level: item.congestionLevel || "Unknown",
+      };
+    }
+
+    acc[key].totalScore += Number(item.congestionScore || 0);
+    acc[key].count += 1;
+
+    return acc;
+  }, {});
+
+  return Object.values(grouped)
+    .sort((a, b) => a.timestampMs - b.timestampMs)
+    .map((item, index) => ({
       index,
-      time: formatShortTime(item.timestampMs || item.timestampText || item.timestamp, "Now"),
-      score,
-      level: item.congestionLevel || "Unknown",
-      rawTimestamp: item.timestampMs || item.timestampText || item.timestamp || null,
-    };
-  });
-}
-
-function buildFallbackChartData(graphPoints) {
-  return graphPoints.map((value, index, arr) => ({
-    index,
-    time: ["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"][
-      Math.round((index / Math.max(arr.length - 1, 1)) * 7)
-    ],
-    score: Math.round(value * 100),
-    level: "Estimated",
-    rawTimestamp: null,
-  }));
+      time: formatShortTime(item.timestampMs, "Now"),
+      score: Number((item.totalScore / item.count).toFixed(2)),
+      level: item.level,
+      rawTimestamp: item.timestampMs,
+    }))
+    .slice(-96);
 }
 
 function CustomTooltip({ active, payload, label }) {
@@ -150,6 +161,28 @@ const tripButtonStyle = {
   minWidth: "170px",
 };
 
+const refreshButtonStyle = (disabled) => ({
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: "0.55rem",
+  padding: "0.95rem 1.2rem",
+  borderRadius: "16px",
+  border: "1px solid rgba(34, 211, 238, 0.22)",
+  background: disabled
+    ? "linear-gradient(90deg, rgba(34,211,238,0.35) 0%, rgba(59,130,246,0.35) 100%)"
+    : "linear-gradient(90deg, #22d3ee 0%, #3b82f6 100%)",
+  color: "#031525",
+  fontWeight: 800,
+  fontSize: "0.98rem",
+  cursor: disabled ? "not-allowed" : "pointer",
+  boxShadow: disabled
+    ? "none"
+    : "0 10px 24px rgba(34, 211, 238, 0.18)",
+  transition: "transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease",
+  opacity: disabled ? 0.8 : 1,
+});
+
 export default function Dashboard() {
   const { user } = useAuth();
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
@@ -184,6 +217,8 @@ export default function Dashboard() {
     trafficHistory = [],
     historyAnalytics = {},
     lastTrafficUpdated,
+    trafficLoading,
+    refreshTraffic,
   } = useTrafficData(gtfsStops, TOMTOM_API_KEY, {
     enabled: true,
     liveTraffic: true,
@@ -213,72 +248,127 @@ export default function Dashboard() {
     sourceMode: "gtfs",
   });
 
-  const graphPoints = useMemo(() => {
-    if (trafficHistory.length >= 2) {
-      return trafficHistory.map((item) => scoreToRatio(item.congestionScore)).slice(-24);
-    }
-
-    const sampleLevels =
-      trafficSamples.length > 0
-        ? trafficSamples
-            .map((sample) => scoreToRatio(sample?.congestionScore))
-            .filter((value) => Number.isFinite(value))
-        : [];
-
-    if (sampleLevels.length > 1) return sampleLevels.slice(0, 16);
-
-    const heavy = Number(trafficSummary.heavy || 0);
-    const moderate = Number(trafficSummary.moderate || 0);
-    const low = Number(trafficSummary.light || trafficSummary.low || 0);
-    const closed = Number(trafficSummary.closed || 0);
-
-    const generated = [];
-    for (let i = 0; i < heavy; i += 1) generated.push(0.85);
-    for (let i = 0; i < moderate; i += 1) generated.push(0.55);
-    for (let i = 0; i < low; i += 1) generated.push(0.25);
-    for (let i = 0; i < closed; i += 1) generated.push(1);
-
-    if (generated.length) return generated.slice(0, 8);
-
-    return [0.2, 0.12, 0.35, 0.82, 0.58, 0.74, 0.95, 0.42];
-  }, [trafficHistory, trafficSamples, trafficSummary]);
-
   const chartData = useMemo(() => {
-    if (trafficHistory.length >= 2) {
-      return buildChartDataFromHistory(trafficHistory);
+    return buildChartDataFromHistory(trafficHistory);
+  }, [trafficHistory]);
+
+  const graphTitle = "LAST 24H CONGESTION TREND";
+  const graphNote = `Based on ${chartData.length} real snapshots from the last 24 hours.`;
+
+  const derivedLastTrafficUpdated = useMemo(() => {
+    if (lastTrafficUpdated) return lastTrafficUpdated;
+
+    if (Array.isArray(trafficHistory) && trafficHistory.length > 0) {
+      const latestHistory = [...trafficHistory]
+        .map((item) => {
+          const ts =
+            Number(item.timestampMs) ||
+            new Date(item.timestampText || item.timestamp || item.createdAt || 0).getTime();
+          return { ...item, _ts: ts };
+        })
+        .filter((item) => Number.isFinite(item._ts))
+        .sort((a, b) => a._ts - b._ts);
+
+      const latest = latestHistory[latestHistory.length - 1];
+      if (latest) return latest.timestampText || latest.createdAt || latest._ts;
     }
-    return buildFallbackChartData(graphPoints);
-  }, [trafficHistory, graphPoints]);
 
-  const graphTitle =
-    trafficHistory.length >= 2 ? "LAST 24H CONGESTION TREND" : "CURRENT CONGESTION PROFILE";
+    if (Array.isArray(trafficSamples) && trafficSamples.length > 0) {
+      const latestSample = trafficSamples[trafficSamples.length - 1];
+      return (
+        latestSample?.timestampText ||
+        latestSample?.createdAt ||
+        latestSample?.timestampMs ||
+        null
+      );
+    }
 
-  const graphNote =
-    trafficHistory.length >= 2
-      ? `Based on ${chartData.length} stored snapshots from the last 24 hours.`
-      : `Based on ${trafficSamples.length || graphPoints.length} current monitored traffic sample points.`;
+    return null;
+  }, [lastTrafficUpdated, trafficHistory, trafficSamples]);
 
-  const formatUpdatedAt = (isoString) => {
-    if (!isoString) return "No update yet";
-    const date = new Date(isoString);
-    return date.toLocaleString([], {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
+  const computedOnTimeRate = useMemo(() => {
+    const rawMetric = Number(metrics?.onTimeRate);
+    if (Number.isFinite(rawMetric) && rawMetric > 0) {
+      return rawMetric.toFixed(1);
+    }
 
-  const timeSince = (isoString) => {
-    if (!isoString) return "";
-    const ms = Date.now() - new Date(isoString).getTime();
-    if (ms < 0) return "";
-    const minutes = Math.floor(ms / 60000);
-    if (minutes < 1) return "less than a minute";
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    return `${hours}h ${minutes % 60}m`;
-  };
+    const avgDelay = Number(
+      trafficSummary?.delayMinutes ??
+        trafficSummary?.avgDelay ??
+        trafficSummary?.averageDelay ??
+        0
+    );
+
+    if (Number.isFinite(avgDelay) && avgDelay > 0) {
+      const estimated = Math.max(0, Math.min(100, 100 - avgDelay * 8));
+      return estimated.toFixed(1);
+    }
+
+    const latestScore = Number(
+      historyAnalytics?.latestScore ?? trafficSummary?.congestionScore ?? 0
+    );
+
+    if (Number.isFinite(latestScore) && latestScore > 0) {
+      const estimated = Math.max(0, Math.min(100, 100 - latestScore * 0.6));
+      return estimated.toFixed(1);
+    }
+
+    if (Array.isArray(trafficHistory) && trafficHistory.length > 0) {
+      const avgScore =
+        trafficHistory.reduce(
+          (sum, item) => sum + Number(item?.congestionScore || 0),
+          0
+        ) / trafficHistory.length;
+
+      const estimated = Math.max(0, Math.min(100, 100 - avgScore * 0.6));
+      return estimated.toFixed(1);
+    }
+
+    return "0.0";
+  }, [metrics?.onTimeRate, trafficSummary, historyAnalytics, trafficHistory]);
+
+  const onTimeRateDescription = useMemo(() => {
+    if (Number(metrics?.onTimeRate) > 0) {
+      return "Percentage of trips meeting the planned schedule.";
+    }
+
+    if (Array.isArray(trafficHistory) && trafficHistory.length > 0) {
+      return "Estimated from real traffic snapshot conditions and recent congestion history.";
+    }
+
+    return "Waiting for enough live traffic data to compute the schedule performance.";
+  }, [metrics?.onTimeRate, trafficHistory]);
+
+const formatUpdatedAt = (isoString) => {
+  if (!isoString) return "No update yet";
+
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "No update yet";
+
+  return date.toLocaleString("en-PH", {
+    timeZone: "Asia/Manila",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
+const timeSince = (isoString) => {
+  if (!isoString) return "";
+
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const ms = Date.now() - date.getTime();
+  if (ms < 0) return "";
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 1) return "less than a minute";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${minutes % 60}m`;
+};
 
   const recommendationTone =
     currentPrediction.predictedDelayRisk === "High"
@@ -298,84 +388,114 @@ export default function Dashboard() {
         }}
       >
         <div
-  style={{
-    width: "100%",
-    marginBottom: "0.75rem",
-  }}
->
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      borderRadius: "18px",
-      border: "1px solid rgba(34, 211, 238, 0.2)",
-      background: "#071a2b",
-      overflow: "hidden",
-      boxShadow: "0 10px 24px rgba(0, 0, 0, 0.16)",
-      minHeight: "56px",
-    }}
-  >
-    <input
-      type="text"
-      placeholder="Search route, stop, destination..."
-      style={{
-        flex: 1,
-        minWidth: 0,
-        padding: "1rem 1.1rem",
-        border: "none",
-        outline: "none",
-        background: "transparent",
-        color: "#e6fcff",
-        fontSize: "1rem",
-      }}
-    />
+          style={{
+            width: "100%",
+            marginBottom: "0.75rem",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              borderRadius: "18px",
+              border: "1px solid rgba(34, 211, 238, 0.2)",
+              background: "#071a2b",
+              overflow: "hidden",
+              boxShadow: "0 10px 24px rgba(0, 0, 0, 0.16)",
+              minHeight: "56px",
+            }}
+          >
+            <input
+              type="text"
+              placeholder="Search route, stop, destination..."
+              style={{
+                flex: 1,
+                minWidth: 0,
+                padding: "1rem 1.1rem",
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                color: "#e6fcff",
+                fontSize: "1rem",
+              }}
+            />
 
-    <div
-      style={{
-        width: "1px",
-        alignSelf: "stretch",
-        background: "rgba(34, 211, 238, 0.18)",
-      }}
-    />
+            <div
+              style={{
+                width: "1px",
+                alignSelf: "stretch",
+                background: "rgba(34, 211, 238, 0.18)",
+              }}
+            />
 
-    <select
-      defaultValue=""
-      style={{
-        minWidth: "240px",
-        padding: "1rem 1.1rem",
-        border: "none",
-        outline: "none",
-        background: "#071a2b",
-        color: "#e6fcff",
-        fontSize: "1rem",
-        fontWeight: 600,
-        cursor: "pointer",
-        appearance: "none",
-        WebkitAppearance: "none",
-        MozAppearance: "none",
-        backgroundImage:
-          "linear-gradient(45deg, transparent 50%, #cfeef6 50%), linear-gradient(135deg, #cfeef6 50%, transparent 50%)",
-        backgroundPosition:
-          "calc(100% - 22px) calc(50% - 3px), calc(100% - 16px) calc(50% - 3px)",
-        backgroundSize: "6px 6px, 6px 6px",
-        backgroundRepeat: "no-repeat",
-        paddingRight: "2.5rem",
-      }}
-    >
-      <option value="" disabled>
-        Select current location
-      </option>
-      <option value="Bulacan">Bulacan</option>
-      <option value="Monumento">Monumento</option>
-      <option value="Caloocan">Caloocan</option>
-      <option value="Quezon City">Quezon City</option>
-      <option value="Manila">Manila</option>
-      <option value="Makati">Makati</option>
-      <option value="Pasig">Pasig</option>
-      <option value="Taguig">Taguig</option>
-    </select>
-  </div>
-</div>
+            <select
+              defaultValue=""
+              style={{
+                minWidth: "240px",
+                padding: "1rem 1.1rem",
+                border: "none",
+                outline: "none",
+                background: "#071a2b",
+                color: "#e6fcff",
+                fontSize: "1rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                appearance: "none",
+                WebkitAppearance: "none",
+                MozAppearance: "none",
+                backgroundImage:
+                  "linear-gradient(45deg, transparent 50%, #cfeef6 50%), linear-gradient(135deg, #cfeef6 50%, transparent 50%)",
+                backgroundPosition:
+                  "calc(100% - 22px) calc(50% - 3px), calc(100% - 16px) calc(50% - 3px)",
+                backgroundSize: "6px 6px, 6px 6px",
+                backgroundRepeat: "no-repeat",
+                paddingRight: "2.5rem",
+              }}
+            >
+              <option value="" disabled>
+                Select current location
+              </option>
+              <option value="Bulacan">Bulacan</option>
+              <option value="Monumento">Monumento</option>
+              <option value="Caloocan">Caloocan</option>
+              <option value="Quezon City">Quezon City</option>
+              <option value="Manila">Manila</option>
+              <option value="Makati">Makati</option>
+              <option value="Pasig">Pasig</option>
+              <option value="Taguig">Taguig</option>
+            </select>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            alignItems: "center",
+            marginTop: "-0.35rem",
+            marginBottom: "-0.15rem",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => refreshTraffic(true)}
+            disabled={trafficLoading}
+            style={refreshButtonStyle(trafficLoading)}
+            title="Fetch a fresh traffic snapshot and reload the latest real history"
+          >
+            <span
+              style={{
+                display: "inline-flex",
+                width: "10px",
+                height: "10px",
+                borderRadius: "999px",
+                background: trafficLoading ? "#0f172a" : "#031525",
+                opacity: 0.85,
+              }}
+            />
+            {trafficLoading ? "Refreshing Traffic..." : "Refresh Traffic Now"}
+          </button>
+        </div>
 
         <div
           style={{
@@ -406,7 +526,7 @@ export default function Dashboard() {
                 marginBottom: "0.75rem",
               }}
             >
-              {formatUpdatedAt(lastTrafficUpdated)}
+              {formatUpdatedAt(derivedLastTrafficUpdated)}
             </div>
             <div
               style={{
@@ -414,8 +534,8 @@ export default function Dashboard() {
                 fontSize: "1rem",
               }}
             >
-              {lastTrafficUpdated
-                ? `Updated ${timeSince(lastTrafficUpdated)} ago`
+              {derivedLastTrafficUpdated
+                ? `Updated ${timeSince(derivedLastTrafficUpdated)} ago`
                 : "Waiting for latest traffic refresh."}
             </div>
           </div>
@@ -442,7 +562,7 @@ export default function Dashboard() {
                 marginBottom: "0.75rem",
               }}
             >
-              {metrics.onTimeRate}%
+              {computedOnTimeRate}%
             </div>
             <div
               style={{
@@ -450,7 +570,7 @@ export default function Dashboard() {
                 fontSize: "1rem",
               }}
             >
-              Percentage of trips meeting the planned schedule.
+              {onTimeRateDescription}
             </div>
           </div>
         </div>
@@ -535,13 +655,33 @@ export default function Dashboard() {
         <div style={sectionCardStyle}>
           <div
             style={{
-              fontSize: "1.5rem",
-              fontWeight: 800,
-              color: "#e6fcff",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "1rem",
+              flexWrap: "wrap",
               marginBottom: "1rem",
             }}
           >
-            {graphTitle}
+            <div
+              style={{
+                fontSize: "1.5rem",
+                fontWeight: 800,
+                color: "#e6fcff",
+              }}
+            >
+              {graphTitle}
+            </div>
+
+            <div
+              style={{
+                color: "rgba(230, 252, 255, 0.72)",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+              }}
+            >
+              {trafficLoading ? "Fetching latest real traffic..." : "Showing latest saved traffic history"}
+            </div>
           </div>
 
           <div
