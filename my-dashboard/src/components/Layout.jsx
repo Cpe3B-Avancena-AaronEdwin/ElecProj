@@ -14,6 +14,7 @@ function getFirstName(user) {
   return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
 }
 
+
 export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
