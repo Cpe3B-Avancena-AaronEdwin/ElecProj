@@ -427,3 +427,44 @@ body,
     padding: 10px 8px 60px;
   }
 }
+.trip-planner-panel,
+.trip-planner-panel * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 520px) {
+  .dashboard-container {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  .trip-planner-panel {
+    width: 100% !important;
+  }
+
+  .trip-planner-panel select,
+  .trip-planner-panel input,
+  .trip-planner-panel button {
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+}
+@media (max-width: 900px) {
+  .trip-planner-controls {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+    width: 100% !important;
+  }
+
+  .trip-planner-controls > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .trip-planner-controls button {
+    height: 44px !important;
+  }
+}

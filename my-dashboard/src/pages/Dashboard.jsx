@@ -84,7 +84,7 @@ function buildChartDataFromHistory(trafficHistory = []) {
     return acc;
   }, {});
 
-  const realPoints = Object.values(grouped)
+  return Object.values(grouped)
     .sort((a, b) => a.timestampMs - b.timestampMs)
     .map((item, index) => ({
       index,
@@ -95,13 +95,10 @@ function buildChartDataFromHistory(trafficHistory = []) {
       isRealPoint: true,
     }))
     .slice(-96);
-
-  return realPoints;
 }
 
 function buildDisplayChartData(chartData = []) {
   if (!Array.isArray(chartData) || chartData.length === 0) return [];
-
   if (chartData.length >= 2) return chartData;
 
   const onlyPoint = chartData[0];
@@ -219,10 +216,7 @@ const refreshButtonStyle = (disabled) => ({
   fontWeight: 800,
   fontSize: "0.98rem",
   cursor: disabled ? "not-allowed" : "pointer",
-  boxShadow: disabled
-    ? "none"
-    : "0 10px 24px rgba(34, 211, 238, 0.18)",
-  transition: "transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease",
+  boxShadow: disabled ? "none" : "0 10px 24px rgba(34, 211, 238, 0.18)",
   opacity: disabled ? 0.8 : 1,
 });
 
@@ -279,7 +273,7 @@ export default function Dashboard() {
     trafficSummary,
   });
 
-  const { currentPrediction, predictionMessage } = useCurrentPrediction({
+  const { currentPrediction } = useCurrentPrediction({
     routes: gtfsRoutes,
     stops: gtfsStops,
     trips: gtfsTrips,
@@ -299,12 +293,6 @@ export default function Dashboard() {
   const displayChartData = useMemo(() => {
     return buildDisplayChartData(chartData);
   }, [chartData]);
-
-  const graphTitle = "LAST 24H CONGESTION TREND";
-  const graphNote =
-    chartData.length === 1
-      ? "Based on 1 real snapshot from the last 24 hours."
-      : `Based on ${chartData.length} real snapshots from the last 24 hours.`;
 
   const derivedLastTrafficUpdated = useMemo(() => {
     if (lastTrafficUpdated) return lastTrafficUpdated;
@@ -326,12 +314,7 @@ export default function Dashboard() {
 
     if (Array.isArray(trafficSamples) && trafficSamples.length > 0) {
       const latestSample = trafficSamples[trafficSamples.length - 1];
-      return (
-        latestSample?.timestampText ||
-        latestSample?.createdAt ||
-        latestSample?.timestampMs ||
-        null
-      );
+      return latestSample?.timestampText || latestSample?.createdAt || latestSample?.timestampMs || null;
     }
 
     return null;
@@ -339,56 +322,40 @@ export default function Dashboard() {
 
   const computedOnTimeRate = useMemo(() => {
     const rawMetric = Number(metrics?.onTimeRate);
-    if (Number.isFinite(rawMetric) && rawMetric > 0) {
-      return rawMetric.toFixed(1);
-    }
+    if (Number.isFinite(rawMetric) && rawMetric > 0) return rawMetric.toFixed(1);
 
     const avgDelay = Number(
-      trafficSummary?.delayMinutes ??
-        trafficSummary?.avgDelay ??
-        trafficSummary?.averageDelay ??
-        0
+      trafficSummary?.delayMinutes ?? trafficSummary?.avgDelay ?? trafficSummary?.averageDelay ?? 0
     );
 
     if (Number.isFinite(avgDelay) && avgDelay > 0) {
-      const estimated = Math.max(0, Math.min(100, 100 - avgDelay * 8));
-      return estimated.toFixed(1);
+      return Math.max(0, Math.min(100, 100 - avgDelay * 8)).toFixed(1);
     }
 
-    const latestScore = Number(
-      historyAnalytics?.latestScore ?? trafficSummary?.congestionScore ?? 0
-    );
+    const latestScore = Number(historyAnalytics?.latestScore ?? trafficSummary?.congestionScore ?? 0);
 
     if (Number.isFinite(latestScore) && latestScore > 0) {
-      const estimated = Math.max(0, Math.min(100, 100 - latestScore * 0.6));
-      return estimated.toFixed(1);
-    }
-
-    if (Array.isArray(trafficHistory) && trafficHistory.length > 0) {
-      const avgScore =
-        trafficHistory.reduce(
-          (sum, item) => sum + Number(item?.congestionScore || 0),
-          0
-        ) / trafficHistory.length;
-
-      const estimated = Math.max(0, Math.min(100, 100 - avgScore * 0.6));
-      return estimated.toFixed(1);
+      return Math.max(0, Math.min(100, 100 - latestScore * 0.6)).toFixed(1);
     }
 
     return "0.0";
-  }, [metrics?.onTimeRate, trafficSummary, historyAnalytics, trafficHistory]);
+  }, [metrics?.onTimeRate, trafficSummary, historyAnalytics]);
 
-  const onTimeRateDescription = useMemo(() => {
-    if (Number(metrics?.onTimeRate) > 0) {
-      return "Percentage of trips meeting the planned schedule.";
-    }
+  const estimatedPassengerVolume = useMemo(() => {
+    const routeCount = gtfsRoutes.length;
+    const stopCount = gtfsStops.length;
+    const congestionScore = Number(trafficSummary?.congestionScore || 0);
 
-    if (Array.isArray(trafficHistory) && trafficHistory.length > 0) {
-      return "Estimated from real traffic snapshot conditions and recent congestion history.";
-    }
+    const basePerRoute = 35;
+    const basePerStop = 4;
+    const congestionMultiplier = 1 + congestionScore / 100;
 
-    return "Waiting for enough live traffic data to compute the schedule performance.";
-  }, [metrics?.onTimeRate, trafficHistory]);
+    const estimate = Math.round(
+      (routeCount * basePerRoute + stopCount * basePerStop) * congestionMultiplier
+    );
+
+    return Math.max(0, estimate);
+  }, [gtfsRoutes, gtfsStops, trafficSummary]);
 
   const formatUpdatedAt = (isoString) => {
     if (!isoString) return "No update yet";
@@ -421,32 +388,26 @@ export default function Dashboard() {
     return `${hours}h ${minutes % 60}m`;
   };
 
+  const predictionRisk = currentPrediction?.predictedDelayRisk || "Low";
+  const predictionConfidence = Number(currentPrediction?.confidence || 0);
+  const etaImpact = Number(currentPrediction?.etaImpactMinutes || 0);
+  const predictionScore = Number(currentPrediction?.score || trafficSummary?.congestionScore || 0);
+  const predictionTrend = currentPrediction?.trend || "Stable";
+
+  const smartExplanation =
+    currentPrediction?.explanation ||
+    `Next-hour forecast: traffic is predicted to stay ${predictionRisk.toLowerCase()} in the next 60 minutes. This uses the latest saved traffic score, 24-hour congestion history, delay estimate, sampled road conditions, and trend direction. Current score is ${predictionScore}/100 with a ${predictionTrend.toLowerCase()} trend.`;
+
   const recommendationTone =
-    currentPrediction.predictedDelayRisk === "High"
+    predictionRisk === "High"
       ? "rgba(239, 68, 68, 0.08)"
-      : currentPrediction.predictedDelayRisk === "Medium"
+      : predictionRisk === "Medium"
       ? "rgba(245, 158, 11, 0.08)"
       : "rgba(34, 197, 94, 0.08)";
 
   return (
     <Layout>
-      <div
-        className="dashboard-container"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "1.5rem",
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            marginBottom: "0.75rem",
-          }}
-        >
-
-        </div>
-
+      <div className="dashboard-container" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
         <div
           style={{
             display: "flex",
@@ -458,19 +419,13 @@ export default function Dashboard() {
             flexWrap: "wrap",
           }}
         >
-          <div
-            style={{
-              color: "rgba(230, 252, 255, 0.74)",
-              fontSize: "0.95rem",
-              fontWeight: 600,
-            }}
-          >
+          <div style={{ color: "rgba(230, 252, 255, 0.74)", fontSize: "0.95rem", fontWeight: 600 }}>
             {nextAutoRefreshLabel}
           </div>
 
           <button
             type="button"
-            onClick={() => refreshTraffic(true)}
+            onClick={() => refreshTraffic(false)}
             disabled={trafficLoading}
             style={refreshButtonStyle(trafficLoading)}
             title="Manually fetch a fresh traffic snapshot now"
@@ -489,112 +444,51 @@ export default function Dashboard() {
           </button>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: "1.25rem",
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1.25rem" }}>
           <div style={statCardStyle}>
-            <div
-              style={{
-                color: "rgba(230, 252, 255, 0.7)",
-                fontSize: "0.95rem",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                marginBottom: "1rem",
-              }}
-            >
+            <div style={{ color: "rgba(230, 252, 255, 0.7)", fontSize: "0.95rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "1rem" }}>
               Last Updated
             </div>
-            <div
-              style={{
-                color: "#ffffff",
-                fontSize: "2rem",
-                fontWeight: 800,
-                lineHeight: 1.1,
-                marginBottom: "0.75rem",
-              }}
-            >
+            <div style={{ color: "#ffffff", fontSize: "2rem", fontWeight: 800, lineHeight: 1.1, marginBottom: "0.75rem" }}>
               {formatUpdatedAt(derivedLastTrafficUpdated)}
             </div>
-            <div
-              style={{
-                color: "rgba(230, 252, 255, 0.75)",
-                fontSize: "1rem",
-              }}
-            >
-              {derivedLastTrafficUpdated
-                ? `Updated ${timeSince(derivedLastTrafficUpdated)} ago`
-                : "Waiting for latest traffic refresh."}
+            <div style={{ color: "rgba(230, 252, 255, 0.75)", fontSize: "1rem" }}>
+              {derivedLastTrafficUpdated ? `Updated ${timeSince(derivedLastTrafficUpdated)} ago` : "Waiting for latest traffic refresh."}
             </div>
           </div>
 
           <div style={statCardStyle}>
-            <div
-              style={{
-                color: "rgba(230, 252, 255, 0.7)",
-                fontSize: "0.95rem",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                marginBottom: "1rem",
-              }}
-            >
+            <div style={{ color: "rgba(230, 252, 255, 0.7)", fontSize: "0.95rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "1rem" }}>
               On-Time Rate
             </div>
-            <div
-              style={{
-                color: "#ffffff",
-                fontSize: "2rem",
-                fontWeight: 800,
-                lineHeight: 1.1,
-                marginBottom: "0.75rem",
-              }}
-            >
+            <div style={{ color: "#ffffff", fontSize: "2rem", fontWeight: 800, lineHeight: 1.1, marginBottom: "0.75rem" }}>
               {computedOnTimeRate}%
             </div>
-            <div
-              style={{
-                color: "rgba(230, 252, 255, 0.75)",
-                fontSize: "1rem",
-              }}
-            >
-              {onTimeRateDescription}
+            <div style={{ color: "rgba(230, 252, 255, 0.75)", fontSize: "1rem" }}>
+              Estimated from real traffic snapshot conditions and recent congestion history.
+            </div>
+          </div>
+
+          <div style={statCardStyle}>
+            <div style={{ color: "rgba(230, 252, 255, 0.7)", fontSize: "0.95rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "1rem" }}>
+              Estimated Passenger Volume
+            </div>
+            <div style={{ color: "#ffffff", fontSize: "2rem", fontWeight: 800, lineHeight: 1.1, marginBottom: "0.75rem" }}>
+              {estimatedPassengerVolume.toLocaleString()}
+            </div>
+            <div style={{ color: "rgba(230, 252, 255, 0.75)", fontSize: "1rem" }}>
+              Estimated from {gtfsRoutes.length} routes, {gtfsStops.length} stops, and live congestion.
             </div>
           </div>
         </div>
 
         <div style={sectionCardStyle}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "1rem",
-              flexWrap: "wrap",
-              gap: "1rem",
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
             <div>
-              <div
-                style={{
-                  fontSize: "1.75rem",
-                  fontWeight: 800,
-                  color: "#e6fcff",
-                }}
-              >
+              <div style={{ fontSize: "1.75rem", fontWeight: 800, color: "#e6fcff" }}>
                 Live Traffic Map
               </div>
-              <div
-                style={{
-                  color: "rgba(230,252,255,0.75)",
-                  fontSize: "1rem",
-                  marginTop: "0.35rem",
-                }}
-              >
+              <div style={{ color: "rgba(230,252,255,0.75)", fontSize: "1rem", marginTop: "0.35rem" }}>
                 Visual transit and congestion data across the network.
               </div>
             </div>
@@ -604,14 +498,7 @@ export default function Dashboard() {
             </Link>
           </div>
 
-          <div
-            style={{
-              position: "relative",
-              height: "420px",
-              borderRadius: "18px",
-              overflow: "hidden",
-            }}
-          >
+          <div style={{ position: "relative", height: "420px", borderRadius: "18px", overflow: "hidden" }}>
             <DashboardMap
               stops={gtfsStops}
               vehicles={vehicles}
@@ -625,17 +512,14 @@ export default function Dashboard() {
 
             <div className="map-legend">
               <div className="legend-title">Traffic Legend</div>
-
               <div className="legend-item">
                 <span className="legend-color red"></span>
                 Heavy Traffic
               </div>
-
               <div className="legend-item">
                 <span className="legend-color yellow"></span>
                 Moderate Traffic
               </div>
-
               <div className="legend-item">
                 <span className="legend-color green"></span>
                 Light Traffic
@@ -645,36 +529,13 @@ export default function Dashboard() {
         </div>
 
         <div style={sectionCardStyle}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "1rem",
-              flexWrap: "wrap",
-              marginBottom: "1rem",
-            }}
-          >
-            <div
-              style={{
-                fontSize: "1.5rem",
-                fontWeight: 800,
-                color: "#e6fcff",
-              }}
-            >
-              {graphTitle}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+            <div style={{ fontSize: "1.5rem", fontWeight: 800, color: "#e6fcff" }}>
+              LAST 24H CONGESTION TREND
             </div>
 
-            <div
-              style={{
-                color: "rgba(230, 252, 255, 0.72)",
-                fontSize: "0.95rem",
-                fontWeight: 600,
-              }}
-            >
-              {trafficLoading
-                ? "Fetching latest real traffic..."
-                : "Showing latest saved traffic history"}
+            <div style={{ color: "rgba(230, 252, 255, 0.72)", fontSize: "0.95rem", fontWeight: 600 }}>
+              {trafficLoading ? "Fetching latest real traffic..." : "Showing latest saved traffic history"}
             </div>
           </div>
 
@@ -702,17 +563,8 @@ export default function Dashboard() {
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={420}>
-                <LineChart
-                  data={displayChartData}
-                  margin={{ top: 12, right: 12, left: 8, bottom: 8 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="4 6"
-                    stroke="rgba(255,255,255,0.12)"
-                    vertical={true}
-                    horizontal={true}
-                  />
-
+                <LineChart data={displayChartData} margin={{ top: 12, right: 12, left: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="4 6" stroke="rgba(255,255,255,0.12)" vertical horizontal />
                   <XAxis
                     dataKey="time"
                     tick={{ fill: "rgba(255,255,255,0.82)", fontSize: 14, fontWeight: 700 }}
@@ -720,7 +572,6 @@ export default function Dashboard() {
                     tickLine={false}
                     interval="preserveStartEnd"
                   />
-
                   <YAxis
                     domain={[0, 100]}
                     ticks={[0, 25, 50, 75, 100]}
@@ -729,15 +580,7 @@ export default function Dashboard() {
                     tickLine={false}
                     width={54}
                   />
-
-                  <Tooltip
-                    content={<CustomTooltip />}
-                    cursor={{
-                      stroke: "rgba(255,255,255,0.95)",
-                      strokeWidth: 2,
-                    }}
-                  />
-
+                  <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(255,255,255,0.95)", strokeWidth: 2 }} />
                   <Line
                     type="monotone"
                     dataKey="score"
@@ -746,25 +589,10 @@ export default function Dashboard() {
                     dot={(props) => {
                       const { cx, cy, payload } = props;
                       if (!payload?.isRealPoint) return null;
-
-                      return (
-                        <circle
-                          cx={cx}
-                          cy={cy}
-                          r={8}
-                          fill="#ffffff"
-                          stroke="#45f4ff"
-                          strokeWidth={4}
-                        />
-                      );
+                      return <circle cx={cx} cy={cy} r={8} fill="#ffffff" stroke="#45f4ff" strokeWidth={4} />;
                     }}
-                    activeDot={{
-                      r: 8,
-                      fill: "#ffffff",
-                      stroke: "#45f4ff",
-                      strokeWidth: 4,
-                    }}
-                    isAnimationActive={true}
+                    activeDot={{ r: 8, fill: "#ffffff", stroke: "#45f4ff", strokeWidth: 4 }}
+                    isAnimationActive
                     connectNulls={false}
                   />
                 </LineChart>
@@ -772,63 +600,45 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div
-            style={{
-              color: "rgba(230, 252, 255, 0.75)",
-              marginTop: "0.9rem",
-            }}
-          >
-            {graphNote}
+          <div style={{ color: "rgba(230, 252, 255, 0.75)", marginTop: "0.9rem" }}>
+            {chartData.length === 1
+              ? "Based on 1 real snapshot from the last 24 hours."
+              : `Based on ${chartData.length} real snapshots from the last 24 hours.`}
           </div>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "1.25rem",
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1.25rem" }}>
           <div style={smallCardStyle}>
             <div style={{ color: "rgba(230, 252, 255, 0.68)", marginBottom: "0.5rem" }}>
               Recommended Action
             </div>
-            <div
-              style={{
-                fontSize: "1.05rem",
-                fontWeight: 700,
-                color: "#e6fcff",
-              }}
-            >
-              {currentPrediction.recommendation}
+            <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#e6fcff" }}>
+              {currentPrediction?.recommendation || "Maintain current dispatch plan and continue routine monitoring."}
             </div>
             <div style={{ color: "rgba(230, 252, 255, 0.72)", marginTop: "0.45rem" }}>
-              {currentPrediction.etaImpactMinutes > 0
-                ? `Expected delay impact: +${currentPrediction.etaImpactMinutes} minutes.`
+              {etaImpact > 0
+                ? `Expected delay impact: +${etaImpact} minutes.`
                 : "No material delay impact is currently expected from the latest saved traffic snapshot."}
             </div>
           </div>
 
-          <div
-            style={{
-              ...smallCardStyle,
-              background: recommendationTone,
-            }}
-          >
+          <div style={{ ...smallCardStyle, background: recommendationTone }}>
             <div style={{ color: "rgba(230, 252, 255, 0.68)", marginBottom: "0.5rem" }}>
-              Smart Prediction
+              Next-Hour Prediction
             </div>
-            <div
-              style={{
-                fontSize: "1.05rem",
-                fontWeight: 700,
-                color: "#e6fcff",
-              }}
-            >
-              {currentPrediction.predictedDelayRisk}
+
+            <div style={{ fontSize: "1.25rem", fontWeight: 900, color: "#e6fcff", marginBottom: "0.4rem" }}>
+              {predictionRisk} in the next hour
             </div>
-            <div style={{ color: "rgba(230, 252, 255, 0.72)", marginTop: "0.45rem" }}>
-              {predictionMessage || currentPrediction.explanation}
+
+            <div style={{ color: "#22d3ee", fontWeight: 800, marginBottom: "0.55rem" }}>
+              Score: {predictionScore}/100
+              {predictionConfidence > 0 ? ` • Confidence: ${predictionConfidence}%` : ""}
+              {etaImpact > 0 ? ` • ETA +${etaImpact} min` : ""}
+            </div>
+
+            <div style={{ color: "rgba(230,252,255,0.78)", lineHeight: 1.6 }}>
+              {smartExplanation}
             </div>
           </div>
         </div>

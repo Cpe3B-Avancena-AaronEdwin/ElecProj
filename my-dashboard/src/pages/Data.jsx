@@ -8,7 +8,6 @@ import { useTrafficData } from "../hooks/useTrafficData";
 import Layout from "../components/Layout";
 import DashboardToolbar from "../components/dashboard/DashboardToolbar";
 import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
-import TrafficStatusPanel from "../components/dashboard/TrafficStatusPanel";
 import RouteSummaryPanel from "../components/dashboard/RouteSummaryPanel";
 import RoutingStatusPanel from "../components/dashboard/RoutingStatusPanel";
 
@@ -64,46 +63,56 @@ export default function Data() {
   const TOMTOM_API_KEY = (import.meta.env.VITE_TOMTOM_API_KEY || "").trim();
 
   const [selectedRouteId, setSelectedRouteId] = useState("all");
-  const [sourceMode, setSourceMode] = useState("firestore");
+  const [sourceMode, setSourceMode] = useState("mysql");
   const [showTrafficOverlay, setShowTrafficOverlay] = useState(true);
 
-  const { routes = [], stops = [], trips = [], vehicles = [] } = useFirestoreTransitData();
+  const { routes = [], stops = [], trips = [], vehicles = [] } =
+    useFirestoreTransitData();
+
   const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
 
-  const hasFirestoreData =
+  const hasAdminData =
     routes.length > 0 ||
     stops.length > 0 ||
     trips.length > 0 ||
     vehicles.length > 0;
 
   const actualSourceMode =
-    sourceMode === "firestore" && hasFirestoreData ? "firestore" : "gtfs";
+    sourceMode === "mysql" && hasAdminData ? "mysql" : "gtfs";
 
   const sourceRoutes =
-    actualSourceMode === "firestore" ? routes : gtfsBundle?.routes || [];
+    actualSourceMode === "mysql" ? routes : gtfsBundle?.routes || [];
+
   const sourceStops =
-    actualSourceMode === "firestore" ? stops : gtfsBundle?.stops || [];
+    actualSourceMode === "mysql" ? stops : gtfsBundle?.stops || [];
+
   const sourceTrips =
-    actualSourceMode === "firestore" ? trips : gtfsBundle?.trips || [];
-  const sourceVehicles =
-    actualSourceMode === "firestore" ? vehicles : [];
+    actualSourceMode === "mysql" ? trips : gtfsBundle?.trips || [];
+
+  const sourceVehicles = actualSourceMode === "mysql" ? vehicles : [];
 
   const sourceRouteMap = useMemo(() => {
     return (sourceRoutes || []).reduce((acc, route) => {
       const routeId = route.id || route.route_id;
       if (!routeId) return acc;
+
       acc[routeId] = {
         ...route,
         routeCode: route.routeCode || route.route_short_name || "N/A",
         routeName:
-          route.routeName || route.route_long_name || route.route_desc || "Unnamed Route",
+          route.routeName ||
+          route.route_long_name ||
+          route.route_desc ||
+          "Unnamed Route",
       };
+
       return acc;
     }, {});
   }, [sourceRoutes]);
 
   const filteredStops = useMemo(() => {
     if (selectedRouteId === "all") return sourceStops;
+
     return (sourceStops || []).filter(
       (stop) =>
         (stop.routeId || stop.route_id) === selectedRouteId ||
@@ -116,30 +125,38 @@ export default function Data() {
     return sourceRouteMap[selectedRouteId] || null;
   }, [selectedRouteId, sourceRouteMap]);
 
-  const { routePaths, routingLoading, routingError, lastRoutingUpdated, refreshRouteLines } =
-    useRouteLines(
-      filteredStops,
-      TOMTOM_API_KEY,
-      actualSourceMode,
-      sourceRouteMap,
-      [],
-      selectedRouteMeta,
-      {
-        cacheKey: `data-page:${actualSourceMode}:${selectedRouteId}`,
-      }
-    );
+  const selectedTrafficRouteId =
+    selectedRouteId === "all" ? "" : selectedRouteId;
 
   const {
-    trafficSamples = [],
+    routePaths,
+    routingLoading,
+    routingError,
+    lastRoutingUpdated,
+    refreshRouteLines,
+  } = useRouteLines(
+    filteredStops,
+    TOMTOM_API_KEY,
+    actualSourceMode,
+    sourceRouteMap,
+    [],
+    selectedRouteMeta,
+    {
+      cacheKey: `data-page:${actualSourceMode}:${selectedRouteId}`,
+    }
+  );
+
+  const {
     trafficSummary = {},
     trafficLoading,
     trafficError,
     lastTrafficUpdated,
     refreshTraffic,
   } = useTrafficData(filteredStops, TOMTOM_API_KEY, {
-    enabled: actualSourceMode !== "gtfs",
+    enabled: true,
     liveTraffic: true,
-    history: false,
+    history: true,
+    routeId: selectedTrafficRouteId,
     cacheKey: `data-page:${actualSourceMode}:${selectedRouteId}`,
     maxSamplePoints: 20,
   });
@@ -178,10 +195,10 @@ export default function Data() {
               maxWidth: "960px",
             }}
           >
-            This page gives you a structured view of transit records and operational
-            summaries. It is designed for quick review of route coverage, stop counts,
-            trip records, route line generation status, and traffic-supported data
-            monitoring without opening the live map.
+            This page gives you a structured view of transit records and
+            operational summaries. It is designed for quick review of route
+            coverage, stop counts, trip records, route line generation status,
+            and route-specific traffic monitoring without opening the live map.
           </div>
 
           <div
@@ -203,9 +220,16 @@ export default function Data() {
               >
                 What this page contains
               </div>
-              <div style={{ color: "rgba(230, 252, 255, 0.72)", lineHeight: 1.6 }}>
-                Route summaries, traffic summaries, route line generation status, and
-                operational cards based on the selected data source and route filter.
+
+              <div
+                style={{
+                  color: "rgba(230, 252, 255, 0.72)",
+                  lineHeight: 1.6,
+                }}
+              >
+                Route summaries, route-specific traffic summaries, route line
+                generation status, and operational cards based on the selected
+                data source and route filter.
               </div>
             </div>
 
@@ -219,9 +243,15 @@ export default function Data() {
               >
                 How to use it
               </div>
-              <div style={{ color: "rgba(230, 252, 255, 0.72)", lineHeight: 1.6 }}>
-                Use the toolbar to change route filters, switch data source, and refresh
-                traffic or route line data before reviewing the cards below.
+
+              <div
+                style={{
+                  color: "rgba(230, 252, 255, 0.72)",
+                  lineHeight: 1.6,
+                }}
+              >
+                Select a specific route to view congestion and prediction data
+                for that route, then refresh traffic or route line data.
               </div>
             </div>
 
@@ -235,9 +265,15 @@ export default function Data() {
               >
                 Why this page matters
               </div>
-              <div style={{ color: "rgba(230, 252, 255, 0.72)", lineHeight: 1.6 }}>
-                It provides a cleaner analytics-focused view for admins and reviewers,
-                making the data easier to scan, compare, and explain.
+
+              <div
+                style={{
+                  color: "rgba(230, 252, 255, 0.72)",
+                  lineHeight: 1.6,
+                }}
+              >
+                It provides a cleaner analytics-focused view for admins and
+                reviewers, making the data easier to scan, compare, and explain.
               </div>
             </div>
           </div>
@@ -252,10 +288,10 @@ export default function Data() {
             onChangeSourceMode={setSourceMode}
             showTrafficOverlay={showTrafficOverlay}
             onChangeTrafficOverlay={setShowTrafficOverlay}
-            hasFirestoreData={hasFirestoreData}
+            hasAdminData={hasAdminData}
             trafficLoading={trafficLoading}
             routingLoading={routingLoading}
-            onRefreshTraffic={refreshTraffic}
+            onRefreshTraffic={() => refreshTraffic(false)}
             onRefreshRouteLines={refreshRouteLines}
             tomtomEnabled={!!TOMTOM_API_KEY}
             stats={{
@@ -264,7 +300,11 @@ export default function Data() {
               stopsLoaded: sourceStops.length,
               tripsLoaded: sourceTrips.length,
               vehiclesLoaded: sourceVehicles.length,
-              gtfsStatus: gtfsLoading ? "Loading" : gtfsError ? "Error" : "Ready",
+              gtfsStatus: gtfsLoading
+                ? "Loading"
+                : gtfsError
+                ? "Error"
+                : "Ready",
               trafficUpdated: lastTrafficUpdated || "—",
               routesUpdated: lastRoutingUpdated || "—",
             }}
@@ -311,8 +351,8 @@ export default function Data() {
                 fontSize: "1rem",
               }}
             >
-              {hasFirestoreData
-                ? "Using admin dataset when available."
+              {hasAdminData
+                ? "Using MySQL admin dataset when selected."
                 : "Using GTFS data fallback."}
             </div>
           </div>
@@ -349,7 +389,10 @@ export default function Data() {
                 fontSize: "1rem",
               }}
             >
-              {trafficError || "Traffic status data is loaded here."}
+              {trafficError ||
+                (selectedTrafficRouteId
+                  ? "Traffic status is filtered for the selected route."
+                  : "Traffic status is loaded for the full network.")}
             </div>
           </div>
         </div>
@@ -373,17 +416,6 @@ export default function Data() {
 
           <div style={equalPanelWrapStyle}>
             <TrafficSummaryPanel summary={trafficSummary} />
-          </div>
-
-          <div style={equalPanelWrapStyle}>
-            <TrafficStatusPanel
-              loading={trafficLoading}
-              error={trafficError}
-              sourceMode={actualSourceMode}
-              showTrafficOverlay={showTrafficOverlay}
-              samplePoints={trafficSamples.length}
-              apiConfigured={!!TOMTOM_API_KEY}
-            />
           </div>
         </div>
 

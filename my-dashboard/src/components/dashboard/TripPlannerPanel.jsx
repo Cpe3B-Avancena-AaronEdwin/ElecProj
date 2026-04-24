@@ -5,24 +5,12 @@ function StopHintList({ title, items = [], onPick }) {
   if (!items.length) return null;
 
   return (
-    <div style={{ marginTop: "0.55rem" }}>
-      <div
-        style={{
-          fontSize: "0.8rem",
-          color: "var(--text-sub)",
-          marginBottom: "0.35rem",
-        }}
-      >
+    <div style={{ marginTop: "0.55rem", width: "100%" }}>
+      <div style={{ fontSize: "0.8rem", color: "var(--text-sub)", marginBottom: "0.35rem" }}>
         {title}
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "0.45rem",
-        }}
-      >
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem" }}>
         {items.map((item) => (
           <button
             key={item.id}
@@ -36,6 +24,8 @@ function StopHintList({ title, items = [], onPick }) {
               color: "var(--text-sub)",
               background: "rgba(255,255,255,0.03)",
               cursor: "pointer",
+              maxWidth: "100%",
+              whiteSpace: "normal",
             }}
           >
             {item.stopCode ? `${item.stopName} (${item.stopCode})` : item.stopName}
@@ -43,162 +33,6 @@ function StopHintList({ title, items = [], onPick }) {
         ))}
       </div>
     </div>
-  );
-}
-
-function StepBadge({ type }) {
-  const map = {
-    walk: { label: "Walk", bg: "rgba(59,130,246,0.18)" },
-    ride: { label: "Ride", bg: "rgba(34,197,94,0.18)" },
-    transfer: { label: "Transfer", bg: "rgba(245,158,11,0.18)" },
-    arrive: { label: "Arrive", bg: "rgba(239,68,68,0.18)" },
-  };
-
-  const item = map[type] || { label: type, bg: "rgba(255,255,255,0.08)" };
-
-  return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: "72px",
-        padding: "0.3rem 0.55rem",
-        borderRadius: "999px",
-        background: item.bg,
-        color: "var(--text-on-dark)",
-        fontSize: "0.78rem",
-        fontWeight: 700,
-      }}
-    >
-      {item.label}
-    </span>
-  );
-}
-
-function DirectionsList({ plan }) {
-  if (!plan?.steps?.length) return null;
-
-  return (
-    <div style={{ marginTop: "1rem" }}>
-      <div
-        style={{
-          fontWeight: 700,
-          marginBottom: "0.65rem",
-        }}
-      >
-        Step-by-step directions
-      </div>
-
-      <div style={{ display: "grid", gap: "0.7rem" }}>
-        {plan.steps.map((step, index) => (
-          <div
-            key={`${step.type}-${index}`}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "auto 1fr",
-              gap: "0.8rem",
-              alignItems: "start",
-              padding: "0.9rem",
-              borderRadius: "14px",
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid var(--border)",
-            }}
-          >
-            <StepBadge type={step.type} />
-
-            <div>
-              <div
-                style={{
-                  fontWeight: 700,
-                  color: "var(--text-on-dark)",
-                }}
-              >
-                {index + 1}. {step.instruction}
-              </div>
-
-              {step.type === "ride" ? (
-                <div
-                  style={{
-                    color: "var(--text-sub)",
-                    marginTop: "0.25rem",
-                  }}
-                >
-                  {step.directionLabel} • {step.stopCount} stops
-                </div>
-              ) : null}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PlanSummary({ plan }) {
-  if (!plan) return null;
-
-  return (
-    <>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: "0.85rem",
-          marginTop: "1rem",
-        }}
-      >
-        <div
-          style={{
-            padding: "0.85rem",
-            borderRadius: "14px",
-            background: "rgba(255,255,255,0.04)",
-          }}
-        >
-          <div style={{ color: "var(--text-sub)", fontSize: "0.82rem" }}>Trip Type</div>
-          <div style={{ fontWeight: 800, marginTop: "0.3rem" }}>
-            {plan.transfers ? `${plan.transfers} Transfer${plan.transfers > 1 ? "s" : ""}` : "Direct"}
-          </div>
-        </div>
-
-        <div
-          style={{
-            padding: "0.85rem",
-            borderRadius: "14px",
-            background: "rgba(255,255,255,0.04)",
-          }}
-        >
-          <div style={{ color: "var(--text-sub)", fontSize: "0.82rem" }}>Board At</div>
-          <div style={{ fontWeight: 700, marginTop: "0.3rem" }}>{plan.fromStopName}</div>
-        </div>
-
-        <div
-          style={{
-            padding: "0.85rem",
-            borderRadius: "14px",
-            background: "rgba(255,255,255,0.04)",
-          }}
-        >
-          <div style={{ color: "var(--text-sub)", fontSize: "0.82rem" }}>Get Off At</div>
-          <div style={{ fontWeight: 700, marginTop: "0.3rem" }}>{plan.toStopName}</div>
-        </div>
-
-        <div
-          style={{
-            padding: "0.85rem",
-            borderRadius: "14px",
-            background: "rgba(255,255,255,0.04)",
-          }}
-        >
-          <div style={{ color: "var(--text-sub)", fontSize: "0.82rem" }}>Total Stops</div>
-          <div style={{ fontWeight: 800, marginTop: "0.3rem" }}>
-            {plan.totalStops ?? plan.stopCount}
-          </div>
-        </div>
-      </div>
-
-      <DirectionsList plan={plan} />
-    </>
   );
 }
 
@@ -218,15 +52,11 @@ function StopPicker({
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (!wrapperRef.current?.contains(event.target)) {
-        setOpen(false);
-      }
+      if (!wrapperRef.current?.contains(event.target)) setOpen(false);
     }
 
     function handleEscape(event) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
+      if (event.key === "Escape") setOpen(false);
     }
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -241,9 +71,7 @@ function StopPicker({
   const filteredOptions = useMemo(() => {
     const query = String(value || "").trim().toLowerCase();
 
-    if (!query) {
-      return options.slice(0, 50);
-    }
+    if (!query) return options.slice(0, 50);
 
     return options
       .filter((stop) => {
@@ -261,23 +89,16 @@ function StopPicker({
       onChange("");
       onClear?.();
       setOpen(true);
-
-      requestAnimationFrame(() => {
-        inputRef.current?.focus();
-      });
-
+      requestAnimationFrame(() => inputRef.current?.focus());
       return;
     }
 
     setOpen((prev) => !prev);
-
-    requestAnimationFrame(() => {
-      inputRef.current?.focus();
-    });
+    requestAnimationFrame(() => inputRef.current?.focus());
   };
 
   return (
-    <div style={{ minWidth: 0 }} ref={wrapperRef}>
+    <div ref={wrapperRef} style={{ width: "100%", minWidth: 0, position: "relative" }}>
       <label
         htmlFor={id}
         style={{
@@ -290,11 +111,7 @@ function StopPicker({
         {label}
       </label>
 
-      <div
-        style={{
-          position: "relative",
-        }}
-      >
+      <div style={{ position: "relative", width: "100%" }}>
         <input
           ref={inputRef}
           id={id}
@@ -308,6 +125,7 @@ function StopPicker({
           autoComplete="off"
           style={{
             width: "100%",
+            minWidth: 0,
             padding: "0.8rem 3rem 0.8rem 0.9rem",
             borderRadius: "12px",
             border: "1px solid var(--border)",
@@ -321,20 +139,11 @@ function StopPicker({
         <button
           type="button"
           onClick={handleArrowClick}
-          aria-label={
-            open && String(value || "").trim()
-              ? `Clear ${label} and show all options`
-              : `Toggle ${label} options`
-          }
-          title={
-            open && String(value || "").trim()
-              ? "Clear and show all options"
-              : "Show options"
-          }
+          aria-label="Toggle stop options"
           style={{
             position: "absolute",
             top: "50%",
-            right: "0.6rem",
+            right: "0.55rem",
             transform: "translateY(-50%)",
             width: "34px",
             height: "34px",
@@ -348,6 +157,7 @@ function StopPicker({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            flexShrink: 0,
           }}
         >
           {open && String(value || "").trim() ? "✕" : "▼"}
@@ -389,30 +199,19 @@ function StopPicker({
                     color: "var(--text-on-dark)",
                     cursor: "pointer",
                     display: "block",
+                    whiteSpace: "normal",
                   }}
                 >
                   <div style={{ fontWeight: 700 }}>{stop.stopName}</div>
                   {stop.stopCode ? (
-                    <div
-                      style={{
-                        fontSize: "0.8rem",
-                        color: "var(--text-sub)",
-                        marginTop: "0.2rem",
-                      }}
-                    >
+                    <div style={{ fontSize: "0.8rem", color: "var(--text-sub)", marginTop: "0.2rem" }}>
                       {stop.stopCode}
                     </div>
                   ) : null}
                 </button>
               ))
             ) : (
-              <div
-                style={{
-                  padding: "0.8rem",
-                  color: "var(--text-sub)",
-                  fontSize: "0.9rem",
-                }}
-              >
+              <div style={{ padding: "0.8rem", color: "var(--text-sub)", fontSize: "0.9rem" }}>
                 No matching stops found.
               </div>
             )}
@@ -420,6 +219,122 @@ function StopPicker({
         )}
       </div>
     </div>
+  );
+}
+
+function StepBadge({ type }) {
+  const map = {
+    walk: { label: "Walk", bg: "rgba(59,130,246,0.18)" },
+    ride: { label: "Ride", bg: "rgba(34,197,94,0.18)" },
+    transfer: { label: "Transfer", bg: "rgba(245,158,11,0.18)" },
+    arrive: { label: "Arrive", bg: "rgba(239,68,68,0.18)" },
+  };
+
+  const item = map[type] || { label: type, bg: "rgba(255,255,255,0.08)" };
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minWidth: "72px",
+        padding: "0.3rem 0.55rem",
+        borderRadius: "999px",
+        background: item.bg,
+        color: "var(--text-on-dark)",
+        fontSize: "0.78rem",
+        fontWeight: 700,
+      }}
+    >
+      {item.label}
+    </span>
+  );
+}
+
+function DirectionsList({ plan }) {
+  if (!plan?.steps?.length) return null;
+
+  return (
+    <div style={{ marginTop: "1rem", width: "100%" }}>
+      <div style={{ fontWeight: 700, marginBottom: "0.65rem" }}>
+        Step-by-step directions
+      </div>
+
+      <div style={{ display: "grid", gap: "0.7rem" }}>
+        {plan.steps.map((step, index) => (
+          <div
+            key={`${step.type}-${index}`}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "auto minmax(0, 1fr)",
+              gap: "0.8rem",
+              alignItems: "start",
+              padding: "0.9rem",
+              borderRadius: "14px",
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            <StepBadge type={step.type} />
+
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700, color: "var(--text-on-dark)" }}>
+                {index + 1}. {step.instruction}
+              </div>
+
+              {step.type === "ride" ? (
+                <div style={{ color: "var(--text-sub)", marginTop: "0.25rem" }}>
+                  {step.directionLabel} • {step.stopCount} stops
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PlanSummary({ plan }) {
+  if (!plan) return null;
+
+  return (
+    <>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: "0.85rem",
+          marginTop: "1rem",
+          width: "100%",
+        }}
+      >
+        {[
+          ["Trip Type", plan.transfers ? `${plan.transfers} Transfer${plan.transfers > 1 ? "s" : ""}` : "Direct"],
+          ["Board At", plan.fromStopName],
+          ["Get Off At", plan.toStopName],
+          ["Total Stops", plan.totalStops ?? plan.stopCount],
+        ].map(([label, value]) => (
+          <div
+            key={label}
+            style={{
+              padding: "0.85rem",
+              borderRadius: "14px",
+              background: "rgba(255,255,255,0.04)",
+              minWidth: 0,
+            }}
+          >
+            <div style={{ color: "var(--text-sub)", fontSize: "0.82rem" }}>{label}</div>
+            <div style={{ fontWeight: 800, marginTop: "0.3rem", overflowWrap: "anywhere" }}>
+              {value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <DirectionsList plan={plan} />
+    </>
   );
 }
 
@@ -433,15 +348,8 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
     "Enter your FROM and TO stops, then click Find Route."
   );
 
-  const fromSuggestions = useMemo(
-    () => searchStops(fromText, gtfsBundle, 6),
-    [fromText, gtfsBundle]
-  );
-
-  const toSuggestions = useMemo(
-    () => searchStops(toText, gtfsBundle, 6),
-    [toText, gtfsBundle]
-  );
+  const fromSuggestions = useMemo(() => searchStops(fromText, gtfsBundle, 6), [fromText, gtfsBundle]);
+  const toSuggestions = useMemo(() => searchStops(toText, gtfsBundle, 6), [toText, gtfsBundle]);
 
   const uniqueStopOptions = useMemo(() => {
     const stops = gtfsBundle?.stops || [];
@@ -509,41 +417,44 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
   const alternatePlans = plannerResult?.plans?.slice(1, 4) || [];
 
   return (
-    <div className="card" style={{ padding: "1rem", marginBottom: "1rem", overflow: "visible" }}>
+    <div
+      className="card trip-planner-panel"
+      style={{
+        width: "100%",
+        maxWidth: "100%",
+        padding: "clamp(0.9rem, 3vw, 1rem)",
+        marginBottom: "1rem",
+        overflow: "visible",
+      }}
+    >
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "1rem",
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr)",
+          gap: "0.75rem",
           marginBottom: "0.85rem",
-          flexWrap: "wrap",
         }}
       >
-        <div>
-          <h3 style={{ margin: 0 }}>Trip Planner</h3>
-          <div style={{ color: "var(--text-sub)", marginTop: "0.3rem" }}>
+        <div style={{ minWidth: 0 }}>
+          <h3 style={{ margin: 0, color: "var(--text-on-dark)" }}>Trip Planner</h3>
+          <div style={{ color: "var(--text-sub)", marginTop: "0.3rem", lineHeight: 1.5 }}>
             Search GTFS routes from one stop to another with Google Maps style directions.
           </div>
         </div>
 
-        <div
-          style={{
-            fontSize: "0.85rem",
-            color: "var(--text-sub)",
-            whiteSpace: "nowrap",
-          }}
-        >
+        <div style={{ fontSize: "0.85rem", color: "var(--text-sub)" }}>
           {gtfsBundle?.stops?.length || 0} stops • {gtfsBundle?.trips?.length || 0} trips
         </div>
       </div>
 
       <div
+        className="trip-planner-controls"
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr) auto",
+          gridTemplateColumns: "minmax(180px, 1fr) 48px minmax(180px, 1fr) minmax(130px, auto)",
           gap: "0.75rem",
           alignItems: "end",
+          width: "100%",
         }}
       >
         <StopPicker
@@ -562,13 +473,16 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
           type="button"
           onClick={handleSwap}
           style={{
-            padding: "0.8rem 0.95rem",
+            width: "48px",
+            height: "44px",
+            padding: 0,
             borderRadius: "12px",
             border: "1px solid var(--border)",
             background: "rgba(255,255,255,0.04)",
             color: "var(--text-on-dark)",
             cursor: "pointer",
             fontWeight: 700,
+            flexShrink: 0,
           }}
           title="Swap FROM and TO"
         >
@@ -591,14 +505,16 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
           type="button"
           onClick={handleFindRoute}
           style={{
-            padding: "0.8rem 1rem",
+            width: "100%",
+            height: "44px",
+            padding: "0 1rem",
             borderRadius: "12px",
             border: "none",
-            background: "var(--primary, #3b82f6)",
-            color: "white",
+            background: "var(--primary, #22d3ee)",
+            color: "#031525",
             cursor: "pointer",
-            fontWeight: 700,
-            minWidth: "120px",
+            fontWeight: 800,
+            whiteSpace: "nowrap",
           }}
         >
           Find Route
@@ -634,25 +550,21 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
           marginTop: "1rem",
           padding: "0.9rem 1rem",
           borderRadius: "14px",
-          background: bestPlan ? "rgba(34, 197, 94, 0.08)" : "rgba(255,255,255,0.04)",
+          background: bestPlan ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.04)",
           border: "1px solid var(--border)",
           color: "var(--text-on-dark)",
+          width: "100%",
+          overflow: "hidden",
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: "0.35rem" }}>Planner Result</div>
-        <div style={{ color: "var(--text-sub)" }}>{plannerMessage}</div>
+        <div style={{ color: "var(--text-sub)", lineHeight: 1.5 }}>{plannerMessage}</div>
 
         <PlanSummary plan={bestPlan} />
 
         {alternatePlans.length ? (
           <div style={{ marginTop: "1rem" }}>
-            <div
-              style={{
-                color: "var(--text-sub)",
-                fontSize: "0.85rem",
-                marginBottom: "0.45rem",
-              }}
-            >
+            <div style={{ color: "var(--text-sub)", fontSize: "0.85rem", marginBottom: "0.45rem" }}>
               Other options
             </div>
 
@@ -662,20 +574,15 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
                   key={`${plan.type}-${index}-${plan.routeLabel}-${plan.fromStopName}-${plan.toStopName}`}
                   type="button"
                   onClick={() => {
-                    const nextResult = {
-                      ...(plannerResult || {}),
-                      bestPlan: plan,
-                    };
+                    const nextResult = { ...(plannerResult || {}), bestPlan: plan };
                     setPlannerResult(nextResult);
                     onPlanSelected?.(plan);
 
-                    if ((plan.transfers || 0) > 0) {
-                      setPlannerMessage(
-                        `Selected an alternate route with ${plan.transfers} transfer${plan.transfers > 1 ? "s" : ""}.`
-                      );
-                    } else {
-                      setPlannerMessage("Selected an alternate direct route.");
-                    }
+                    setPlannerMessage(
+                      (plan.transfers || 0) > 0
+                        ? `Selected an alternate route with ${plan.transfers} transfer${plan.transfers > 1 ? "s" : ""}.`
+                        : "Selected an alternate direct route."
+                    );
                   }}
                   style={{
                     padding: "0.8rem 0.9rem",
@@ -685,6 +592,8 @@ export default function TripPlannerPanel({ gtfsBundle, onPlanSelected }) {
                     textAlign: "left",
                     color: "var(--text-on-dark)",
                     cursor: "pointer",
+                    whiteSpace: "normal",
+                    overflowWrap: "anywhere",
                   }}
                 >
                   <div style={{ fontWeight: 700 }}>{plan.routeLabel}</div>
