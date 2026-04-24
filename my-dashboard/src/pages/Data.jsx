@@ -10,6 +10,7 @@ import DashboardToolbar from "../components/dashboard/DashboardToolbar";
 import TrafficSummaryPanel from "../components/dashboard/TrafficSummaryPanel";
 import RouteSummaryPanel from "../components/dashboard/RouteSummaryPanel";
 import RoutingStatusPanel from "../components/dashboard/RoutingStatusPanel";
+import DashboardMap from "../components/dashboard/DashboardMap";
 
 const unifiedCardStyle = {
   background: "rgba(8, 30, 50, 0.65)",
@@ -21,15 +22,8 @@ const unifiedCardStyle = {
   boxShadow: "0 8px 24px rgba(0, 0, 0, 0.2)",
 };
 
-const introCardStyle = {
-  ...unifiedCardStyle,
-  borderRadius: "22px",
-  padding: "1.5rem",
-};
-
-const softCardStyle = {
-  ...unifiedCardStyle,
-};
+const introCardStyle = { ...unifiedCardStyle, borderRadius: "22px", padding: "1.5rem" };
+const softCardStyle = { ...unifiedCardStyle };
 
 const statCardStyle = {
   ...unifiedCardStyle,
@@ -57,6 +51,110 @@ const equalPanelWrapStyle = {
   flexDirection: "column",
 };
 
+function getRouteId(route) {
+  return String(route?.id || route?.routeId || route?.route_id || "").trim();
+}
+
+function getStopRouteId(stop) {
+  return String(stop?.routeId || stop?.route_id || "").trim();
+}
+
+function getStopLatLng(stop) {
+  const lat = Number(stop?.stopLat ?? stop?.stop_lat ?? stop?.latitude ?? stop?.lat);
+  const lng = Number(stop?.stopLon ?? stop?.stop_lon ?? stop?.longitude ?? stop?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return [lat, lng];
+}
+
+function getGtfsStopsForRoute(routeId, gtfsBundle) {
+  if (!routeId || routeId === "all" || !gtfsBundle) return gtfsBundle?.stops || [];
+
+  const routeTrips = (gtfsBundle.trips || []).filter(
+    (trip) => String(trip.route_id || trip.routeId) === String(routeId)
+  );
+
+  if (!routeTrips.length) return [];
+
+  let bestTrip = null;
+  let bestStopTimes = [];
+
+  for (const trip of routeTrips) {
+    const tripId = trip.trip_id || trip.tripId || trip.id;
+    const stopTimes = gtfsBundle.stopTimesByTripId?.[tripId] || [];
+
+    if (stopTimes.length > bestStopTimes.length) {
+      bestTrip = trip;
+      bestStopTimes = stopTimes;
+    }
+  }
+
+  if (!bestTrip || !bestStopTimes.length) return [];
+
+  return bestStopTimes
+    .slice()
+    .sort((a, b) => Number(a.stop_sequence || 0) - Number(b.stop_sequence || 0))
+    .map((stopTime) => gtfsBundle.stopsById?.[stopTime.stop_id || stopTime.stopId])
+    .filter(Boolean);
+}
+
+function buildFallbackRoutePath(stops, selectedRouteMeta) {
+  const path = (stops || []).map(getStopLatLng).filter(Boolean);
+
+  if (path.length < 2) return [];
+
+  return [
+    {
+      id: selectedRouteMeta?.id || selectedRouteMeta?.route_id || "selected-route",
+      name:
+        selectedRouteMeta?.routeName ||
+        selectedRouteMeta?.route_long_name ||
+        selectedRouteMeta?.routeCode ||
+        "Selected Route",
+      color: selectedRouteMeta?.routeColor || "#22d3ee",
+      path,
+    },
+  ];
+}
+
+function normalizeMapRoutePaths(routePaths = []) {
+  return (routePaths || [])
+    .map((route, index) => {
+      const rawPath =
+        route.path ||
+        route.points ||
+        route.coordinates ||
+        route.polyline ||
+        route.latLngs ||
+        [];
+
+      const path = rawPath
+        .map((point) => {
+          if (Array.isArray(point)) return [Number(point[0]), Number(point[1])];
+
+          return [
+            Number(point.lat ?? point.latitude ?? point.stopLat ?? point.stop_lat),
+            Number(point.lng ?? point.lon ?? point.longitude ?? point.stopLon ?? point.stop_lon),
+          ];
+        })
+        .filter(
+          (point) =>
+            Array.isArray(point) &&
+            point.length >= 2 &&
+            Number.isFinite(point[0]) &&
+            Number.isFinite(point[1])
+        );
+
+      return {
+        ...route,
+        id: route.id || route.routeId || route.route_id || `route-path-${index}`,
+        name: route.name || route.routeName || route.route_name || "Route Line",
+        color: route.color || route.routeColor || "#22d3ee",
+        path,
+      };
+    })
+    .filter((route) => route.path.length >= 2);
+}
+
 export default function Data() {
   useAuth();
 
@@ -66,34 +164,22 @@ export default function Data() {
   const [sourceMode, setSourceMode] = useState("mysql");
   const [showTrafficOverlay, setShowTrafficOverlay] = useState(true);
 
-  const { routes = [], stops = [], trips = [], vehicles = [] } =
-    useFirestoreTransitData();
-
+  const { routes = [], stops = [], trips = [], vehicles = [] } = useFirestoreTransitData();
   const { gtfsBundle, gtfsLoading, gtfsError } = useGtfsBundle();
 
   const hasAdminData =
-    routes.length > 0 ||
-    stops.length > 0 ||
-    trips.length > 0 ||
-    vehicles.length > 0;
+    routes.length > 0 || stops.length > 0 || trips.length > 0 || vehicles.length > 0;
 
-  const actualSourceMode =
-    sourceMode === "mysql" && hasAdminData ? "mysql" : "gtfs";
+  const actualSourceMode = sourceMode === "mysql" && hasAdminData ? "mysql" : "gtfs";
 
-  const sourceRoutes =
-    actualSourceMode === "mysql" ? routes : gtfsBundle?.routes || [];
-
-  const sourceStops =
-    actualSourceMode === "mysql" ? stops : gtfsBundle?.stops || [];
-
-  const sourceTrips =
-    actualSourceMode === "mysql" ? trips : gtfsBundle?.trips || [];
-
+  const sourceRoutes = actualSourceMode === "mysql" ? routes : gtfsBundle?.routes || [];
+  const sourceStops = actualSourceMode === "mysql" ? stops : gtfsBundle?.stops || [];
+  const sourceTrips = actualSourceMode === "mysql" ? trips : gtfsBundle?.trips || [];
   const sourceVehicles = actualSourceMode === "mysql" ? vehicles : [];
 
   const sourceRouteMap = useMemo(() => {
     return (sourceRoutes || []).reduce((acc, route) => {
-      const routeId = route.id || route.route_id;
+      const routeId = getRouteId(route);
       if (!routeId) return acc;
 
       acc[routeId] = {
@@ -104,29 +190,31 @@ export default function Data() {
           route.route_long_name ||
           route.route_desc ||
           "Unnamed Route",
+        routeColor: route.routeColor || route.route_color || "#22d3ee",
       };
 
       return acc;
     }, {});
   }, [sourceRoutes]);
 
-  const filteredStops = useMemo(() => {
-    if (selectedRouteId === "all") return sourceStops;
-
-    return (sourceStops || []).filter(
-      (stop) =>
-        (stop.routeId || stop.route_id) === selectedRouteId ||
-        (stop.route_id || stop.routeId) === selectedRouteId
-    );
-  }, [selectedRouteId, sourceStops]);
-
   const selectedRouteMeta = useMemo(() => {
     if (selectedRouteId === "all") return null;
     return sourceRouteMap[selectedRouteId] || null;
   }, [selectedRouteId, sourceRouteMap]);
 
-  const selectedTrafficRouteId =
-    selectedRouteId === "all" ? "" : selectedRouteId;
+  const filteredStops = useMemo(() => {
+    if (selectedRouteId === "all") return sourceStops;
+
+    if (actualSourceMode === "gtfs") {
+      return getGtfsStopsForRoute(selectedRouteId, gtfsBundle);
+    }
+
+    return (sourceStops || []).filter(
+      (stop) => getStopRouteId(stop) === String(selectedRouteId)
+    );
+  }, [selectedRouteId, sourceStops, actualSourceMode, gtfsBundle]);
+
+  const selectedTrafficRouteId = selectedRouteId === "all" ? "" : selectedRouteId;
 
   const {
     routePaths,
@@ -147,6 +235,7 @@ export default function Data() {
   );
 
   const {
+    trafficSamples = [],
     trafficSummary = {},
     trafficLoading,
     trafficError,
@@ -160,6 +249,27 @@ export default function Data() {
     cacheKey: `data-page:${actualSourceMode}:${selectedRouteId}`,
     maxSamplePoints: 20,
   });
+
+  const normalizedRoutePaths = useMemo(() => {
+    const generated = normalizeMapRoutePaths(routePaths);
+
+    if (generated.length > 0) return generated;
+
+    if (selectedRouteId !== "all") {
+      return buildFallbackRoutePath(filteredStops, selectedRouteMeta);
+    }
+
+    return [];
+  }, [routePaths, selectedRouteId, filteredStops, selectedRouteMeta]);
+
+  const mapStops = selectedRouteId === "all" ? sourceStops : filteredStops;
+
+  const mapTitle =
+    selectedRouteId === "all"
+      ? "Network Route Map"
+      : `${selectedRouteMeta?.routeCode || "Selected Route"} - ${
+          selectedRouteMeta?.routeName || "Route Map"
+        }`;
 
   const formattedTrafficUpdate = lastTrafficUpdated
     ? new Date(lastTrafficUpdated).toLocaleString()
@@ -195,87 +305,8 @@ export default function Data() {
               maxWidth: "960px",
             }}
           >
-            This page gives you a structured view of transit records and
-            operational summaries. It is designed for quick review of route
-            coverage, stop counts, trip records, route line generation status,
-            and route-specific traffic monitoring without opening the live map.
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-              gap: "1.25rem",
-              alignItems: "stretch",
-              marginTop: "1.2rem",
-            }}
-          >
-            <div style={miniInfoCardStyle}>
-              <div
-                style={{
-                  color: "#e6fcff",
-                  fontWeight: 700,
-                  marginBottom: "0.35rem",
-                }}
-              >
-                What this page contains
-              </div>
-
-              <div
-                style={{
-                  color: "rgba(230, 252, 255, 0.72)",
-                  lineHeight: 1.6,
-                }}
-              >
-                Route summaries, route-specific traffic summaries, route line
-                generation status, and operational cards based on the selected
-                data source and route filter.
-              </div>
-            </div>
-
-            <div style={miniInfoCardStyle}>
-              <div
-                style={{
-                  color: "#e6fcff",
-                  fontWeight: 700,
-                  marginBottom: "0.35rem",
-                }}
-              >
-                How to use it
-              </div>
-
-              <div
-                style={{
-                  color: "rgba(230, 252, 255, 0.72)",
-                  lineHeight: 1.6,
-                }}
-              >
-                Select a specific route to view congestion and prediction data
-                for that route, then refresh traffic or route line data.
-              </div>
-            </div>
-
-            <div style={miniInfoCardStyle}>
-              <div
-                style={{
-                  color: "#e6fcff",
-                  fontWeight: 700,
-                  marginBottom: "0.35rem",
-                }}
-              >
-                Why this page matters
-              </div>
-
-              <div
-                style={{
-                  color: "rgba(230, 252, 255, 0.72)",
-                  lineHeight: 1.6,
-                }}
-              >
-                It provides a cleaner analytics-focused view for admins and
-                reviewers, making the data easier to scan, compare, and explain.
-              </div>
-            </div>
+            This page gives you a structured view of transit records and operational
+            summaries. Select a route to show its stops and route line directly on the map.
           </div>
         </div>
 
@@ -300,15 +331,82 @@ export default function Data() {
               stopsLoaded: sourceStops.length,
               tripsLoaded: sourceTrips.length,
               vehiclesLoaded: sourceVehicles.length,
-              gtfsStatus: gtfsLoading
-                ? "Loading"
-                : gtfsError
-                ? "Error"
-                : "Ready",
+              gtfsStatus: gtfsLoading ? "Loading" : gtfsError ? "Error" : "Ready",
               trafficUpdated: lastTrafficUpdated || "—",
               routesUpdated: lastRoutingUpdated || "—",
             }}
           />
+        </div>
+
+        <div style={softCardStyle}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: "1rem",
+              flexWrap: "wrap",
+              marginBottom: "1rem",
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  color: "#e6fcff",
+                  fontSize: "1.45rem",
+                  fontWeight: 800,
+                }}
+              >
+                {mapTitle}
+              </div>
+
+              <div
+                style={{
+                  color: "rgba(230, 252, 255, 0.72)",
+                  marginTop: "0.3rem",
+                  lineHeight: 1.5,
+                }}
+              >
+                {selectedRouteId === "all"
+                  ? "Showing the full transit network. Select a route above to isolate one route."
+                  : `Showing ${filteredStops.length} stops and ${normalizedRoutePaths.length} route line${
+                      normalizedRoutePaths.length === 1 ? "" : "s"
+                    } for the selected route.`}
+              </div>
+            </div>
+
+            <div
+              style={{
+                color: showTrafficOverlay ? "#22d3ee" : "rgba(230,252,255,0.65)",
+                fontWeight: 800,
+              }}
+            >
+              Traffic Overlay: {showTrafficOverlay ? "Shown" : "Hidden"}
+            </div>
+          </div>
+
+          <div
+            style={{
+              position: "relative",
+              width: "100%",
+              height: "460px",
+              borderRadius: "18px",
+              overflow: "hidden",
+              border: "1px solid rgba(34, 211, 238, 0.18)",
+              background: "#031525",
+            }}
+          >
+            <DashboardMap
+              stops={mapStops}
+              vehicles={sourceVehicles}
+              routePaths={normalizedRoutePaths}
+              trafficSamples={showTrafficOverlay ? trafficSamples : []}
+              showTrafficFlow={showTrafficOverlay}
+              tomtomApiKey={TOMTOM_API_KEY}
+              showStops={true}
+              showRoutes={true}
+            />
+          </div>
         </div>
 
         <div
@@ -351,9 +449,7 @@ export default function Data() {
                 fontSize: "1rem",
               }}
             >
-              {hasAdminData
-                ? "Using MySQL admin dataset when selected."
-                : "Using GTFS data fallback."}
+              {hasAdminData ? "Using MySQL admin dataset when selected." : "Using GTFS data fallback."}
             </div>
           </div>
 
@@ -427,7 +523,7 @@ export default function Data() {
           }}
         >
           <div style={equalPanelWrapStyle}>
-            <RoutingStatusPanel routes={routePaths} error={routingError} />
+            <RoutingStatusPanel routes={normalizedRoutePaths} error={routingError} />
           </div>
         </div>
       </div>
