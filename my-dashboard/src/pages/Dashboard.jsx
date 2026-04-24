@@ -265,7 +265,7 @@ export default function Dashboard() {
     refreshTraffic,
   } = useTrafficData(gtfsStops, TOMTOM_API_KEY, {
     enabled: true,
-    liveTraffic: false,
+    liveTraffic: true,
     history: true,
     cacheKey: "dashboard-gtfs-network",
     maxSamplePoints: 15,
