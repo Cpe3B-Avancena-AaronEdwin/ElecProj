@@ -5,7 +5,8 @@ import { logoutUser } from "../firebase/auth";
 import SiteFooter from "./SiteFooter";
 
 function getFirstName(user) {
-  const rawName = user?.displayName?.trim() || user?.email?.split("@")[0] || "User";
+  const rawName =
+    user?.displayName?.trim() || user?.email?.split("@")[0] || "User";
   const firstToken = rawName.split(/\s+/)[0] || "User";
   return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
 }
@@ -54,16 +55,24 @@ export default function Layout({ children }) {
 
   const navItems = useMemo(() => {
     const items = [
-      { label: "Dashboard", path: "/dashboard", icon: "🏠" },
-      { label: "Data", path: "/traffic", icon: "📊" },
-      { label: "Trip Planner", path: "/trip-planner", icon: "🧭" },
-      { label: "About Us", path: "/about", icon: "ℹ️" },
+      { label: "Dashboard", path: "/dashboard", icon: "/dashboard.png" },
+      { label: "Data", path: "/traffic", icon: "/data.jpg" },
+      { label: "Trip Planner", path: "/trip-planner", icon: "/tripplanner.jpg" },
+      { label: "About Us", path: "/about", icon: "/aboutus.jpg" },
     ];
 
     if (role === "admin") {
       items.push(
-        { label: "Users Information Settings", path: "/admin/users", icon: "👤" },
-        { label: "Manage Routes", path: "/admin", icon: "🗺️" }
+        {
+          label: "Users Information Settings",
+          path: "/admin/users",
+          icon: "/usermanagement.jpg",
+        },
+        {
+          label: "Manage Routes",
+          path: "/admin",
+          icon: "/manageroutes.jpg",
+        }
       );
     }
 
@@ -132,7 +141,14 @@ export default function Layout({ children }) {
                   to={item.path}
                   className={`nav-item ${isActive ? "active" : ""}`}
                 >
-                  <span className="nav-icon">{item.icon}</span>
+                  <span className="nav-icon">
+                    <img
+                      src={item.icon}
+                      alt={`${item.label} icon`}
+                      className="nav-icon-img"
+                    />
+                  </span>
+
                   <span className="nav-label">{item.label}</span>
                 </Link>
               );

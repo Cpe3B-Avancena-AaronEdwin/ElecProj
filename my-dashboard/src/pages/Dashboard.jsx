@@ -444,78 +444,7 @@ export default function Dashboard() {
             marginBottom: "0.75rem",
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              borderRadius: "18px",
-              border: "1px solid rgba(34, 211, 238, 0.2)",
-              background: "#071a2b",
-              overflow: "hidden",
-              boxShadow: "0 10px 24px rgba(0, 0, 0, 0.16)",
-              minHeight: "56px",
-            }}
-          >
-            <input
-              type="text"
-              placeholder="Search route, stop, destination..."
-              style={{
-                flex: 1,
-                minWidth: 0,
-                padding: "1rem 1.1rem",
-                border: "none",
-                outline: "none",
-                background: "transparent",
-                color: "#e6fcff",
-                fontSize: "1rem",
-              }}
-            />
 
-            <div
-              style={{
-                width: "1px",
-                alignSelf: "stretch",
-                background: "rgba(34, 211, 238, 0.18)",
-              }}
-            />
-
-            <select
-              defaultValue=""
-              style={{
-                minWidth: "240px",
-                padding: "1rem 1.1rem",
-                border: "none",
-                outline: "none",
-                background: "#071a2b",
-                color: "#e6fcff",
-                fontSize: "1rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                appearance: "none",
-                WebkitAppearance: "none",
-                MozAppearance: "none",
-                backgroundImage:
-                  "linear-gradient(45deg, transparent 50%, #cfeef6 50%), linear-gradient(135deg, #cfeef6 50%, transparent 50%)",
-                backgroundPosition:
-                  "calc(100% - 22px) calc(50% - 3px), calc(100% - 16px) calc(50% - 3px)",
-                backgroundSize: "6px 6px, 6px 6px",
-                backgroundRepeat: "no-repeat",
-                paddingRight: "2.5rem",
-              }}
-            >
-              <option value="" disabled>
-                Select current location
-              </option>
-              <option value="Bulacan">Bulacan</option>
-              <option value="Monumento">Monumento</option>
-              <option value="Caloocan">Caloocan</option>
-              <option value="Quezon City">Quezon City</option>
-              <option value="Manila">Manila</option>
-              <option value="Makati">Makati</option>
-              <option value="Pasig">Pasig</option>
-              <option value="Taguig">Taguig</option>
-            </select>
-          </div>
         </div>
 
         <div

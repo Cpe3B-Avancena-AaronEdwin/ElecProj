@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const HISTORY_REFRESH_INTERVAL_MS = 60 * 1000;
-const CRON_INTERVAL_MINUTES = 15;
+const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 const DEFAULT_MAX_SAMPLE_POINTS = 15;
 const SNAPSHOT_TIMEOUT_MS = 15000;
 
@@ -344,27 +343,6 @@ function getLatestTimestampFromHistory(history = []) {
   return latest?.timestampText || latest?.createdAt || null;
 }
 
-function getNextCronRunTime(fromDate = new Date(), intervalMinutes = CRON_INTERVAL_MINUTES) {
-  const next = new Date(fromDate);
-  next.setSeconds(0, 0);
-
-  const minute = next.getMinutes();
-  const remainder = minute % intervalMinutes;
-  const minutesToAdd = remainder === 0 ? intervalMinutes : intervalMinutes - remainder;
-
-  next.setMinutes(minute + minutesToAdd);
-  return next;
-}
-
-function formatCountdown(ms) {
-  const safeMs = Math.max(0, Number(ms || 0));
-  const totalSeconds = Math.ceil(safeMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
 export function useTrafficData(stops = [], _apiKey, options = {}) {
   const resolvedOptions = resolveOptions(options);
   const { enabled, liveTraffic, history, maxSamplePoints, skipWhenHidden } = resolvedOptions;
@@ -376,13 +354,6 @@ export function useTrafficData(stops = [], _apiKey, options = {}) {
   const [trafficLoading, setTrafficLoading] = useState(false);
   const [trafficError, setTrafficError] = useState("");
   const [lastTrafficUpdated, setLastTrafficUpdated] = useState(null);
-  const [nextAutoRefreshAt, setNextAutoRefreshAt] = useState(() =>
-    getNextCronRunTime(new Date()).toISOString()
-  );
-  const [nextAutoRefreshInMs, setNextAutoRefreshInMs] = useState(() => {
-    const nextRun = getNextCronRunTime(new Date());
-    return Math.max(0, nextRun.getTime() - Date.now());
-  });
 
   const refreshInFlightRef = useRef(false);
   const validStopsRef = useRef([]);
@@ -393,20 +364,12 @@ export function useTrafficData(stops = [], _apiKey, options = {}) {
     validStopsRef.current = validStops;
   }, [validStops]);
 
-  const updateNextCronCountdown = useCallback(() => {
-    const now = new Date();
-    const nextRun = getNextCronRunTime(now);
-    setNextAutoRefreshAt(nextRun.toISOString());
-    setNextAutoRefreshInMs(Math.max(0, nextRun.getTime() - now.getTime()));
-  }, []);
-
   const loadHistoryOnly = useCallback(async () => {
     if (!history) {
       setTrafficHistory([]);
       setHistoryAnalytics({ ...EMPTY_ANALYTICS });
       setTrafficSummary({ ...EMPTY_SUMMARY });
       setLastTrafficUpdated(null);
-      updateNextCronCountdown();
       return [];
     }
 
@@ -431,10 +394,9 @@ export function useTrafficData(stops = [], _apiKey, options = {}) {
     setTrafficSamples(
       groupedHistory.length > 0 ? [groupedHistory[groupedHistory.length - 1]] : []
     );
-    updateNextCronCountdown();
 
     return groupedHistory;
-  }, [history, updateNextCronCountdown]);
+  }, [history]);
 
   const refreshTraffic = useCallback(
     async (force = false) => {
@@ -456,72 +418,52 @@ export function useTrafficData(stops = [], _apiKey, options = {}) {
       try {
         if (!enabled) return;
 
-        if (!liveTraffic) {
-          await loadHistoryOnly();
-          return;
-        }
-
-        await fetchJsonWithTimeout(
-          buildApiUrl("/api/traffic/snapshot"),
-          "Failed to generate traffic snapshot.",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              stops: validStopsRef.current,
-              maxSamplePoints,
-            }),
-          },
-          SNAPSHOT_TIMEOUT_MS
-        );
-
         await loadHistoryOnly();
+
+        if (liveTraffic) {
+          try {
+            await fetchJsonWithTimeout(
+              buildApiUrl("/api/traffic/snapshot"),
+              "Failed to generate traffic snapshot.",
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  stops: validStopsRef.current,
+                  maxSamplePoints,
+                }),
+              },
+              SNAPSHOT_TIMEOUT_MS
+            );
+
+            await loadHistoryOnly();
+          } catch (liveError) {
+            setTrafficError(liveError.message || "Failed to refresh live traffic snapshot.");
+          }
+        }
       } catch (error) {
-        setTrafficError(error.message || "Failed to refresh live traffic snapshot.");
+        setTrafficError(error.message || "Failed to load traffic data.");
       } finally {
         setTrafficLoading(false);
         refreshInFlightRef.current = false;
-        updateNextCronCountdown();
       }
     },
-    [enabled, liveTraffic, loadHistoryOnly, maxSamplePoints, skipWhenHidden, updateNextCronCountdown]
+    [enabled, liveTraffic, loadHistoryOnly, maxSamplePoints, skipWhenHidden]
   );
 
   useEffect(() => {
-    if (!enabled) return;
-    void loadHistoryOnly();
-  }, [enabled, loadHistoryOnly]);
+    void refreshTraffic(true);
+  }, [refreshTraffic]);
 
   useEffect(() => {
-    if (!enabled) return undefined;
+    if (!enabled || !liveTraffic) return undefined;
 
     const intervalId = window.setInterval(() => {
-      if (
-        skipWhenHidden &&
-        typeof document !== "undefined" &&
-        document.visibilityState === "hidden"
-      ) {
-        updateNextCronCountdown();
-        return;
-      }
-
-      void loadHistoryOnly();
-    }, HISTORY_REFRESH_INTERVAL_MS);
+      void refreshTraffic(true);
+    }, SNAPSHOT_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [enabled, loadHistoryOnly, skipWhenHidden, updateNextCronCountdown]);
-
-  useEffect(() => {
-    if (!enabled) return undefined;
-
-    updateNextCronCountdown();
-
-    const countdownId = window.setInterval(() => {
-      updateNextCronCountdown();
-    }, 1000);
-
-    return () => window.clearInterval(countdownId);
-  }, [enabled, updateNextCronCountdown]);
+  }, [enabled, liveTraffic, refreshTraffic]);
 
   const chartData = useMemo(() => {
     return trafficHistory.map((item) => ({
@@ -541,10 +483,6 @@ export function useTrafficData(stops = [], _apiKey, options = {}) {
     }));
   }, [trafficHistory]);
 
-  const nextAutoRefreshLabel = useMemo(() => {
-    return `Next auto refresh in ${formatCountdown(nextAutoRefreshInMs)}`;
-  }, [nextAutoRefreshInMs]);
-
   return {
     trafficSamples,
     trafficSummary,
@@ -554,9 +492,6 @@ export function useTrafficData(stops = [], _apiKey, options = {}) {
     trafficLoading,
     trafficError,
     lastTrafficUpdated,
-    nextAutoRefreshAt,
-    nextAutoRefreshInMs,
-    nextAutoRefreshLabel,
     refreshTraffic,
   };
 }
