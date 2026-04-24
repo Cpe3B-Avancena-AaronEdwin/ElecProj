@@ -10,82 +10,68 @@
   --radius: 12px;
   --spacing-md: 16px;
   --font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  --shadow-1: 0 20px 40px rgba(0,0,0,0.45);
+  --shadow-1: 0 20px 40px rgba(0, 0, 0, 0.45);
 
-  /* App-wide variables */
-  --bg-main: #0f172a; /* ✅ solid navy blue */
+  --bg-main: #0f172a;
   --bg-card: rgba(15, 23, 42, 0.95);
   --bg-hover: rgba(30, 41, 59, 0.85);
   --bg-panel: #0f172a;
-  
+
   --primary: #22d3ee;
   --accent: #22d3ee;
   --accent-bg: rgba(34, 211, 238, 0.12);
   --accent-border: rgba(34, 211, 238, 0.25);
-  
+
   --success: #4ade80;
   --danger: #f87171;
   --warning: #fbbf24;
-  
+
   --text-main: #f8fafc;
   --text-h: #f8fafc;
   --text-sub: #cbd5e1;
   --text: #cbd5e1;
-  
+
   --border: rgba(148, 163, 184, 0.18);
   --code-bg: #0f172a;
   --social-bg: rgba(30, 41, 59, 0.5);
   --shadow: 0 30px 80px rgba(5, 15, 30, 0.35);
 }
 
-html, body, #root {
-  height: 100%;
-  margin: 0;
-  background-color: #0f172a; /* ✅ solid navy blue */
-  color: #f8fafc;
-  font-family: Inter, system-ui, sans-serif;
-}
-
-body {
-  font-family: var(--font-family);
-  color: var(--text-main);
-
-  /* ✅ solid navy background */
-  background-color: var(--bg-main);
-}
-
-#root {
-  width: 100%;
-  margin: 0 auto;
-  text-align: left;
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
+* {
   box-sizing: border-box;
 }
 
-/* Headings */
-h1, h2 {
-  font-weight: 500;
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow-x: hidden;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family: var(--font-family);
+}
+
+body {
+  min-height: 100svh;
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1,
+h2 {
   color: var(--text-h);
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-}
 p {
   margin: 0;
 }
 
-/* Code blocks */
 code {
   font-size: 15px;
   line-height: 135%;
@@ -93,20 +79,4 @@ code {
   background: var(--code-bg);
   border-radius: 4px;
   color: var(--text-h);
-}
-
-/* Utility for cards */
-.card {
-  background: var(--bg-card);
-  border-radius: var(--radius);
-  padding: 1.5rem;
-  box-shadow: var(--shadow-1);
-  margin-bottom: 2rem;
-}
-.app {
-  display: flex;
-  min-height: 100vh;
-  background: transparent; /* ✅ let global navy show through */
-  color: var(--text-main);
-  flex-direction: column;
 }
