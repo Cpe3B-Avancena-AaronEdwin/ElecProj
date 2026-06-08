@@ -3,27 +3,27 @@ import { Users, Target, Eye, Info, Mail, Phone } from "lucide-react";
 import Layout from "../components/Layout";
 
 const teamMembers = [
-  { name: "AARON EDWIN L. AVANCENA", role: "MEMBER 1" },
-  { name: "CHRISTEA BLESS D.C. CASIA", role: "MEMBER 2" },
-  { name: "DERICK A. DE GUZMAN", role: "MEMBER 3" },
-  { name: "KENNETH BAUTISTA", role: "MEMBER 4" },
-  { name: "JOHN JOSEPH MANALANG", role: "MEMBER 5" },
+  { name: "JOHN LOYD S. ARILLANO", role: "MEMBER 1" },
+  { name: "KENNETH BAUTISTA", role: "MEMBER 2" },
+  { name: "JELO CARLOS", role: "MEMBER 3" },
+  { name: "CHRISTIAN ERIC R. ESCANDOR", role: "MEMBER 4" },
+  { name: "MARC ADRIAN N. LAO", role: "MEMBER 5" },
 ];
 
 const emails = [
-  "aaronavancena23@gmail.com",
+  "arillanoloyd51@gmail.com",
   "kenneth.bautista0604@gmail.com",
-  "casia.christeablessdc@gmail.com",
-  "derickdeguzman17@gmail.com",
-  "johnjosephmanalangg@gmail.com",
+  "carlosjelo@gmail.com",
+  "escandor.christianericr@gmail.com",
+  "marcadrian005@gmail.com",
 ];
 
 const phones = [
-  "09253066632",
+  "09628792352",
   "09464037811",
   "09503589237",
-  "09774524599",
-  "09478225246",
+  "09216978575",
+  "09932241481",
 ];
 
 const sectionTitleStyle = {
